@@ -77,6 +77,10 @@ path-exclude=/usr/share/locale/*
 path-include=/usr/share/locale/locale.alias
 path-include=/usr/share/locale/en*
 EOF
+# Firmware for data-centre network cards and phone chips is not needed on PCs.
+for dir in netronome mellanox liquidio qed cxgb4 bnx2x mrvl/prestera qcom dpaa2; do
+  printf 'path-exclude=/lib/firmware/%s/*\npath-exclude=/usr/lib/firmware/%s/*\n' "$dir" "$dir"
+done > "$CHROOT/etc/dpkg/dpkg.cfg.d/91nimbus-firmware"
 # Services must not start inside the build environment.
 printf '#!/bin/sh\nexit 101\n' > "$CHROOT/usr/sbin/policy-rc.d"
 chmod 755 "$CHROOT/usr/sbin/policy-rc.d"
@@ -85,15 +89,15 @@ log "Choosing a kernel"
 in_chroot apt-get update
 KERNEL_META="linux-image-generic-hwe-24.04"
 in_chroot apt-cache show "$KERNEL_META" >/dev/null 2>&1 || KERNEL_META="linux-image-generic"
-KIMAGE="$(in_chroot apt-cache depends "$KERNEL_META" | awk '/Depends: linux-image-[0-9]/ {print $2; exit}')"
+KIMAGE="$(in_chroot apt-cache depends "$KERNEL_META" | awk '/Depends: linux-image-[0-9]/ && !found {print $2; found = 1}')"
 [ -n "$KIMAGE" ] || die "could not find a kernel package behind $KERNEL_META"
 KEXTRA="${KIMAGE/linux-image-/linux-modules-extra-}"
 echo "Kernel package: $KIMAGE (+ $KEXTRA)"
 
 log "Installing the system"
 PACKAGES=(
-  "$KIMAGE" "$KEXTRA" intel-microcode amd64-microcode
-  casper initramfs-tools
+  "$KIMAGE" "$KEXTRA" linux-firmware intel-microcode amd64-microcode
+  casper user-setup initramfs-tools
   systemd-sysv systemd-resolved systemd-timesyncd udev dbus dbus-user-session libpam-systemd polkitd kmod
   sudo locales tzdata kbd iproute2 ca-certificates less nano
   cage libgl1-mesa-dri libegl1 libegl-mesa0 libgles2 libgbm1
@@ -144,6 +148,13 @@ in_chroot update-initramfs -c -k "$KVER"
 
 log "Cleaning up"
 in_chroot apt-get clean
+# The finished system uses the public Ubuntu servers and its own name lookup service.
+cat > "$CHROOT/etc/apt/sources.list" <<EOF
+deb http://archive.ubuntu.com/ubuntu $SUITE main restricted universe
+deb http://archive.ubuntu.com/ubuntu $SUITE-updates main restricted universe
+deb http://security.ubuntu.com/ubuntu $SUITE-security main restricted universe
+EOF
+ln -sf ../run/systemd/resolve/stub-resolv.conf "$CHROOT/etc/resolv.conf"
 rm -rf "$CHROOT/var/lib/apt/lists/"* "$CHROOT/var/cache/apt/"*.bin "$CHROOT/tmp/"* "$CHROOT/var/tmp/"* "$CHROOT/var/log/"*.log
 rm -f "$CHROOT/usr/sbin/policy-rc.d" "$CHROOT/var/lib/dbus/machine-id"
 : > "$CHROOT/etc/machine-id"

@@ -45,7 +45,9 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p out/ci
-          sudo NIMBUS_VERSION=0.1 ./build.sh 2>&1 | tee out/ci/build.log
+          # The runner's own nearby Ubuntu mirror; the finished image points at the public servers.
+          sudo NIMBUS_VERSION=0.1 UBUNTU_MIRROR=http://azure.archive.ubuntu.com/ubuntu \
+            UBUNTU_SECURITY_MIRROR=http://azure.archive.ubuntu.com/ubuntu ./build.sh 2>&1 | tee out/ci/build.log
 
       - name: Boot-test the ISO
         run: |
