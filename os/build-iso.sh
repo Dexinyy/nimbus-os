@@ -91,12 +91,14 @@ KERNEL_META="linux-image-generic-hwe-24.04"
 in_chroot apt-cache show "$KERNEL_META" >/dev/null 2>&1 || KERNEL_META="linux-image-generic"
 KIMAGE="$(in_chroot apt-cache depends "$KERNEL_META" | awk '/Depends: linux-image-[0-9]/ && !found {print $2; found = 1}')"
 [ -n "$KIMAGE" ] || die "could not find a kernel package behind $KERNEL_META"
+# Older kernels keep many drivers in a separate package; newer ones ship them all together.
 KEXTRA="${KIMAGE/linux-image-/linux-modules-extra-}"
-echo "Kernel package: $KIMAGE (+ $KEXTRA)"
+in_chroot apt-cache show "$KEXTRA" >/dev/null 2>&1 || KEXTRA=""
+echo "Kernel package: $KIMAGE ${KEXTRA:+(+ $KEXTRA)}"
 
 log "Installing the system"
 PACKAGES=(
-  "$KIMAGE" "$KEXTRA" linux-firmware intel-microcode amd64-microcode
+  "$KIMAGE" ${KEXTRA:+"$KEXTRA"} linux-firmware intel-microcode amd64-microcode
   casper user-setup initramfs-tools
   systemd-sysv systemd-resolved systemd-timesyncd udev dbus dbus-user-session libpam-systemd polkitd kmod
   sudo locales tzdata kbd iproute2 ca-certificates less nano
@@ -110,10 +112,11 @@ in_chroot apt-get install -y "${PACKAGES[@]}"
 
 log "Configuring Nimbus OS"
 in_chroot locale-gen en_US.UTF-8
-ln -sf /usr/share/zoneinfo/UTC "$CHROOT/etc/localtime"
-echo "UTC" > "$CHROOT/etc/timezone"
+ln -sf /usr/share/zoneinfo/Etc/UTC "$CHROOT/etc/localtime"
+echo "Etc/UTC" > "$CHROOT/etc/timezone"
 
-cp -a "$HERE/overlay/." "$CHROOT/"
+# Copy our files in as root, without touching the owner or rights of existing folders like /etc.
+tar -C "$HERE/overlay" --owner=0 --group=0 -cf - . | tar -C "$CHROOT" --no-overwrite-dir -xf -
 chmod 755 "$CHROOT/usr/bin/nimbus-shell" "$CHROOT/usr/bin/nimbus-session"
 mkdir -p "$CHROOT/usr/share/nimbus" "$CHROOT/usr/share/fonts/truetype/nimbus" "$CHROOT/usr/share/doc/nimbus-os"
 cp -a "$WORK/shell" "$CHROOT/usr/share/nimbus/shell"
