@@ -1,0 +1,37 @@
+#!/bin/sh
+# Starts the Nimbus desktop on this computer's screen (run by nimbus-session.service).
+export XDG_SESSION_TYPE=wayland
+export XDG_CURRENT_DESKTOP=Nimbus
+export GDK_BACKEND=wayland
+export LANG="${LANG:-en_US.UTF-8}"
+export XCURSOR_THEME="${XCURSOR_THEME:-Adwaita}"
+export XCURSOR_SIZE="${XCURSOR_SIZE:-24}"
+export WLR_RENDERER_ALLOW_SOFTWARE=1
+export NO_AT_BRIDGE=1
+
+software() {
+  export WLR_RENDERER=pixman NIMBUS_SOFTWARE=1 WEBKIT_DISABLE_DMABUF_RENDERER=1 LIBGL_ALWAYS_SOFTWARE=1
+}
+
+# Use the graphics card only for drivers known to work well; virtual machines and
+# "basic graphics" mode draw with the processor, which is slower but always works.
+gpu=no
+for d in /sys/class/drm/card[0-9]/device/driver /sys/class/drm/card[0-9][0-9]/device/driver; do
+  [ -e "$d" ] || continue
+  case "$(basename "$(readlink -f "$d")")" in
+    i915|xe|amdgpu|radeon|nouveau) gpu=yes ;;
+  esac
+done
+ls /dev/dri/renderD* >/dev/null 2>&1 || gpu=no
+[ "$gpu" = yes ] || software
+
+# -d: no client-side decorations, -s: allow switching to text consoles (Ctrl+Alt+F2...)
+started=$(date +%s)
+cage -d -s -- /usr/bin/nimbus-shell
+status=$?
+if [ "$status" -ne 0 ] && [ "$gpu" = yes ] && [ $(( $(date +%s) - started )) -lt 15 ]; then
+  echo "nimbus-session: the graphics card did not start, drawing with the processor instead" >&2
+  software
+  exec cage -d -s -- /usr/bin/nimbus-shell
+fi
+exit "$status"

@@ -1,0 +1,6 @@
+/build/
+/out/
+/shell/dist/
+/shell/test/shots/
+node_modules/
+__pycache__/

@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nimbus OS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Sora:wght@200;300;400;600&display=swap">
+<script>
+(function () {
+  var t = 'auto', a = '#4a74f5';
+  try {
+    var s = JSON.parse(localStorage.getItem('nimbus-os:v1') || 'null');
+    if (s && s.settings) { t = s.settings.theme || 'auto'; a = s.settings.accent || a; }
+  } catch (e) {}
+  var root = document.documentElement;
+  if (t !== 'light' && t !== 'dark') {
+    var v = root.getAttribute('data-theme');
+    t = (v === 'dark' || v === 'light') ? v : (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  }
+  root.setAttribute('data-os-theme', t);
+  if (/^#[0-9a-f]{6}$/i.test(a)) root.style.setProperty('--accent', a);
+})();
+</script>
+<style>
+/*__CSS__*/
+</style>
+</head>
+<body>
+<div id="os" data-tb-pos="bottom" data-tb-align="center" data-tb-float="">
+  <div id="wall" aria-hidden="true"></div>
+  <div id="desktop" aria-label="Desktop">
+    <div id="icons" role="group" aria-label="Desktop icons"></div>
+    <div id="marquee" aria-hidden="true"></div>
+  </div>
+  <div id="taskview" aria-hidden="true"></div>
+  <div id="windows"></div>
+  <nav id="taskbar" class="acrylic" aria-label="Taskbar">
+    <div class="tb-left"></div>
+    <div class="tb-mid">
+      <button id="tb-start" class="tbtn" data-fly="start" aria-label="Start" data-tip="Start"></button>
+      <button id="tb-search" class="tbtn" data-fly="start" aria-label="Search" data-tip="Search (Ctrl+K)"></button>
+      <button id="tb-tv" class="tbtn" aria-label="Task view" data-tip="Task view"></button>
+      <div id="tb-apps"></div>
+    </div>
+    <div class="tb-right">
+      <button id="tb-focus" class="tray-btn focus-chip" hidden></button>
+      <button id="tb-assist" class="tbtn" aria-label="Assistant" data-tip="Assistant"></button>
+      <button id="tb-tray" class="tray-btn" data-fly="qs" aria-label="Quick settings"></button>
+      <button id="tb-clock" class="tray-btn clock-btn" data-fly="nc" aria-label="Notifications and calendar"><span class="cl"><span id="tb-time"></span><span id="tb-date"></span></span><span id="tb-badge" hidden></span></button>
+      <button id="tb-desk" class="showdesk" aria-label="Show desktop" data-tip="Show desktop"></button>
+    </div>
+  </nav>
+  <section id="start" class="flyout acrylic" role="dialog" aria-label="Start" hidden></section>
+  <section id="qs" class="flyout acrylic" role="dialog" aria-label="Quick settings" hidden></section>
+  <section id="nc" class="flyout acrylic" role="dialog" aria-label="Notifications and calendar" hidden></section>
+  <div id="toasts" aria-live="polite"></div>
+  <div id="tip" role="tooltip"></div>
+  <div id="screens"></div>
+  <div id="nightlight" aria-hidden="true"></div>
+  <div id="dim" aria-hidden="true"></div>
+</div>
+<script>
+/*__JS__*/
+</script>
+</body>
+</html>

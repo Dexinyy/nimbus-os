@@ -1,0 +1,287 @@
+#!/usr/bin/env python3
+"""Nimbus OS desktop shell.
+
+Shows the Nimbus desktop full screen and gives it a small, fixed set of
+abilities on the real machine (power, system information, time zone).
+The page talks to this process through a WebKit script message handler
+named "nimbus"; replies come back through window.__nimbusNative.
+"""
+import glob
+import json
+import os
+import shutil
+import socket
+import subprocess
+import sys
+import threading
+import time
+
+import gi
+
+gi.require_version("Gtk", "3.0")
+gi.require_version("WebKit2", "4.1")
+from gi.repository import Gdk, GLib, Gtk, WebKit2  # noqa: E402
+
+VERSION = "0.1"
+SHELL_DIR = os.environ.get("NIMBUS_SHELL_DIR", "/usr/share/nimbus/shell")
+DATA_DIR = os.path.join(GLib.get_user_data_dir(), "nimbus")
+CACHE_DIR = os.path.join(GLib.get_user_cache_dir(), "nimbus")
+SOFTWARE = os.environ.get("NIMBUS_SOFTWARE") == "1" or not glob.glob("/dev/dri/renderD*")
+VENDORS = {"0x8086": "Intel", "0x1002": "AMD", "0x10de": "NVIDIA", "0x1234": "QEMU", "0x1af4": "Virtio",
+           "0x15ad": "VMware", "0x80ee": "VirtualBox", "0x1414": "Microsoft Hyper-V", "0x5143": "Qualcomm"}
+
+
+def read(path, default=""):
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            return f.read().strip()
+    except OSError:
+        return default
+
+
+def os_release(path):
+    out = {}
+    for line in read(path).splitlines():
+        if "=" in line:
+            k, v = line.split("=", 1)
+            out[k] = v.strip().strip('"')
+    return out
+
+
+def cpu_model():
+    for line in read("/proc/cpuinfo").splitlines():
+        if line.lower().startswith("model name"):
+            return " ".join(line.split(":", 1)[1].split())
+    return platform_machine()
+
+
+def platform_machine():
+    return os.uname().machine
+
+
+def mem_total():
+    for line in read("/proc/meminfo").splitlines():
+        if line.startswith("MemTotal:"):
+            return int(line.split()[1]) * 1024
+    return 0
+
+
+def gpus():
+    out = []
+    for card in sorted(glob.glob("/sys/class/drm/card[0-9]")):
+        dev = os.path.join(card, "device")
+        vendor = read(os.path.join(dev, "vendor"))
+        driver = os.path.basename(os.path.realpath(os.path.join(dev, "driver"))) if os.path.exists(os.path.join(dev, "driver")) else ""
+        name = VENDORS.get(vendor, "Display adapter")
+        if driver == "simple-framebuffer" or driver == "simpledrm":
+            name = "Basic display"
+        out.append({"name": name, "driver": driver})
+    return out
+
+
+def battery():
+    for ps in sorted(glob.glob("/sys/class/power_supply/*")):
+        if read(os.path.join(ps, "type")) == "Battery" and read(os.path.join(ps, "scope"), "System") != "Device":
+            cap = read(os.path.join(ps, "capacity"))
+            if cap.isdigit():
+                status = read(os.path.join(ps, "status"))
+                return {"percent": int(cap), "charging": status in ("Charging", "Full")}
+    return None
+
+
+def is_live():
+    cmd = read("/proc/cmdline")
+    return "boot=casper" in cmd or os.path.isdir("/run/casper") or os.path.isdir("/cdrom/casper")
+
+
+def timezone():
+    target = os.path.realpath("/etc/localtime")
+    tz = target.split("/zoneinfo/", 1)[1] if "/zoneinfo/" in target else (read("/etc/timezone") or "UTC")
+    return "UTC" if tz in ("Etc/UTC", "Etc/Universal", "Universal", "Zulu", "Etc/Zulu", "UCT", "Etc/UCT") else tz
+
+
+def timezones():
+    try:
+        import zoneinfo
+        zones = zoneinfo.available_timezones()
+    except Exception:
+        zones = set()
+    keep = [z for z in zones if "/" in z and not z.startswith(("Etc/", "SystemV/", "posix/", "right/"))]
+    return sorted(keep) + ["UTC"]
+
+
+def info():
+    base = os_release("/usr/lib/os-release.base") or os_release("/etc/os-release")
+    usage = shutil.disk_usage("/")
+    dmi = " ".join(x for x in (read("/sys/class/dmi/id/sys_vendor"), read("/sys/class/dmi/id/product_name")) if x and x.lower() not in ("to be filled by o.e.m.", "system product name", "default string"))
+    return {
+        "version": VERSION,
+        "base": base.get("PRETTY_NAME", "Linux"),
+        "kernel": os.uname().release,
+        "cpu": cpu_model(),
+        "cores": os.cpu_count() or 1,
+        "memory": mem_total(),
+        "disk": {"total": usage.total, "free": usage.free},
+        "gpus": gpus(),
+        "device": dmi or "This computer",
+        "hostname": socket.gethostname(),
+        "uptime": float(read("/proc/uptime", "0 0").split()[0]),
+        "live": is_live(),
+        "timezone": timezone(),
+        "battery": battery(),
+        "software": SOFTWARE,
+    }
+
+
+class Shell:
+    def __init__(self):
+        os.makedirs(DATA_DIR, exist_ok=True)
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        manager = WebKit2.WebsiteDataManager(base_data_directory=os.path.join(DATA_DIR, "web"),
+                                             base_cache_directory=os.path.join(CACHE_DIR, "web"))
+        context = WebKit2.WebContext.new_with_website_data_manager(manager)
+        context.set_cache_model(WebKit2.CacheModel.DOCUMENT_VIEWER)
+        content = WebKit2.UserContentManager()
+        content.connect("script-message-received::nimbus", self.on_message)
+        try:
+            content.register_script_message_handler("nimbus")
+        except TypeError:  # newer API takes a script world name too
+            content.register_script_message_handler("nimbus", None)
+        self.view = WebKit2.WebView(web_context=context, user_content_manager=content)
+        s = self.view.get_settings()
+        for key, value in (("enable-developer-extras", bool(os.environ.get("NIMBUS_DEBUG"))),
+                           ("allow-file-access-from-file-urls", True),
+                           ("allow-universal-access-from-file-urls", True),
+                           ("enable-write-console-messages-to-stdout", True),
+                           ("javascript-can-access-clipboard", True),
+                           ("enable-back-forward-navigation-gestures", False),
+                           ("enable-page-cache", False),
+                           ("enable-smooth-scrolling", True)):
+            try:
+                s.set_property(key, value)
+            except TypeError:
+                pass
+        try:
+            s.set_property("hardware-acceleration-policy",
+                           WebKit2.HardwareAccelerationPolicy.NEVER if SOFTWARE else WebKit2.HardwareAccelerationPolicy.ALWAYS)
+        except Exception:
+            pass
+        self.view.set_background_color(Gdk.RGBA(0, 0, 0, 1))
+        self.view.connect("context-menu", self.on_context_menu)
+        self.view.connect("decide-policy", self.on_policy)
+        self.view.connect("web-process-terminated", self.on_crash)
+        self.window = Gtk.Window(title="Nimbus")
+        self.window.set_default_size(1280, 800)
+        self.window.add(self.view)
+        self.window.connect("destroy", Gtk.main_quit)
+        self.window.show_all()
+        self.window.fullscreen()
+        self.view.load_uri(GLib.filename_to_uri(os.path.join(SHELL_DIR, "index.html"), None))
+
+    # ---- page <-> machine ----
+    def on_message(self, _manager, value):
+        try:
+            if hasattr(value, "get_js_value"):  # WebKitGTK before 2.40
+                value = value.get_js_value()
+            msg = json.loads(value.to_string())
+            mid, method, args = int(msg["id"]), str(msg["method"]), msg.get("args") or {}
+        except Exception as exc:  # malformed message: nothing to answer
+            print("nimbus-shell: bad message:", exc, file=sys.stderr)
+            return
+        handler = getattr(self, "m_" + method, None)
+        if not handler:
+            self.reply(mid, False, "Unknown method: " + method)
+            return
+
+        def run():
+            try:
+                result = handler(args)
+                GLib.idle_add(self.reply, mid, True, result)
+            except Exception as exc:
+                GLib.idle_add(self.reply, mid, False, str(exc))
+        threading.Thread(target=run, daemon=True).start()
+
+    def reply(self, mid, ok, data):
+        script = "window.__nimbusNative && window.__nimbusNative.%s(%d, %s);" % ("resolve" if ok else "reject", mid, json.dumps(data))
+        self.run_js(script)
+        return False
+
+    def run_js(self, script):
+        # The JavaScript entry point differs between WebKitGTK releases; use whichever this one has.
+        view = self.view
+        attempts = (
+            lambda: view.evaluate_javascript(script, -1, None, None, None, None),
+            lambda: view.evaluate_javascript(script, -1, None, None, None, None, None),
+            lambda: view.run_javascript(script, None, None),
+            lambda: view.run_javascript(script, None, None, None),
+        )
+        for attempt in attempts:
+            try:
+                attempt()
+                return
+            except (TypeError, AttributeError):
+                continue
+        print("nimbus-shell: could not reply to the page", file=sys.stderr)
+
+    def m_info(self, _args):
+        return info()
+
+    def m_battery(self, _args):
+        return battery()
+
+    def m_timezones(self, _args):
+        return timezones()
+
+    def m_setTimezone(self, args):
+        tz = str(args.get("tz", ""))
+        if tz not in timezones():
+            raise ValueError("Unknown time zone")
+        subprocess.run(["timedatectl", "set-timezone", tz], check=True, timeout=15, capture_output=True)
+        # The page's clock reads the zone when it starts, so start a fresh page.
+        GLib.timeout_add(400, self.restart)
+        return tz
+
+    def m_power(self, args):
+        action = args.get("action")
+        cmd = {"poweroff": ["systemctl", "poweroff"], "reboot": ["systemctl", "reboot"], "suspend": ["systemctl", "suspend"]}.get(action)
+        if not cmd:
+            raise ValueError("Unknown power action")
+        r = subprocess.run(cmd, timeout=20, capture_output=True, text=True)
+        if r.returncode != 0:
+            raise RuntimeError((r.stderr or r.stdout or "The system refused").strip())
+        return action
+
+    def m_log(self, args):
+        print("page:", str(args.get("text", ""))[:500])
+        return True
+
+    def restart(self):
+        os.execv(sys.executable, [sys.executable] + sys.argv)
+
+    # ---- guard rails ----
+    def on_context_menu(self, _view, _menu, _event, hit):
+        return not hit.context_is_editable()  # keep cut/copy/paste in text fields only
+
+    def on_policy(self, _view, decision, kind):
+        if kind == WebKit2.PolicyDecisionType.NAVIGATION_ACTION:
+            uri = decision.get_navigation_action().get_request().get_uri()
+            if not uri.startswith("file://" + SHELL_DIR) and not uri.startswith("about:"):
+                decision.ignore()
+                return True
+        if kind == WebKit2.PolicyDecisionType.NEW_WINDOW_ACTION:
+            decision.ignore()
+            return True
+        return False
+
+    def on_crash(self, view, _reason):
+        print("nimbus-shell: page process stopped, reloading", file=sys.stderr)
+        GLib.timeout_add(500, lambda: (view.reload(), False)[1])
+
+
+def main():
+    Shell()
+    Gtk.main()
+
+
+if __name__ == "__main__":
+    main()
