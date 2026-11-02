@@ -128,6 +128,11 @@ PACKAGES=(
   bluez power-profiles-daemon grim wl-clipboard dmz-cursor-theme
   # What Google Chrome needs beyond the above, so installing it later only downloads Chrome itself
   fonts-liberation libcups2t64 libnss3 libvulkan1 xdg-utils
+  # The Store: apps from Flathub (Steam, Discord, Lutris for Battle.net...) installed with flatpak, and the
+  # portals they open files and links through
+  flatpak gir1.2-flatpak-1.0 xdg-desktop-portal xdg-desktop-portal-gtk
+  # Nimbus Security: ClamAV (its definitions download when first needed) and the firewall
+  clamav clamav-freshclam ufw
 )
 if [ -n "$APT_CACHE" ]; then
   mkdir -p "$APT_CACHE/apt/partial"
@@ -218,6 +223,13 @@ in_chroot systemctl disable systemd-networkd.service systemd-networkd.socket >/d
 in_chroot systemctl mask systemd-networkd-wait-online.service NetworkManager-wait-online.service
 # The ISO has no checksum list to verify, so this check would only report a failure at startup.
 in_chroot systemctl mask casper-md5check.service
+# Nimbus Security downloads ClamAV's definitions when they're first needed, then daily (the desktop asks the
+# root helper); freshclam's own service would download 230 MB at every start of a live system.
+in_chroot systemctl disable clamav-freshclam.service >/dev/null 2>&1 || true
+# The firewall is on from the start (Windows' is): incoming connections are refused unless allowed
+sed -i 's/^ENABLED=.*/ENABLED=yes/' "$CHROOT/etc/ufw/ufw.conf"
+grep -q '^ENABLED=yes' "$CHROOT/etc/ufw/ufw.conf" || die "could not turn the firewall on"
+in_chroot systemctl enable ufw.service
 
 log "Adjusting the live boot scripts"
 # casper creates the storage area ("writable") in a USB stick's free space by itself, then mounts it

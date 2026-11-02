@@ -12,7 +12,17 @@ Every argument is checked here: this program trusts nothing it is given.
   nimbus-sys printer-add NAME URI   add a driverless (IPP Everywhere) printer
   nimbus-sys printer-remove NAME
   nimbus-sys printer-default NAME
+  nimbus-sys security-update        download the latest virus definitions (ClamAV's freshclam), its output as it goes
+  nimbus-sys firewall status        the firewall (ufw) and Nimbus's settings for it, as JSON
+  nimbus-sys firewall apply private|public           use the settings of the network profile in use
+  nimbus-sys firewall set private|public enabled|block on|off
+  nimbus-sys firewall app APP private|public on|off  allow an app (see FW_APPS, or a port added below) through
+  nimbus-sys firewall port add PORTS tcp|udp|both NAME
+  nimbus-sys firewall port remove APP
+  nimbus-sys firewall share IFACE on|off             let devices on a mobile hotspot get addresses (DHCP, DNS)
+  nimbus-sys firewall reset
 """
+import json
 import os
 import re
 import subprocess
@@ -20,6 +30,19 @@ import sys
 import time
 
 CAMERA_RULE = "/etc/udev/rules.d/70-nimbus-camera-off.rules"
+FW_CONF = "/etc/nimbus/firewall.json"
+# Apps the firewall can let in, by the ports they listen on
+FW_APPS = {
+    "steam-remote-play": ("Steam Remote Play", ["27031:27036/udp", "27036:27037/tcp"]),
+    "steam-lan": ("Steam: game downloads from other PCs on your network", ["27040/tcp"]),
+    "steam-servers": ("Steam: game servers you host", ["27015:27030/udp", "27015:27030/tcp"]),
+    "kdeconnect": ("KDE Connect and GSConnect (your phone)", ["1714:1764/udp", "1714:1764/tcp"]),
+    "minecraft": ("Minecraft: games you host", ["25565/tcp", "25565/udp", "19132:19133/udp"]),
+    "ssh": ("Remote sign-in (SSH)", ["22/tcp"]),
+}
+FW_DEFAULT = {"enabled": {"private": True, "public": True}, "block": {"private": False, "public": False},
+              "apps": {"steam-remote-play": {"private": True, "public": False}, "steam-lan": {"private": True, "public": False}},
+              "custom": {}, "profile": "public", "shares": []}
 
 
 def die(msg, code=1):
@@ -49,6 +72,156 @@ def du(path):
             except OSError:
                 pass
     return total
+
+
+def fw_load():
+    c = json.loads(json.dumps(FW_DEFAULT))
+    try:
+        with open(FW_CONF) as f:
+            saved = json.load(f)
+        for k in c:
+            if isinstance(saved.get(k), type(c[k])):
+                c[k] = saved[k]
+    except (OSError, ValueError):
+        pass
+    return c
+
+
+def fw_save(c):
+    os.makedirs(os.path.dirname(FW_CONF), exist_ok=True)
+    with open(FW_CONF + ".tmp", "w") as f:
+        json.dump(c, f)
+    os.replace(FW_CONF + ".tmp", FW_CONF)
+
+
+def fw_profile(p):
+    if p not in ("private", "public"):
+        die("bad network profile")
+    return p
+
+
+def fw_onoff(v):
+    if v not in ("on", "off"):
+        die("on or off")
+    return v == "on"
+
+
+def fw_active():
+    return run(["ufw", "status"], check=False).startswith("Status: active")
+
+
+def fw_wanted(c, profile):
+    """(spec words for ufw, comment) for every rule this profile wants"""
+    rules = []
+    if not c["block"].get(profile):
+        for app, sel in sorted(c["apps"].items()):
+            if sel.get(profile) and app in FW_APPS:
+                rules += [(["allow", spec], "nimbus:" + app) for spec in FW_APPS[app][1]]
+        for cid, rule in sorted(c["custom"].items()):
+            if rule.get(profile):
+                protos = ["tcp", "udp"] if rule["proto"] == "both" else [rule["proto"]]
+                rules += [(["allow", "%s/%s" % (rule["ports"], pr)], "nimbus:" + cid) for pr in protos]
+    for iface in c["shares"]:  # a mobile hotspot hands out addresses and answers name lookups
+        rules += [(["allow", "in", "on", iface, "to", "any", "port", port, "proto", pr], "nimbus-share:" + iface)
+                  for port, pr in (("67", "udp"), ("53", "udp"), ("53", "tcp"))]
+    return rules
+
+
+def fw_apply(c, profile):
+    c["profile"] = profile
+    fw_save(c)
+    if not c["enabled"].get(profile, True):
+        if fw_active():
+            run(["ufw", "disable"])
+        return
+    want = fw_wanted(c, profile)
+    numbered = run(["ufw", "status", "numbered"], check=False)
+    have = sorted(set(re.findall(r"# (nimbus(?:-share)?:\S+)", numbered)))
+    if fw_active() and have == sorted(set(cm for _w, cm in want)):
+        return  # already so
+    for num in sorted((int(n) for n, rest in re.findall(r"^\[\s*(\d+)\](.*)$", numbered, re.M) if "# nimbus" in rest), reverse=True):
+        run(["ufw", "--force", "delete", str(num)], check=False)
+    run(["ufw", "default", "deny", "incoming"])
+    run(["ufw", "default", "allow", "outgoing"])
+    for words, comment in want:
+        run(["ufw"] + words + ["comment", comment], check=False)
+    if not fw_active():
+        run(["ufw", "--force", "enable"])
+
+
+def fw_status():
+    c = fw_load()
+    out = run(["ufw", "status", "verbose"], check=False)
+    apps = [{"id": a, "name": n, "ports": ", ".join(p), "private": bool(c["apps"].get(a, {}).get("private")),
+             "public": bool(c["apps"].get(a, {}).get("public")), "custom": False} for a, (n, p) in FW_APPS.items()]
+    apps += [{"id": cid, "name": r["name"], "ports": "%s/%s" % (r["ports"], r["proto"]), "private": bool(r.get("private")),
+              "public": bool(r.get("public")), "custom": True} for cid, r in sorted(c["custom"].items())]
+    return {"available": True, "active": out.startswith("Status: active"), "profile": c["profile"], "enabled": c["enabled"],
+            "block": c["block"], "apps": apps, "shares": c["shares"],
+            "incoming": (re.search(r"Default: (\w+) \(incoming\)", out) or [None, "deny"])[1]}
+
+
+def firewall(args):
+    if not args:
+        die("firewall what?")
+    c = fw_load()
+    what = args[0]
+    if what == "status":
+        print(json.dumps(fw_status()))
+        return
+    if what == "apply" and len(args) == 2:
+        fw_apply(c, fw_profile(args[1]))
+        return
+    if what == "set" and len(args) == 4 and args[2] in ("enabled", "block"):
+        c[args[2]][fw_profile(args[1])] = fw_onoff(args[3])
+    elif what == "app" and len(args) == 4:
+        app, prof, on = args[1], fw_profile(args[2]), fw_onoff(args[3])
+        if app in FW_APPS:
+            c["apps"].setdefault(app, {})[prof] = on
+        elif app in c["custom"]:
+            c["custom"][app][prof] = on
+        else:
+            die("unknown app")
+    elif what == "port" and len(args) == 5 and args[1] == "add":
+        ports, proto, name = args[2], args[3], args[4]
+        if not re.match(r"^\d{1,5}(:\d{1,5})?$", ports) or not all(0 < int(x) < 65536 for x in ports.split(":")):
+            die("bad port: type a number like 25565, or a range like 27000:27050")
+        if proto not in ("tcp", "udp", "both"):
+            die("bad protocol")
+        name = re.sub(r"[^\w .:()/+-]", "", name)[:60] or "Port " + ports
+        cid = "custom-%d" % (max([int(k.split("-")[1]) for k in c["custom"]] or [0]) + 1)
+        c["custom"][cid] = {"name": name, "ports": ports, "proto": proto, "private": True, "public": False}
+    elif what == "port" and len(args) == 3 and args[1] == "remove":
+        c["custom"].pop(args[2], None)
+    elif what == "share" and len(args) == 3:
+        iface = args[1]
+        if not re.match(r"^[A-Za-z0-9_.-]{1,15}$", iface):
+            die("bad interface")
+        c["shares"] = [i for i in c["shares"] if i != iface] + ([iface] if fw_onoff(args[2]) else [])
+    elif what == "reset" and len(args) == 1:
+        profile = c["profile"]
+        run(["ufw", "--force", "reset"], check=False)
+        c = json.loads(json.dumps(FW_DEFAULT))
+        c["profile"] = profile
+    else:
+        die("unknown firewall command")
+    fw_apply(c, c["profile"])
+
+
+def security_update():
+    """freshclam, as the clamav user (its configuration says so), passing its output on as it goes"""
+    if run(["systemctl", "is-active", "clamav-freshclam"], check=False).strip() == "active":
+        run(["systemctl", "stop", "clamav-freshclam"], check=False)  # it would hold the definitions' lock
+    proc = subprocess.Popen(["freshclam", "--stdout", "--no-warnings"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                            env={"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL": "C.UTF-8"})
+    last = ""
+    for line in proc.stdout:
+        line = line.rstrip()
+        if line:
+            last = line
+            print(line, flush=True)
+    if proc.wait() != 0:
+        die(last or "The update didn't finish")
 
 
 def main(args):
@@ -116,6 +289,10 @@ def main(args):
         run(["lpadmin", "-x", printer(args[1])])
     elif cmd == "printer-default" and len(args) == 2:
         run(["lpadmin", "-d", printer(args[1])])
+    elif cmd == "security-update" and len(args) == 1:
+        security_update()
+    elif cmd == "firewall":
+        firewall(args[1:])
     else:
         die("unknown command")
 

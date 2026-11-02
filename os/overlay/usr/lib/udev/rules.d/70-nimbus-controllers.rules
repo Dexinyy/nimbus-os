@@ -1,0 +1,36 @@
+# Game controllers for the person at the computer (Nimbus OS):
+# - their raw HID interfaces (hidraw), which Steam Input, browsers' gamepad support and games' own drivers read for
+#   everything the kernel's driver doesn't pass on (a DualSense's touchpad, lights and adaptive triggers, gyros...);
+# - /dev/uinput, through which Steam Input presents controllers to games as Xbox controllers.
+# The event devices (/dev/input/event*) of joysticks are already the user's (70-uaccess.rules).
+# Like Valve's steam-devices rules; "uaccess" gives access only to whoever is signed in at the screen.
+
+KERNEL=="uinput", SUBSYSTEM=="misc", TAG+="uaccess", OPTIONS+="static_node=uinput"
+
+# USB
+SUBSYSTEMS=="usb", KERNEL=="hidraw*", ATTRS{idVendor}=="054c", TAG+="uaccess"
+SUBSYSTEMS=="usb", KERNEL=="hidraw*", ATTRS{idVendor}=="045e", TAG+="uaccess"
+SUBSYSTEMS=="usb", KERNEL=="hidraw*", ATTRS{idVendor}=="057e", TAG+="uaccess"
+SUBSYSTEMS=="usb", KERNEL=="hidraw*", ATTRS{idVendor}=="28de", TAG+="uaccess"
+SUBSYSTEMS=="usb", KERNEL=="hidraw*", ATTRS{idVendor}=="2dc8", TAG+="uaccess"
+SUBSYSTEMS=="usb", KERNEL=="hidraw*", ATTRS{idVendor}=="0e6f", TAG+="uaccess"
+SUBSYSTEMS=="usb", KERNEL=="hidraw*", ATTRS{idVendor}=="0f0d", TAG+="uaccess"
+SUBSYSTEMS=="usb", KERNEL=="hidraw*", ATTRS{idVendor}=="20d6", TAG+="uaccess"
+SUBSYSTEMS=="usb", KERNEL=="hidraw*", ATTRS{idVendor}=="146b", TAG+="uaccess"
+SUBSYSTEMS=="usb", KERNEL=="hidraw*", ATTRS{idVendor}=="0738", TAG+="uaccess"
+SUBSYSTEMS=="usb", KERNEL=="hidraw*", ATTRS{idVendor}=="044f", TAG+="uaccess"
+SUBSYSTEMS=="usb", KERNEL=="hidraw*", ATTRS{idVendor}=="046d", ATTRS{idProduct}=="c21[89def]|c242", TAG+="uaccess"
+
+# Bluetooth (the HID device's name holds the vendor and product: 0005:054C:0CE6.0003)
+KERNEL=="hidraw*", KERNELS=="*054C:*", TAG+="uaccess"
+KERNEL=="hidraw*", KERNELS=="*045E:0B*", TAG+="uaccess"
+KERNEL=="hidraw*", KERNELS=="*045E:02E0*", TAG+="uaccess"
+KERNEL=="hidraw*", KERNELS=="*045E:02FD*", TAG+="uaccess"
+KERNEL=="hidraw*", KERNELS=="*057E:*", TAG+="uaccess"
+KERNEL=="hidraw*", KERNELS=="*28DE:*", TAG+="uaccess"
+KERNEL=="hidraw*", KERNELS=="*2DC8:*", TAG+="uaccess"
+
+# A DualSense's and DualShock 4's touchpad is for games, not for moving the mouse pointer
+SUBSYSTEM=="input", ATTRS{name}=="*Wireless Controller Touchpad", ENV{LIBINPUT_IGNORE_DEVICE}="1"
+SUBSYSTEM=="input", ATTRS{name}=="*DualSense*Touchpad", ENV{LIBINPUT_IGNORE_DEVICE}="1"
+SUBSYSTEM=="input", ATTRS{name}=="*Controller Motion Sensors", ENV{LIBINPUT_IGNORE_DEVICE}="1"

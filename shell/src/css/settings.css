@@ -452,3 +452,17 @@ select.ws-input { padding-right: 8px; }
 
 /* dialogs from Settings follow Windows' content dialog */
 .ws-dialog { width: min(500px, calc(100% - 32px)); }
+
+/* ---- Game controllers: the live test ---- */
+.gp-test { padding: 16px; border-radius: 5px; background: var(--ws-card); border: 1px solid var(--ws-card-line); display: flex; flex-direction: column; gap: 10px; }
+.gp-head { display: flex; flex-direction: column; gap: 2px; }
+.gp-svg { width: 100%; max-width: 460px; align-self: center; font-family: var(--font-ui); }
+.gp-svg .gp-body { fill: color-mix(in srgb, var(--text) 9%, transparent); stroke: color-mix(in srgb, var(--text) 22%, transparent); stroke-width: 1.5; }
+.gp-svg .gp-b circle, .gp-svg .gp-b rect, .gp-svg path.gp-b, .gp-svg .gp-trig rect:first-child, .gp-svg .gp-stick circle:first-child {
+  fill: var(--card); stroke: color-mix(in srgb, var(--text) 30%, transparent); stroke-width: 1.2; transition: fill .08s; }
+.gp-svg .gp-dot { fill: color-mix(in srgb, var(--text) 30%, var(--card)); transition: transform .05s linear; }
+.gp-svg .gp-b.on circle, .gp-svg .gp-b.on rect, .gp-svg path.gp-b.on, .gp-svg .gp-dot.on { fill: var(--accent); stroke: var(--accent); }
+.gp-svg .gp-b.on text { fill: var(--on-accent); }
+.gp-svg .gp-fill { fill: var(--accent); }
+.gp-svg text { font-size: 10px; text-anchor: middle; fill: var(--text); pointer-events: none; }
+.gp-svg .gp-cap { font-size: 8px; fill: var(--text-2); }

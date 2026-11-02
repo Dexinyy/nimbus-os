@@ -1098,12 +1098,21 @@ class SysMethods:
                 "band": props.get("802-11-wireless.band") or "any"}
 
     def m_hotspot(self, args):
+        iface = self.wifi_iface()
         if not args.get("on"):
             run(["nmcli", "connection", "down", "Hotspot"], timeout=20, check=False)
+            if iface:
+                try:
+                    helper("firewall", "share", iface, "off", timeout=90)
+                except SysError:
+                    pass
             return self.m_hotspotStatus({})
-        iface = self.wifi_iface()
         if not iface:
             raise SysError("This PC has no Wi-Fi adapter")
+        try:  # the firewall lets devices on the hotspot get addresses and look up names
+            helper("firewall", "share", iface, "on", timeout=90)
+        except SysError as exc:
+            print("nimbus-shell: hotspot firewall:", exc)
         ssid, pw, band = str(args.get("ssid", ""))[:32], str(args.get("password", "")), args.get("band")
         if not ssid or len(pw) < 8:
             raise SysError("The hotspot needs a name and a password of at least 8 characters")

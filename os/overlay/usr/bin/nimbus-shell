@@ -27,7 +27,9 @@ import time
 import gi
 
 sys.path.insert(0, os.environ.get("NIMBUS_LIB_DIR", "/usr/lib/nimbus"))
+import nimbus_controllers  # noqa: E402
 import nimbus_net  # noqa: E402
+import nimbus_security  # noqa: E402
 import nimbus_store  # noqa: E402
 import nimbus_sys  # noqa: E402
 import nimbus_term  # noqa: E402
@@ -365,7 +367,7 @@ class WMLink:
         return False
 
 
-class Shell(nimbus_sys.SysMethods, nimbus_store.StoreMethods):
+class Shell(nimbus_sys.SysMethods, nimbus_store.StoreMethods, nimbus_security.SecurityMethods, nimbus_controllers.ControllerMethods):
     def __init__(self):
         os.makedirs(DATA_DIR, exist_ok=True)
         os.makedirs(CACHE_DIR, exist_ok=True)
@@ -431,7 +433,9 @@ class Shell(nimbus_sys.SysMethods, nimbus_store.StoreMethods):
         self.focused = None
         self.wm = WMLink(int(os.environ["NIMBUS_WM_FD"]), self.on_wm_event) if os.environ.get("NIMBUS_WM_FD") else None
         self.sys_init()
+        self.security_init()
         threading.Thread(target=self.share_session_env, daemon=True).start()
+        threading.Thread(target=self.firewall_follow, daemon=True).start()
         self.listen_for_links()
         if self.wm and os.access(CHROME, os.X_OK):
             GLib.timeout_add_seconds(90, self.update_chrome)
@@ -611,7 +615,7 @@ class Shell(nimbus_sys.SysMethods, nimbus_store.StoreMethods):
         if args.get("test"):
             argv.append("--no-first-run")
         url = str(args.get("url") or "")
-        if url and re.match(r"^(https?|file|data):", url, re.I):
+        if url and (re.match(r"^(https?|file|data):", url, re.I) or re.match(r"^chrome://settings(/[a-z]+)?$", url)):
             argv.append(url)
         return spawn(argv)
 
@@ -784,6 +788,12 @@ class Shell(nimbus_sys.SysMethods, nimbus_store.StoreMethods):
                 print("nimbus-shell: network status:", exc, file=sys.stderr)
                 return
             GLib.idle_add(lambda: self.emit("net", data) and False)
+            # another network: the firewall uses its profile's settings (Private or Public)
+            conn = nimbus_security.active_connection()
+            uid = conn["uuid"] if conn else None
+            if uid != getattr(self, "fw_conn", None):
+                self.fw_conn = uid
+                self.firewall_follow()
         threading.Thread(target=run, daemon=True).start()
         return False
 

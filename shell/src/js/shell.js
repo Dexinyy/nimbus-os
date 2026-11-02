@@ -16,6 +16,7 @@ const APPS = {
   chrome: { name: 'Google Chrome', icon: 'browser', launch: (args) => Apps.launch('chrome', args), requires: 'programs', desc: 'Browse the web. Your default browser.', keywords: 'browser web internet google chrome www search sites' },
   installer: { name: 'Get Google Chrome', icon: 'browser', mount: mountInstaller, size: [520, 420], minSize: [400, 320], single: true, noResize: true, hidden: true, taskbarAs: 'chrome', requires: 'programs', desc: '', keywords: '' },
   // Apps and games from Flathub (and Windows game launchers through Lutris); what's installed joins this list (Programs)
+  security: { name: 'Nimbus Security', icon: 'security', mount: mountSecurity, size: [1080, 720], minSize: [560, 420], single: true, requires: 'programs', desc: 'Virus & threat protection, the firewall, and your device’s security.', keywords: 'windows security defender antivirus anti-virus virus malware scan firewall threat protection quarantine' },
   store: { name: 'Store', icon: 'store', mount: mountStore, size: [1120, 740], minSize: [600, 440], single: true, requires: 'programs', desc: 'Get apps and games: Steam, Discord, Battle.net and more.', keywords: 'microsoft store apps games install download get steam discord battle.net spotify flathub programs' },
 };
 function appAvailable(id) { const a = APPS[id]; return !!a && (!a.requires || !!caps[a.requires]); }

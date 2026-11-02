@@ -447,3 +447,58 @@ function mountStore(root, api, args) {
   }
   if (args && args.app) go('app', { id: args.app }); else go(args && args.page ? args.page : 'home', args || {});
 }
+
+/* Boot test (nimbus.test=store): the real Flathub catalog, search, Discord's page, installing Discord with the
+   Store's own button (it comes with what it runs on), opening it as a window (an X11 one, through Xwayland) that
+   gets Discord's taskbar button, and checking for updates. Results go to the system log for os/qmp.py. */
+async function testStore() {
+  const log = (text) => Native.call('log', { text: 'test store: ' + text }).catch(() => {});
+  const until = async (fn, ms) => { const end = Date.now() + ms; for (;;) { const v = fn(); if (v) return v; if (Date.now() > end) return null; await sleep(500); } };
+  const ID = 'com.discordapp.Discord';
+  try {
+    const st = await Native.call('storeStatus');
+    log(`flatpak ${st.flatpak} flathub ${st.remote} libflatpak ${st.libflatpak}`);
+    const t0 = Date.now();
+    WM.open('store');
+    const cat = await Native.call('storeCatalog', {}, 30 * 60 * 1000);
+    log(`catalog ${cat.count} apps in ${Math.round((Date.now() - t0) / 1000)} s`);
+    await sleep(4000);
+    log('page home');
+    const hits = await Native.call('storeSearch', { q: 'discord' });
+    log('search discord: ' + hits.slice(0, 3).map((x) => x.id).join(' '));
+    const steam = await Native.call('storeSearch', { q: 'steam' });
+    log('search steam: ' + steam.slice(0, 2).map((x) => x.id).join(' '));
+    const d = await Native.call('storeApp', { id: ID }, 120000);
+    log(`details ${d.name} by ${d.dev}: ${d.download ? Math.round(d.download / 1e6) + ' MB' : '?'} to download, ${(d.permissions || []).length} permissions, ${(d.shots || []).length} screenshots`);
+    WM.open('store', { app: ID });
+    const get = await until(() => document.querySelector('.app-store .ms-get'), 60000);
+    await sleep(2500);
+    log('page app');
+    const t1 = Date.now();
+    let mark = -25;
+    const off = bus.on('native:store-progress', (p) => {
+      if (!p || p.id !== ID || typeof p.progress !== 'number' || p.progress < mark + 25) return;
+      mark = Math.floor(p.progress / 25) * 25;
+      log(`progress ${Math.round(p.progress)}% ${p.text || ''}`);
+      if (mark === 25) setTimeout(() => log('page installing'), 300);
+    });
+    if (!get) throw new Error('no Install button');
+    get.click();
+    const done = await until(() => Programs.installed(ID) || (!StoreJobs.jobs[ID] && Date.now() - t1 > 5000 ? 'stopped' : null), 45 * 60 * 1000);
+    off();
+    if (done !== true) throw new Error('installing stopped' + (Notif.items[0] ? ': ' + Notif.items[0].title + ' ' + Notif.items[0].body : ''));
+    log(`installed in ${Math.round((Date.now() - t1) / 1000)} s; Start has ${Programs.list.map((p) => p.id).join(' ')}`);
+    await sleep(2000);
+    log('page installed');
+    await Programs.launch('fp:' + ID);
+    const w = await until(() => WM.list().find((x) => x.native && x.flatpak === ID && !x.min), 5 * 60 * 1000);
+    log(w ? `window ${w.title} (${w.x11 ? 'X11' : 'Wayland'}) on the taskbar as ${w.appId}` : 'no window from Discord');
+    if (w) { await sleep(25000); log('page discord'); }
+    const ups = await Native.call('storeUpdates', {}, 120000);
+    log(`updates waiting: ${ups.length}`);
+    WM.open('store', { page: 'library' });
+    await sleep(3000);
+    log('page library');
+    log('done');
+  } catch (e) { log('failed: ' + e.message); }
+}

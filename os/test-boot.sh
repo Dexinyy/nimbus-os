@@ -8,6 +8,8 @@
 #   6. Saving from a DVD with an empty disk: Nimbus sets the disk up; a setting survives a restart
 #   7. Chrome: installed from Google, opened as a window; Start, Settings and Alt+Tab over it, typing, closing
 #   8. Settings: sound, display resolution, input, power, printing and storage through the real services
+#   9. Security: real-time protection, scans and quarantine (a test signature), the firewall, a virtual controller
+#  10. Store: Flathub's catalog, then Discord installed and opened as a window
 # usage: os/test-boot.sh ISO [OUTDIR]     results: OUTDIR/*.png, *-serial.log, summary.md
 set -uo pipefail
 
@@ -27,12 +29,12 @@ OVMF_VARS="$(ls /usr/share/OVMF/OVMF_VARS_4M.fd /usr/share/OVMF/OVMF_VARS.fd 2>/
 printf '## Boot test\n\nImage: %s (%s MB)\n' "$(basename "$ISO")" "$(( $(stat -c %s "$ISO") / 1048576 ))" > "$OUTDIR/summary.md"
 FAILED=0
 
-run_vm() { # name scenario [extra qemu arguments]
+run_vm() { # name scenario [extra qemu arguments]   (MEM=megabytes to change the memory)
   local name="$1" scenario="$2"; shift 2
   local sock="/tmp/nimbus-$name.qmp"
   rm -f "$sock"
   echo "== $name ($scenario)"
-  qemu-system-x86_64 "${ACCEL[@]}" -machine q35 -m 4096 -smp 2 \
+  qemu-system-x86_64 "${ACCEL[@]}" -machine q35 -m "${MEM:-4096}" -smp 2 \
     -vga none -device VGA,edid=on,xres=1440,yres=900 \
     -device qemu-xhci -device usb-tablet \
     -nic user,model=virtio-net-pci \
@@ -96,6 +98,15 @@ run_vm settings settings -cdrom "$ISO" -kernel /tmp/nimbus-vmlinuz -initrd /tmp/
 # Google Chrome: Nimbus installs it from Google (the machine reaches the internet through QEMU) and shows it as a window
 run_vm chrome chrome -cdrom "$ISO" -kernel /tmp/nimbus-vmlinuz -initrd /tmp/nimbus-initrd \
   -append "boot=casper noprompt nimbus.debug nimbus.test=chrome $SERIAL"
+
+# Nimbus Security: virus protection with a test signature, the firewall, device security, a virtual game controller
+run_vm security security -cdrom "$ISO" -kernel /tmp/nimbus-vmlinuz -initrd /tmp/nimbus-initrd \
+  -append "boot=casper noprompt nimbus.debug nimbus.test=security $SERIAL"
+
+# The Store: Flathub's catalog, and Discord installed and opened (an X11 program, through Xwayland). Apps land in
+# memory on a live system, so this machine gets more of it.
+MEM=6144 run_vm store store -cdrom "$ISO" -kernel /tmp/nimbus-vmlinuz -initrd /tmp/nimbus-initrd \
+  -append "boot=casper noprompt nimbus.debug nimbus.test=store $SERIAL"
 
 cat "$OUTDIR/summary.md"
 exit "$FAILED"

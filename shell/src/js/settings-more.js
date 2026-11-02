@@ -104,7 +104,9 @@ defSettings('typing', [['kbLayout', 'Keyboard layout', 'language input qwerty az
 /* ---------- Gaming ---------- */
 defPage('gaming', { title: 'Gaming', icon: 'gaming', keywords: 'game mode screenshots captures', render: (ctx) => [WS.group(null,
   WS.card(ctx, { icon: 'captures', title: 'Captures', desc: 'Screenshots, where they’re saved', go: 'captures' }),
-  WS.card(ctx, { icon: 'gameMode', title: 'Game Mode', desc: 'Optimize your PC for play', go: 'gamemode' }))] });
+  WS.card(ctx, { icon: 'gameMode', title: 'Game Mode', desc: 'Optimize your PC for play', go: 'gamemode' }),
+  WS.card(ctx, { icon: 'controller', title: 'Game controllers', desc: 'Xbox, PlayStation, Switch Pro and others', go: 'controllers' }),
+  caps.programs ? WS.card(ctx, { icon: 'store', title: 'Get games', desc: 'Steam, Battle.net, Heroic (Epic and GOG) and more from the Store', onClick: () => WM.open('store', { page: 'gaming' }) }) : null)] });
 defPage('captures', { title: 'Captures', parent: 'gaming', icon: 'captures', keywords: 'screenshot print screen snip', render: (ctx) => [
   WS.group(null,
     WS.card(ctx, { icon: 'folder', title: 'Captures location', desc: 'Pictures › Screenshots', ctl: WS.button('Open folder', () => { const f = Shots.folder(); WM.open('files', { folder: f }); }) })),
@@ -182,6 +184,9 @@ defSettings('keyboarda11y', [['shortcuts', 'Keyboard shortcuts', 'keys hotkeys']
 
 /* ---------- Privacy & security ---------- */
 defPage('privacy', { title: 'Privacy & security', icon: 'privacy', keywords: 'privacy permissions camera microphone location activity diagnostics', render: (ctx) => [
+  caps.programs ? WS.group('Security',
+    WS.card(ctx, { icon: 'shieldCheck', title: 'Nimbus Security', desc: 'Antivirus, browsing protection, firewall and network protection', go: 'winsec' }),
+    WS.card(ctx, { icon: 'shield', title: 'Find my device', desc: 'Not available: Nimbus has no online account to find this device with' })) : null,
   WS.group('Nimbus permissions',
     WS.card(ctx, { icon: 'shieldCheck', title: 'General', desc: 'Ads, tracking, accounts', go: 'privgeneral' }),
     WS.card(ctx, { icon: 'diagnostics', title: 'Diagnostics & feedback', desc: 'Diagnostic data, feedback frequency', go: 'diagnostics' }),
@@ -193,6 +198,23 @@ defPage('privacy', { title: 'Privacy & security', icon: 'privacy', keywords: 'pr
     WS.card(ctx, { icon: 'mic', title: 'Microphone', desc: S.data.micAccess === false ? 'Off' : 'On', go: 'micperm' }),
     WS.card(ctx, { icon: 'notifications', title: 'Notifications', go: 'notifications' })),
 ] });
+/* Like Windows Security's page in Settings: the protection areas, each opening the Security app there */
+defPage('winsec', { title: 'Nimbus Security', parent: 'privacy', icon: 'shieldCheck', keywords: 'windows security defender antivirus virus firewall threat protection malware scan', hidden: () => !caps.programs, render: (ctx) => {
+  const list = h('div', { class: 'ws-cards' });
+  const paint = (st) => list.replaceChildren(...SEC_AREAS.filter(([id]) => id !== 'history').map(([id, label, icon]) => {
+    const s = secAreaState(id, st);
+    return WS.card(ctx, { icon, title: label, desc: st ? s.text : 'Checking…', onClick: () => WM.open('security', { page: id }), ctl: h('span', { class: 'ws-secst', html: st ? secBadge(s.level) : '' }) });
+  }));
+  paint(SecState.st);
+  if (IS_NATIVE) secStatus().then(paint).catch(() => {});
+  ctx.on('security-status', paint);
+  return [
+    h('p', { class: 'ws-d ws-intro', text: 'Nimbus Security is your home to view and manage the security and health of your device.' }),
+    h('div', {}, WS.button('Open Nimbus Security', () => WM.open('security'), { accent: true })),
+    WS.group('Protection areas', list),
+  ];
+} });
+defSettings('winsec', [['virus', 'Virus & threat protection', 'antivirus scan malware defender'], ['firewall', 'Firewall & network protection', 'firewall network ports']]);
 const pvFacts = () => {
   const cloudOn = Store.status && Store.status.cloud === 'on';
   return [

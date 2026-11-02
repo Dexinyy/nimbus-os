@@ -102,8 +102,11 @@ function boot() {
           S.set('storePinned', true);
         }
         Taskbar.render(); Start.render();
+        SecAuto.start();
       }
       if (info.test === 'chrome') testChrome();
+      if (info.test === 'security') testSecurity();
+      if (info.test === 'store') testStore();
       if (info.test === 'settings') testSettings();
     });
     Net.refresh();

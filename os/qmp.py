@@ -9,6 +9,10 @@ usage: qmp.py SOCKET OUTDIR NAME SLOWNESS SCENARIO
             storage - boot with nimbus.test=storage from a USB image: set up saving, restart twice, check
             chrome - boot with nimbus.test=chrome: install Chrome from Google, open it as a window, then
                      Start, Settings and Alt+Tab over it, typing into it and closing it
+            security - boot with nimbus.test=security: real-time protection, a quick scan, quarantine, the
+                     firewall and network profiles, device security, a virtual game controller
+            store - boot with nimbus.test=store: Flathub's catalog, search, installing Discord with the Store and
+                     opening it as a window
             logs  - boot, take one screenshot, leave the serial log for reading
 
 Screenshots go to OUTDIR/NAME-*.png and results are appended to OUTDIR/summary.md.
@@ -319,6 +323,66 @@ def main():
         note("Every Settings page opens", bool(m) and m.group(2) == "0" and not bad, (m.group(0).split(": ", 1)[1] if m else "no result") + (" (" + ", ".join(bad) + ")" if bad else ""))
         failed = re.search(r"test settings: failed: ([^\r\n]*)", slog())
         note("The Settings test finished", bool(re.search(r"test settings: done", slog())), failed.group(1) if failed else "")
+        try:
+            vm.cmd("quit")
+        except Exception:
+            pass
+        return finish()
+
+    if scenario in ("security", "store"):
+        serial = os.path.join(outdir, f"{name}-serial.log")
+        tag = f"test {scenario}: "
+
+        def slog():
+            return open(serial, errors="replace").read() if os.path.exists(serial) else ""
+
+        shots = set()
+
+        def got(pattern, seconds):
+            """wait for a line; take the screenshots asked for ("page X") on the way"""
+            end = time.time() + seconds * slow
+            while True:
+                text = slog()
+                for page in re.findall(re.escape(tag) + r"page (\w+)", text):
+                    if page not in shots:
+                        shots.add(page)
+                        snap(f"{len(shots) + 2:02d}-{scenario}-{page}")
+                m = re.search(re.escape(tag) + pattern, text)
+                if m or (tag + "failed") in text or time.time() > end:
+                    return m
+                time.sleep(1)
+
+        def check(label, pattern, seconds, ok=lambda m: True, detail=lambda m: m.group(0).split(": ", 1)[-1].strip()):
+            m = got(pattern, seconds)
+            failed = re.search(re.escape(tag) + r"failed: ([^\r\n]*)", slog())
+            note(label, bool(m) and bool(ok(m)), detail(m) if m else (failed.group(1) if failed else "no result in the system log"))
+            return m
+
+        if scenario == "security":
+            check("ClamAV and the test signature are ready", r"engine (\S+) definitions ([^\r\n]*) realtime (\w+)", 120,
+                  lambda m: m.group(1) != "missing" and "missing" not in m.group(2) and m.group(3) == "true")
+            check("The firewall is on", r"firewall (\w+)[^\r\n]* network (\w+)", 60, lambda m: m.group(1) == "active")
+            check("Real-time protection quarantines a threat in a new download", r"realtime found ([^\r\n]*)", 240, lambda m: "quarantined" in m.group(1))
+            check("A quick scan finds a threat", r"quick scan (\w+): (\d+) files, (\d+) threats([^\r\n]*)", 600, lambda m: m.group(1) == "done" and int(m.group(3)) >= 1)
+            check("Start actions quarantines it", r"start actions: (\d+) quarantined, (\d+) still active[^\r\n]*", 120, lambda m: int(m.group(1)) >= 1 and m.group(2) == "0")
+            check("Protection history: remove and restore", r"history (\d+) items, allowed (\d+), quarantine (\d+)", 60, lambda m: int(m.group(1)) >= 3 and int(m.group(2)) >= 1)
+            check("Blocking all incoming connections works", r"firewall block public (\w+) active (\w+)", 120, lambda m: m.group(1) == "true" and m.group(2) == "true")
+            check("...and unblocking", r"firewall unblock public (\w+)", 120, lambda m: m.group(1) == "true")
+            check("A Private network allows Steam Remote Play", r"firewall network ([^\r\n]*)", 120, lambda m: m.group(1).startswith("none") or m.group(1).rstrip().endswith("true"))
+            check("Device security is read", r"device secure boot ([^\r\n]*)", 60)
+            check("A PlayStation controller is detected", r"controller Nimbus Test DualSense: ([^\r\n]*)", 60, lambda m: "DualSense" in m.group(1) and "playstation" in m.group(1))
+            check("Its button presses reach Settings", r"controller input: ([^\r\n]*)", 60, lambda m: "Cross pressed" in m.group(1))
+            check("The Security test finished", r"done", 60)
+        else:
+            check("Flatpak and Flathub are ready", r"flatpak (\w+) flathub (\w+) libflatpak (\w+)", 120, lambda m: m.group(1) == "true")
+            check("The Store downloads Flathub's catalog", r"catalog (\d+) apps in (\d+) s", 900, lambda m: int(m.group(1)) > 1000)
+            check("Search finds Discord", r"search discord: (\S+)", 60, lambda m: m.group(1) == "com.discordapp.Discord")
+            check("Search finds Steam", r"search steam: (\S+)", 60, lambda m: m.group(1) == "com.valvesoftware.Steam")
+            check("Discord's page has its details", r"details ([^\r\n]*)", 180, lambda m: "Discord" in m.group(1))
+            check("The Store installs Discord", r"installed in (\d+) s; Start has ([^\r\n]*)", 2700, lambda m: "fp:com.discordapp.Discord" in m.group(2))
+            check("Discord opens as a window with its taskbar button", r"window ([^\r\n]*) on the taskbar as (\S+)", 360, lambda m: m.group(2) == "fp:com.discordapp.Discord")
+            check("Updates can be checked", r"updates waiting: (\d+)", 180)
+            check("The Store test finished", r"done", 120)
         try:
             vm.cmd("quit")
         except Exception:

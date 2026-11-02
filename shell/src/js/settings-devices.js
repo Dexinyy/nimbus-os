@@ -88,12 +88,100 @@ defPage('devices', { title: 'Bluetooth & devices', icon: 'devices', keywords: 'b
       WS.card(ctx, { icon: 'devices', title: 'Devices', desc: 'Mouse, keyboard, audio, displays and other devices', go: 'devicesall' }),
       WS.card(ctx, { icon: 'printer', title: 'Printers & scanners', desc: 'Preferences, troubleshoot', go: 'printers' }),
       WS.card(ctx, { icon: 'camera', title: 'Cameras', desc: 'Connected cameras, default image settings', go: 'cameras' }),
+      WS.card(ctx, { icon: 'controller', title: 'Game controllers', desc: 'Xbox, PlayStation, Switch Pro and others: battery, test, pairing', go: 'controllers' }),
       WS.card(ctx, { icon: 'mouse', title: 'Mouse', desc: 'Buttons, mouse pointer speed, scrolling', go: 'mouse' }),
       Sys.input.st.touchpad || !IS_NATIVE ? WS.card(ctx, { icon: 'touchpad', title: 'Touchpad', desc: 'Taps, gestures, scrolling, zooming', go: 'touchpad' }) : null,
       WS.card(ctx, { icon: 'keyboard', title: 'Keyboard', desc: 'Layout, repeat delay and speed', go: 'typing' })),
   ];
 } });
 defSettings('devices', [['bluetooth', 'Bluetooth', 'turn on off pair wireless']]);
+
+/* ---------- Game controllers: what's connected, batteries, a live test, rumble, pairing ---------- */
+const PAD_LABELS = {
+  playstation: { south: '✕', east: '○', west: '□', north: '△', lb: 'L1', rb: 'R1', lt: 'L2', rt: 'R2', select: 'Create', start: 'Options', home: 'PS', ls: 'L3', rs: 'R3' },
+  xbox: { south: 'A', east: 'B', west: 'X', north: 'Y', lb: 'LB', rb: 'RB', lt: 'LT', rt: 'RT', select: 'View', start: 'Menu', home: 'Guide', ls: 'LS', rs: 'RS' },
+  nintendo: { south: 'B', east: 'A', west: 'Y', north: 'X', lb: 'L', rb: 'R', lt: 'ZL', rt: 'ZR', select: '−', start: '+', home: 'Home', ls: 'LS', rs: 'RS' },
+};
+// A gamepad drawn generically (not any maker's shape), its parts named like the kernel's buttons
+function padSvg(fam) {
+  const L = PAD_LABELS[fam] || PAD_LABELS.xbox;
+  const sym = fam === 'playstation'; // sticks side by side below the buttons, as on PlayStation pads
+  const ls = sym ? [128, 168] : [96, 108], rs = sym ? [232, 168] : [222, 160], dp = sym ? [92, 108] : [128, 160], fb = [262, 108];
+  const btn = (id, x, y, label) => `<g class="gp-b" data-b="${id}"><circle cx="${x}" cy="${y}" r="11"/><text x="${x}" y="${y + 4}">${esc(label)}</text></g>`;
+  return `<svg class="gp-svg" viewBox="0 0 360 230" role="img" aria-label="Controller test">
+  <path class="gp-body" d="M70 52h220c30 0 46 22 54 58l14 70c6 28-12 46-34 46-16 0-26-10-34-26l-14-28H84l-14 28c-8 16-18 26-34 26-22 0-40-18-34-46l14-70c8-36 24-58 54-58z"/>
+  <g class="gp-b gp-sh" data-b="lb"><rect x="58" y="30" width="62" height="16" rx="8"/><text x="89" y="42">${esc(L.lb)}</text></g>
+  <g class="gp-b gp-sh" data-b="rb"><rect x="240" y="30" width="62" height="16" rx="8"/><text x="271" y="42">${esc(L.rb)}</text></g>
+  <g class="gp-trig" data-a="lt"><rect x="58" y="6" width="62" height="18" rx="5"/><rect class="gp-fill" x="58" y="6" width="0" height="18" rx="5"/><text x="89" y="19">${esc(L.lt)}</text></g>
+  <g class="gp-trig" data-a="rt"><rect x="240" y="6" width="62" height="18" rx="5"/><rect class="gp-fill" x="240" y="6" width="0" height="18" rx="5"/><text x="271" y="19">${esc(L.rt)}</text></g>
+  <g class="gp-stick" data-s="l"><circle cx="${ls[0]}" cy="${ls[1]}" r="24"/><circle class="gp-dot" data-b="ls" cx="${ls[0]}" cy="${ls[1]}" r="12"/></g>
+  <g class="gp-stick" data-s="r"><circle cx="${rs[0]}" cy="${rs[1]}" r="24"/><circle class="gp-dot" data-b="rs" cx="${rs[0]}" cy="${rs[1]}" r="12"/></g>
+  <g class="gp-dpad"><path class="gp-b" data-b="up" d="M${dp[0] - 8} ${dp[1] - 30}h16v20h-16z"/><path class="gp-b" data-b="down" d="M${dp[0] - 8} ${dp[1] + 10}h16v20h-16z"/>
+    <path class="gp-b" data-b="left" d="M${dp[0] - 30} ${dp[1] - 8}h20v16h-20z"/><path class="gp-b" data-b="right" d="M${dp[0] + 10} ${dp[1] - 8}h20v16h-20z"/></g>
+  ${btn('north', fb[0], fb[1] - 24, L.north)}${btn('south', fb[0], fb[1] + 24, L.south)}${btn('west', fb[0] - 24, fb[1], L.west)}${btn('east', fb[0] + 24, fb[1], L.east)}
+  <g class="gp-b gp-sm" data-b="select"><rect x="146" y="80" width="26" height="12" rx="6"/></g><g class="gp-b gp-sm" data-b="start"><rect x="188" y="80" width="26" height="12" rx="6"/></g>
+  <g class="gp-b gp-home" data-b="home"><circle cx="180" cy="116" r="11"/></g>
+  <text class="gp-cap" x="159" y="104">${esc(L.select)}</text><text class="gp-cap" x="201" y="104">${esc(L.start)}</text></svg>`;
+}
+defPage('controllers', { title: 'Game controllers', parent: 'devices', icon: 'controller', keywords: 'gamepad joystick xbox playstation ps5 ps4 ps3 dualsense dualshock switch pro joy-con steam controller 8bitdo test vibration rumble battery', render: (ctx) => {
+  const list = h('div', { class: 'ws-cards' });
+  const tester = h('div', { class: 'gp-test', hidden: true });
+  let pads = [], testing = null, sig = '';
+  const test = (p) => {
+    if (testing === p.id) { testing = null; tester.hidden = true; Native.call('controllerWatch', { on: false }).catch(() => {}); paint(); return; }
+    testing = p.id;
+    tester.replaceChildren(h('div', { class: 'gp-head' }, h('b', { text: 'Testing ' + p.name }), h('span', { class: 'ws-d', text: 'Press buttons and move the sticks: they light up here.' })), frag(padSvg(p.family)));
+    tester.hidden = false;
+    Native.call('controllerWatch', { id: p.id, on: true }).catch((e) => Notif.push({ app: 'settings', title: 'Controller test', body: e.message, silent: true }));
+    paint();
+  };
+  const show = (st) => {
+    if (!st || st.id !== testing || tester.hidden) return;
+    if (st.gone) { test({ id: testing }); return; }
+    const svg = tester.querySelector('svg'); if (!svg) return;
+    const b = Object.assign({}, st.buttons || {}), a = st.axes || {};
+    if ('hatx' in a) { b.left = a.hatx < 0; b.right = a.hatx > 0; }
+    if ('haty' in a) { b.up = a.haty < 0; b.down = a.haty > 0; }
+    svg.querySelectorAll('[data-b]').forEach((el) => el.classList.toggle('on', !!b[el.dataset.b]));
+    for (const [side, x, y] of [['l', 'lx', 'ly'], ['r', 'rx', 'ry']]) {
+      const g = svg.querySelector(`[data-s="${side}"]`); if (!g) continue;
+      g.querySelector('.gp-dot').setAttribute('transform', `translate(${(a[x] || 0) * 12} ${(a[y] || 0) * 12})`);
+    }
+    for (const t of ['lt', 'rt']) { const f = svg.querySelector(`[data-a="${t}"] .gp-fill`); if (f) f.setAttribute('width', String(Math.round(62 * Math.max(a[t] || 0, b[t] ? 1 : 0)))); }
+  };
+  const paint = async () => {
+    if (IS_NATIVE) { try { pads = await Native.call('controllers'); } catch { pads = []; } }
+    const key = JSON.stringify(pads) + testing;
+    if (key === sig) return;
+    sig = key;
+    list.replaceChildren(...(pads.length ? pads.map((p) => WS.card(ctx, { iconHtml: WS.ic('controller'), title: p.name,
+      desc: [p.model !== p.name ? p.model : '', p.connection, p.battery && p.battery.level != null ? `Battery ${p.battery.level}%${p.battery.charging ? ', charging' : ''}` : ''].filter(Boolean).join(' · '),
+      ctl: h('div', { class: 'ws-row' }, p.rumble ? WS.button('Vibrate', () => Native.call('controllerRumble', { id: p.id }).catch((e) => Notif.push({ app: 'settings', title: 'Vibrate', body: e.message, silent: true }))) : null,
+        WS.button(testing === p.id ? 'Stop test' : 'Test', () => test(p))) }))
+      : [WS.card(ctx, { icon: 'controller', title: IS_NATIVE ? 'No controllers connected' : 'Works when Nimbus runs on a computer', desc: 'Plug one in with a USB cable, or pair it over Bluetooth (below). It works as soon as it shows up here.' })]));
+    if (testing && !pads.some((p) => p.id === testing)) { testing = null; tester.hidden = true; }
+  };
+  const off = bus.on('native:controller-input', show);
+  ctx.onLeave(() => { off(); if (testing) Native.call('controllerWatch', { on: false }).catch(() => {}); });
+  ctx.every(2000, paint); paint();
+  const how = (title, text) => WS.sub({ title, desc: text });
+  return [
+    h('p', { class: 'ws-d ws-intro', text: 'Xbox, PlayStation (DualSense, DualShock 4 and 3), Nintendo Switch Pro and Joy-Con, Steam, 8BitDo and most other controllers work over USB and Bluetooth. Steam and games see them as soon as they’re connected.' }),
+    WS.group('Connected controllers', list, tester),
+    WS.group('Pair a controller over Bluetooth',
+      WS.expander(ctx, { icon: 'bluetooth', title: 'How to put a controller in pairing mode', open: true, items: [
+        how('PlayStation 5 (DualSense)', 'Hold the Create button and the PS button until the light around the touchpad flashes.'),
+        how('PlayStation 4 (DualShock 4)', 'Hold the Share button and the PS button until the light bar flashes.'),
+        how('Xbox Wireless Controller', 'Turn it on, then hold the pair button on its top until the Xbox button flashes quickly.'),
+        how('Nintendo Switch Pro Controller', 'Hold the small sync button on its top, next to the USB port, until the lights move.'),
+        how('Then', 'Choose Add device below, and pick the controller from the list.')] }),
+      WS.card(ctx, { icon: 'add', title: 'Add device', desc: 'Find and pair a Bluetooth controller', ctl: WS.button('Add device', () => addDeviceDialog(ctx)), disabled: !Sys.bt.st.available })),
+    WS.group('Related',
+      WS.card(ctx, { icon: 'gaming', title: 'Gaming', desc: 'Game Mode, captures', go: 'gaming' }),
+      caps.programs ? WS.card(ctx, { icon: 'store', title: 'Get Steam', desc: 'Steam Input supports every controller above in Steam’s games', onClick: () => WM.open('store', { app: 'com.valvesoftware.Steam' }) }) : null),
+  ];
+} });
+defSettings('controllers', [['pads', 'Game controllers', 'gamepad controller xbox playstation dualsense test']]);
 
 defPage('devicesall', { title: 'Devices', parent: 'devices', icon: 'devices', keywords: 'connected hardware input audio', render: (ctx) => {
   const btRow = (d) => WS.expander(ctx, { icon: btIcon(d), title: d.name, desc: btState(d), items: [WS.sub({ title: 'Bluetooth device', desc: d.address, ctl: h('div', { class: 'ws-row' }, d.connected ? WS.button('Disconnect', () => btAction('disconnect', d)) : WS.button('Connect', () => btAction('connect', d)), WS.button('Remove device', () => btAction('remove', d))) })] });
