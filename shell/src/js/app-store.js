@@ -463,15 +463,19 @@ async function testStore() {
   const log = (text) => Native.call('log', { text: 'test store: ' + text }).catch(() => {});
   const until = async (fn, ms) => { const end = Date.now() + ms; for (;;) { const v = fn(); if (v) return v; if (Date.now() > end) return null; await sleep(500); } };
   const ID = 'com.discordapp.Discord';
+  const page = async (name) => { log('page ' + name); await sleep(2500); }; // os/qmp.py takes a screenshot
   try {
+    await sleep(12000); // os/qmp.py is watching by now
     const st = await Native.call('storeStatus');
     log(`flatpak ${st.flatpak} flathub ${st.remote} libflatpak ${st.libflatpak}`);
+    const diag = await Native.call('storeDiag');
+    log(`sandboxes: user namespaces restricted ${diag.restrictUserns}, bubblewrap ${diag.bwrap}`);
     const t0 = Date.now();
     WM.open('store');
     const cat = await Native.call('storeCatalog', {}, 30 * 60 * 1000);
     log(`catalog ${cat.count} apps in ${Math.round((Date.now() - t0) / 1000)} s`);
     await sleep(4000);
-    log('page home');
+    await page('home');
     const hits = await Native.call('storeSearch', { q: 'discord' });
     log('search discord: ' + hits.slice(0, 3).map((x) => x.id).join(' '));
     const steam = await Native.call('storeSearch', { q: 'steam' });
@@ -481,7 +485,7 @@ async function testStore() {
     WM.open('store', { app: ID });
     const get = await until(() => document.querySelector('.app-store .ms-get'), 60000);
     await sleep(2500);
-    log('page app');
+    await page('app');
     const t1 = Date.now();
     let mark = -25;
     const off = bus.on('native:store-progress', (p) => {
@@ -497,16 +501,17 @@ async function testStore() {
     if (done !== true) throw new Error('installing stopped' + (Notif.items[0] ? ': ' + Notif.items[0].title + ' ' + Notif.items[0].body : ''));
     log(`installed in ${Math.round((Date.now() - t1) / 1000)} s; Start has ${Programs.list.map((p) => p.id).join(' ')}`);
     await sleep(2000);
-    log('page installed');
+    await page('installed');
     await Programs.launch('fp:' + ID);
     const w = await until(() => WM.list().find((x) => x.native && x.flatpak === ID && !x.min), 5 * 60 * 1000);
     log(w ? `window ${w.title} (${w.x11 ? 'X11' : 'Wayland'}) on the taskbar as ${w.appId}` : 'no window from Discord');
-    if (w) { await sleep(25000); log('page discord'); }
+    if (w) { await sleep(25000); await page('discord'); }
+    else for (const line of (await Native.call('storeDiag')).log) log('programs.log: ' + line);
     const ups = await Native.call('storeUpdates', {}, 120000);
     log(`updates waiting: ${ups.length}`);
     WM.open('store', { page: 'library' });
     await sleep(3000);
-    log('page library');
+    await page('library');
     log('done');
   } catch (e) { log('failed: ' + e.message); }
 }

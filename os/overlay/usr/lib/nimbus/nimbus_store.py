@@ -928,3 +928,26 @@ class StoreMethods:
 
     def m_programLaunch(self, args):
         return self.launch(program_argv(str(args.get("id") or "")))
+
+    def m_storeDiag(self, _args):
+        """What sandboxes need, for boot tests and troubleshooting: user namespaces, and bubblewrap working."""
+        def read(path):
+            try:
+                with open(path) as f:
+                    return f.read().strip()
+            except OSError:
+                return "n/a"
+        try:
+            r = subprocess.run(["bwrap", "--ro-bind", "/", "/", "--unshare-user", "--unshare-pid", "--proc", "/proc", "true"],
+                               capture_output=True, text=True, timeout=20)
+            bwrap = "works" if r.returncode == 0 else (r.stderr.strip() or "exit %d" % r.returncode)[:200]
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            bwrap = str(exc)
+        log = os.path.join(GLib.get_user_cache_dir(), "nimbus", "programs.log")
+        try:
+            with open(log, errors="replace") as f:
+                tail = f.read()[-6000:].splitlines()[-40:]
+        except OSError:
+            tail = []
+        return {"restrictUserns": read("/proc/sys/kernel/apparmor_restrict_unprivileged_userns"),
+                "maxUserns": read("/proc/sys/user/max_user_namespaces"), "bwrap": bwrap, "log": tail}

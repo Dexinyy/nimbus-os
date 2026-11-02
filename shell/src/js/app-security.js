@@ -435,21 +435,23 @@ async function testSecurity() {
   const log = (text) => Native.call('log', { text: 'test security: ' + text }).catch(() => {});
   const until = async (fn, ms) => { const end = Date.now() + ms; for (;;) { const v = await fn(); if (v) return v; if (Date.now() > end) return null; await sleep(500); } };
   const once = (evt, test, ms) => new Promise((resolve) => { const off = bus.on(evt, (d) => { if (test(d)) { off(); resolve(d); } }); setTimeout(() => { off(); resolve(null); }, ms); });
+  const shot = async (name) => { log('page ' + name); await sleep(2500); }; // os/qmp.py takes a screenshot
   try {
+    await sleep(12000); // os/qmp.py is watching by now
     await Native.call('securityTestSetup');
     let st = await secStatus(true);
     log(`engine ${st.engine || 'missing'} definitions ${st.defs.present ? st.defs.version + ' (' + st.defs.sigs + ' signatures)' : 'missing'} realtime ${st.realtime}`);
     log(`firewall ${st.firewall.available ? (st.firewall.active ? 'active' : 'inactive') : 'unavailable: ' + st.firewall.error} network ${st.network ? st.network.profile : 'none'}`);
     WM.open('security', { page: 'home' });
     await sleep(2500);
-    log('page home');
+    await shot('home');
     // Real-time protection: a "download" arrives
     const alert = once('native:security-alert', (d) => !!(d && d.threats && d.threats.length), 180000);
     await Native.call('securityTestFile', { folder: '~/Downloads', name: 'free-game-installer.com' });
     const a = await alert;
     log(a ? `realtime found ${a.threats.length} ${a.threats[0].threat} ${a.auto ? 'and quarantined it' : 'and reported it'}` : 'realtime found nothing');
     await sleep(2500);
-    log('page alert');
+    await shot('alert');
     // A quick scan finds another copy in /tmp
     await Native.call('securityTestFile', { folder: '/tmp', name: 'invoice.pdf.com' });
     WM.open('security', { page: 'virus' });
@@ -462,7 +464,7 @@ async function testSecurity() {
     st = await secStatus(true);
     WM.open('security', { page: 'virus' });
     await sleep(2500);
-    log(`page threats (${st.activeThreats.length} active)`);
+    await shot('threats');
     const n = await Native.call('securityActAll');
     st = await secStatus(true);
     log(`start actions: ${n} quarantined, ${st.activeThreats.length} still active, ${st.quarantined} in quarantine`);
@@ -474,7 +476,7 @@ async function testSecurity() {
     log(`history ${hist.length} items, allowed ${st.prefs.allowed.length}, quarantine ${st.quarantined}`);
     WM.open('security', { page: 'history' });
     await sleep(2500);
-    log('page history');
+    await shot('history');
     // The firewall: block everything on public networks, then back; this network made private
     let fw = (await Native.call('firewallSet', { what: 'block', profile: 'public', on: true, label: 'test' }));
     log(`firewall block public ${fw.block && fw.block.public} active ${fw.active}`);
@@ -489,12 +491,12 @@ async function testSecurity() {
     } else log('firewall network none');
     WM.open('security', { page: 'firewall' });
     await sleep(2500);
-    log('page firewall');
+    await shot('firewall');
     const dev = await Native.call('securityDevice');
     log(`device secure boot ${dev.uefi ? (dev.secureBoot.on ? 'on' : 'off') : 'n/a'}, tpm ${dev.tpm.present ? dev.tpm.version || 'yes' : 'none'}, lockdown ${dev.lockdown}, mitigations ${dev.mitigations.filter((m) => m.on).length}/${dev.mitigations.length}`);
     WM.open('security', { page: 'device' });
     await sleep(2500);
-    log('page device');
+    await shot('device');
     // A game controller: a virtual DualSense appears, its Cross button is pressed
     await Native.call('controllerTest', { action: 'plug' });
     const pad = await until(async () => (await Native.call('controllers')).find((p) => /Nimbus Test/.test(p.name)), 20000);
@@ -510,7 +512,7 @@ async function testSecurity() {
       const s = await pressed;
       log(s ? `controller input: Cross pressed, left stick x ${s.axes.lx}` : 'controller input not seen');
       await sleep(150);
-      log('page controllers');
+      await shot('controllers');
       await sleep(1500);
       await Native.call('controllerWatch', { on: false });
       await Native.call('controllerTest', { action: 'unplug' });
