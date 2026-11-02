@@ -56,6 +56,22 @@
 #os.tv .win.native .nwin-card, .win.native.ghost .nwin-card { display: flex; }
 .win.native.max .nwin-card { border-radius: 0; }
 .nwin-icon svg { width: 96px; height: 96px; }
+/* The title bar Nimbus draws above X11 programs' windows that don't draw their own (deco); the program's
+   content fills the rest of the stand-in, and the resize edges sit just outside it. */
+#windows > .win.native.deco { box-shadow: var(--shadow-win-idle); }
+#windows > .win.native.deco.active { box-shadow: var(--shadow-win); }
+#windows > .win.native.deco.full, #windows > .win.native.deco.ghost, #os.tv #windows > .win.native.deco { box-shadow: none; }
+.win.native > .win-titlebar { pointer-events: auto; position: relative; z-index: 1; padding-left: 10px; gap: 8px;
+  background: color-mix(in srgb, var(--surface) 93%, var(--wall-tint)); border-radius: var(--r-win) var(--r-win) 0 0; }
+.win.native > .win-titlebar .wc { width: 46px; }
+.win.native.max > .win-titlebar, .win.native.snapped > .win-titlebar { border-radius: 0; }
+.win.native.max > .win-titlebar .close, .win.native.snapped > .win-titlebar .close { border-top-right-radius: 0; }
+.win.native > .rz { pointer-events: auto; }
+.win.native:not(.deco) > .win-titlebar, .win.native:not(.deco) > .rz, .win.native.full > .win-titlebar, .win.native.full > .rz,
+  .win.native.max > .rz { display: none; }
+.win.native.deco > .rz.s { bottom: -6px; } .win.native.deco > .rz.e { right: -6px; } .win.native.deco > .rz.w { left: -6px; }
+.win.native.deco > .rz.se { bottom: -8px; right: -8px; } .win.native.deco > .rz.sw { bottom: -8px; left: -8px; }
+.win.native.deco > .rz.e, .win.native.deco > .rz.w { top: 12px; bottom: -6px; }
 .nwin-title { max-width: 80%; font-size: 1.15rem; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .win-titlebar { height: 40px; flex: none; display: flex; align-items: center; gap: 10px; padding-left: 12px; touch-action: none; }
 .win-icon { width: 16px; height: 16px; flex: none; }

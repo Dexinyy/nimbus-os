@@ -510,7 +510,7 @@ class Shell(nimbus_sys.SysMethods):
             self.windows[wid] = dict(event)
         elif kind == "gone":
             self.windows.pop(wid, None)
-        elif wid in self.windows and kind in ("title", "app", "geom", "parent"):
+        elif wid in self.windows and kind in ("title", "app", "geom", "parent", "deco"):
             self.windows[wid].update({k: v for k, v in event.items() if k not in ("ev", "id")})
         if kind == "focus":
             self.focused = wid
@@ -566,6 +566,8 @@ class Shell(nimbus_sys.SysMethods):
             self.wm.send("idle %s %s" % (num(args.get("screen")), num(args.get("sleep"))))
         elif cmd == "paste":
             self.wm.send("paste")
+        elif cmd == "grab":  # the title bar or an edge Nimbus draws around an X11 program's window was dragged
+            self.wm.send("grab %s %s" % (num(args.get("id")), num(int(args.get("edges") or 0) & 15)))
         else:
             raise ValueError("Unknown window manager command")
         return True

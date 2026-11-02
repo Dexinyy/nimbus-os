@@ -116,6 +116,8 @@ PACKAGES=(
   sudo locales tzdata kbd iproute2 ca-certificates less nano
   procps psmisc htop neofetch curl wget vim-tiny bash-completion
   cage libwlroots12t64 libgl1-mesa-dri libegl1 libegl-mesa0 libgles2 libgbm1
+  # X11 programs (Steam, Discord, games, Windows programs through Wine) draw through Xwayland
+  xwayland
   python3 python3-gi gir1.2-gtk-3.0 gir1.2-webkit2-4.1
   adwaita-icon-theme hicolor-icon-theme gsettings-desktop-schemas dconf-gsettings-backend shared-mime-info
   fontconfig fonts-dejavu-core
@@ -136,7 +138,7 @@ in_chroot apt-get install -y "${PACKAGES[@]}"
 in_chroot apt-get install -y --no-install-recommends cups-daemon cups-client cups-filters cups-ipp-utils avahi-daemon ipp-usb libnss-mdns
 
 log "Building the window manager (nimbus-wm)"
-WM_BUILD=(build-essential pkg-config libwlroots-dev wayland-protocols libwayland-bin)
+WM_BUILD=(build-essential pkg-config libwlroots-dev wayland-protocols libwayland-bin libxcb1-dev libxcb-ewmh-dev libxcb-icccm4-dev)
 in_chroot apt-get install -y --no-install-recommends "${WM_BUILD[@]}"
 mkdir -p "$CHROOT/tmp/nimbus-wm"
 cp "$REPO/wm/Makefile" "$REPO/wm/nimbus-wm.c" "$CHROOT/tmp/nimbus-wm/"

@@ -1,7 +1,7 @@
 # nimbus-wm, the Nimbus OS window manager (a wlroots 0.17 compositor)
 #   make            build ./nimbus-wm
 #   make protocols  generate the Wayland protocol headers wlroots' headers include
-PKGS = wlroots wayland-server xkbcommon pixman-1 libinput
+PKGS = wlroots wayland-server xkbcommon pixman-1 libinput xcb
 CFLAGS ?= -O2 -g
 CFLAGS += -std=c11 -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers \
 	-DWLR_USE_UNSTABLE -D_GNU_SOURCE -I. $(shell pkg-config --cflags $(PKGS))

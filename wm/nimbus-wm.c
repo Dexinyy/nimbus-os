@@ -29,8 +29,13 @@
  *     cursor THEME SIZE the pointer's look
  *     idle SCREEN SLEEP seconds without input before the screen turns off and before sleeping (0: never)
  *     paste             press Ctrl+V in the window that has the keyboard (clipboard history)
+ *     grab ID EDGES     move (EDGES 0) or resize a window with the pointer, its button being held down
+ *                       (the title bar the desktop draws for an X11 window was dragged; EDGES: 1 top,
+ *                       2 bottom, 4 left, 8 right)
  * The compositor also sends "outputs" (the displays and their modes), "inputs" (keyboards and pointers)
  * and "idle" (what: off, on, sleep) events.
+ * X11 programs (through Xwayland, DISPLAY) get windows like Wayland programs; a window's "deco" is the
+ * height of the title bar the desktop should draw above it (X11 programs that don't draw their own).
  * If the desktop exits with status 0 the compositor exits; otherwise it is started again, and it is
  * told about the windows that are already open.
  *
@@ -91,17 +96,31 @@
 #include <wlr/util/edges.h>
 #include <wlr/util/log.h>
 #include <wlr/xcursor.h>
+#include <wlr/xwayland.h>
+#include <xcb/xcb.h>
 #include <xkbcommon/xkbcommon.h>
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX_LAYOUT_WINDOWS 128
 #define TASKBAR_GUESS 48
+#define DECO_TOP 32                        /* the title bar the desktop draws for X11 programs that want one */
 
 enum view_kind { VIEW_APP, VIEW_SHELL, VIEW_SHELL_DIALOG };
 enum view_state { STATE_NORMAL, STATE_MAX, STATE_SNAP, STATE_FULL };
 static const char *const state_names[] = { "normal", "max", "snap", "full" };
 enum cursor_mode { CURSOR_PASSTHROUGH, CURSOR_MOVE, CURSOR_RESIZE };
+
+/* X11 window types (_NET_WM_WINDOW_TYPE_...) that change how a window is treated */
+enum x11_atom {
+	TYPE_MENU, TYPE_DROPDOWN_MENU, TYPE_POPUP_MENU, TYPE_TOOLTIP, TYPE_NOTIFICATION, TYPE_COMBO, TYPE_DND,
+	TYPE_DOCK, TYPE_DESKTOP, TYPE_SPLASH, X11_ATOMS
+};
+static const char *const x11_atom_names[X11_ATOMS] = {
+	"_NET_WM_WINDOW_TYPE_MENU", "_NET_WM_WINDOW_TYPE_DROPDOWN_MENU", "_NET_WM_WINDOW_TYPE_POPUP_MENU",
+	"_NET_WM_WINDOW_TYPE_TOOLTIP", "_NET_WM_WINDOW_TYPE_NOTIFICATION", "_NET_WM_WINDOW_TYPE_COMBO",
+	"_NET_WM_WINDOW_TYPE_DND", "_NET_WM_WINDOW_TYPE_DOCK", "_NET_WM_WINDOW_TYPE_DESKTOP", "_NET_WM_WINDOW_TYPE_SPLASH",
+};
 
 struct server;
 
@@ -109,13 +128,18 @@ struct view {
 	struct wl_list link;               /* server.views (program windows only) */
 	struct server *server;
 	enum view_kind kind;
-	struct wlr_xdg_toplevel *toplevel;
+	struct wlr_xdg_toplevel *toplevel; /* Wayland programs */
+	struct wlr_xwayland_surface *xs;   /* X11 programs (through Xwayland); toplevel is NULL then */
 	struct wlr_scene_tree *root;       /* program windows: holds tree, then above */
 	struct wlr_scene_tree *tree;       /* the window with its popups, placed at its window geometry */
 	struct wlr_scene_tree *above;      /* copies of the desktop's picture drawn over this window */
+	struct wlr_scene_tree *content;    /* X11: the window's surface, while it is on screen */
 	uint32_t id;
 	int x, y;                          /* top left of the window geometry, layout coordinates */
+	int deco_top;                      /* X11: height of the title bar the desktop draws above the window */
 	bool mapped, hidden, announced, placed, listed;
+	bool x11_popup;                    /* X11 menus, tooltips and splash screens: placed by the program */
+	bool kbd_popup;                    /* X11 popup that took the keyboard */
 	enum view_state state;
 	struct wlr_box normal;             /* where to go back to from maximized, snapped or full screen */
 	int restore_w, restore_h;          /* size when dragged out of maximized or snapped */
@@ -126,6 +150,8 @@ struct view {
 	struct wl_listener map, unmap, commit, destroy;
 	struct wl_listener request_move, request_resize, request_maximize, request_fullscreen;
 	struct wl_listener request_minimize, request_show_window_menu, set_title, set_app_id, set_parent;
+	struct wl_listener associate, dissociate, request_configure, request_activate, set_decorations;
+	struct wl_listener set_geometry, content_destroy;
 };
 
 struct popup {                         /* a menu of the desktop's, drawn above everything */
@@ -192,7 +218,12 @@ struct server {
 	struct wlr_box work;               /* the screen minus the taskbar, from the desktop */
 	bool work_set;
 
+	struct wlr_compositor *compositor;
 	struct wlr_xdg_shell *xdg_shell;
+	struct wlr_xwayland *xwayland;     /* X11 programs (Steam, Discord, Wine...) */
+	bool xwayland_ready;
+	xcb_atom_t x11_atoms[X11_ATOMS];
+	struct wlr_scene_tree *x11_layer;  /* X11 menus and splash screens with no window of theirs on screen */
 	struct wl_list views;
 	uint32_t next_id;
 	int cascade;
@@ -251,6 +282,7 @@ struct server {
 	struct wl_listener new_inhibitor;
 
 	struct wl_listener new_output, new_input, new_xdg_surface, new_decoration, request_activate;
+	struct wl_listener xwayland_ready_listener, new_xwayland_surface;
 	struct wl_listener cursor_motion, cursor_motion_absolute, cursor_button, cursor_axis, cursor_frame;
 	struct wl_listener request_cursor, request_set_shape, request_set_selection, request_set_primary_selection;
 	struct wl_listener request_start_drag, start_drag, new_virtual_keyboard, new_virtual_pointer;
@@ -391,13 +423,57 @@ static void jb_send(struct server *s, struct jbuf *j) {
 	ipc_write(s, j->b, j->n);
 }
 
+/* The window's size and where its content starts in its surface (Wayland windows can have shadows around them). */
 static struct wlr_box view_geometry(struct view *v) {
-	struct wlr_box g;
+	struct wlr_box g = { 0 };
+	if (v->xs) {
+		struct wlr_surface *surf = v->xs->surface;
+		if (surf && surf->mapped) {
+			g.width = surf->current.width;
+			g.height = surf->current.height;
+		} else {
+			g.width = v->xs->width;
+			g.height = v->xs->height;
+		}
+		return g;
+	}
 	wlr_xdg_surface_get_geometry(v->toplevel->base, &g);
 	return g;
 }
 
+static struct wlr_surface *view_surface(struct view *v) {
+	return v->xs ? v->xs->surface : v->toplevel->base->surface;
+}
+
+static const char *view_app_id(struct view *v) {
+	if (v->xs)
+		return v->xs->class && *v->xs->class ? v->xs->class : v->xs->instance;
+	return v->toplevel->app_id;
+}
+
+static const char *view_title(struct view *v) {
+	return v->xs ? v->xs->title : v->toplevel->title;
+}
+
+static pid_t view_pid(struct view *v) {
+	if (v->xs)
+		return v->xs->pid; /* the X11 program itself, not Xwayland */
+	pid_t pid = 0;
+	wl_client_get_credentials(wl_resource_get_client(v->toplevel->resource), &pid, NULL, NULL);
+	return pid;
+}
+
 static struct view *view_parent(struct view *v) {
+	if (v->xs) {
+		struct wlr_xwayland_surface *p = v->xs->parent;
+		while (p) { /* a dialog of a menu belongs to the menu's window */
+			struct view *pv = p->data;
+			if (pv && !pv->x11_popup && pv->id)
+				return pv;
+			p = p->parent;
+		}
+		return NULL;
+	}
 	struct wlr_xdg_toplevel *p = v->toplevel->parent;
 	if (!p || !p->base->data)
 		return NULL;
@@ -411,8 +487,8 @@ static void send_window(struct server *s, const char *ev, struct view *v) {
 	jb_begin(&j, ev);
 	jb_int(&j, "id", v->id);
 	struct wlr_box g = view_geometry(v);
-	jb_str(&j, "app", v->toplevel->app_id);
-	jb_str(&j, "title", v->toplevel->title);
+	jb_str(&j, "app", view_app_id(v));
+	jb_str(&j, "title", view_title(v));
 	jb_int(&j, "x", v->x);
 	jb_int(&j, "y", v->y);
 	jb_int(&j, "w", g.width);
@@ -421,9 +497,9 @@ static void send_window(struct server *s, const char *ev, struct view *v) {
 	struct view *p = view_parent(v);
 	jb_int(&j, "parent", p ? p->id : 0);
 	jb_int(&j, "min", v->hidden);
-	pid_t pid = 0;
-	wl_client_get_credentials(wl_resource_get_client(v->toplevel->resource), &pid, NULL, NULL);
-	jb_int(&j, "pid", pid);
+	jb_int(&j, "pid", view_pid(v));
+	jb_int(&j, "x11", v->xs != NULL);
+	jb_int(&j, "deco", v->deco_top);
 	jb_send(s, &j);
 	v->reported = (struct wlr_box){ v->x, v->y, g.width, g.height };
 	v->reported_state = v->state;
@@ -754,22 +830,33 @@ static void kbd_enter(struct server *s, struct wlr_surface *surf) {
 		wlr_seat_keyboard_notify_enter(s->seat, surf, NULL, 0, NULL);
 }
 
+/* Tell a program its window is the active one, or no longer is. */
+static void view_activate(struct view *v, bool on) {
+	if (v->xs) {
+		wlr_xwayland_surface_activate(v->xs, on);
+		if (on) /* X11 programs keep their own idea of which window is on top */
+			wlr_xwayland_surface_restack(v->xs, NULL, XCB_STACK_MODE_ABOVE);
+		return;
+	}
+	wlr_xdg_toplevel_set_activated(v->toplevel, on);
+}
+
 /* Give the keyboard to a program window, or to the desktop (v == NULL). */
 static void set_focus(struct server *s, struct view *v) {
 	if (v && (!v->mapped || v->hidden))
 		v = NULL;
 	struct view *old = s->active;
-	struct wlr_surface *target = v ? v->toplevel->base->surface : shell_surface(s);
+	struct wlr_surface *target = v ? view_surface(v) : shell_surface(s);
 	/* an open menu keeps the keyboard; moving the focus elsewhere closes it */
 	if (target != s->seat->keyboard_state.focused_surface &&
 			s->seat->keyboard_state.grab != s->seat->keyboard_state.default_grab)
 		wlr_seat_keyboard_end_grab(s->seat);
 	if (old && old != v)
-		wlr_xdg_toplevel_set_activated(old->toplevel, false);
+		view_activate(old, false);
 	s->active = v;
 	if (v) {
-		wlr_xdg_toplevel_set_activated(v->toplevel, true);
-		kbd_enter(s, v->toplevel->base->surface);
+		view_activate(v, true);
+		kbd_enter(s, view_surface(v));
 	} else if (shell_surface(s)) {
 		kbd_enter(s, shell_surface(s));
 	} else {
@@ -814,6 +901,16 @@ static struct wlr_box work_area(struct server *s) {
 /* The scene tree of an xdg surface starts at its window geometry, so it goes where the window is. */
 static void view_update_position(struct view *v) {
 	wlr_scene_node_set_position(&v->tree->node, v->x, v->y);
+	/* X11 programs place their menus from where they think their window is */
+	if (v->xs && v->xs->surface && (v->xs->x != v->x || v->xs->y != v->y))
+		wlr_xwayland_surface_configure(v->xs, (int16_t)v->x, (int16_t)v->y, MAX(v->xs->width, 1), MAX(v->xs->height, 1));
+}
+
+/* A box for the window and the title bar the desktop draws above it: the window's part of it */
+static struct wlr_box below_title(struct view *v, struct wlr_box b) {
+	b.y += v->deco_top;
+	b.height = MAX(b.height - v->deco_top, 1);
+	return b;
 }
 
 static void set_tiled(struct wlr_xdg_toplevel *t, bool tiled) {
@@ -829,10 +926,18 @@ static void view_configure(struct view *v, enum view_state st, struct wlr_box b)
 		v->normal = (struct wlr_box){ v->x, v->y, g.width, g.height };
 	}
 	v->state = st;
-	wlr_xdg_toplevel_set_maximized(t, st == STATE_MAX);
-	wlr_xdg_toplevel_set_fullscreen(t, st == STATE_FULL);
-	set_tiled(t, st == STATE_MAX || st == STATE_SNAP);
-	wlr_xdg_toplevel_set_size(t, MAX(b.width, 0), MAX(b.height, 0));
+	if (v->xs) {
+		wlr_xwayland_surface_set_maximized(v->xs, st == STATE_MAX);
+		wlr_xwayland_surface_set_fullscreen(v->xs, st == STATE_FULL);
+		struct wlr_box g = view_geometry(v);
+		int w = b.width > 0 ? b.width : g.width, h = b.height > 0 ? b.height : g.height;
+		wlr_xwayland_surface_configure(v->xs, (int16_t)b.x, (int16_t)b.y, (uint16_t)MAX(w, 1), (uint16_t)MAX(h, 1));
+	} else {
+		wlr_xdg_toplevel_set_maximized(t, st == STATE_MAX);
+		wlr_xdg_toplevel_set_fullscreen(t, st == STATE_FULL);
+		set_tiled(t, st == STATE_MAX || st == STATE_SNAP);
+		wlr_xdg_toplevel_set_size(t, MAX(b.width, 0), MAX(b.height, 0));
+	}
 	v->x = b.x;
 	v->y = b.y;
 	v->placed = true;
@@ -849,22 +954,41 @@ static void view_restore(struct view *v) {
 	view_configure(v, STATE_NORMAL, b);
 }
 
+/* X11 programs that say where their window goes (Wine does, for Windows programs) */
+static bool x11_wants_position(struct view *v) {
+	struct server *s = v->server;
+	xcb_size_hints_t *h = v->xs ? v->xs->size_hints : NULL;
+	if (!h)
+		return false;
+	if (v->xs->width >= s->screen.width && v->xs->height >= s->screen.height)
+		return true; /* covers the screen: a game */
+	return (h->flags & (XCB_ICCCM_SIZE_HINT_US_POSITION | XCB_ICCCM_SIZE_HINT_P_POSITION)) && (v->xs->x || v->xs->y);
+}
+
 static void view_place_initial(struct view *v) {
 	struct server *s = v->server;
 	struct wlr_box w = work_area(s);
 	struct wlr_box g = view_geometry(v);
+	int top = v->deco_top; /* the desktop's title bar goes above the window */
 	struct view *parent = view_parent(v);
-	if (parent) {
+	if (x11_wants_position(v)) {
+		v->x = v->xs->x;
+		v->y = v->xs->y;
+		if (g.width >= s->screen.width && g.height >= s->screen.height) {
+			v->placed = true;
+			return;
+		}
+	} else if (parent) {
 		struct wlr_box pg = view_geometry(parent);
 		v->x = parent->x + (pg.width - g.width) / 2;
-		v->y = parent->y + (pg.height - g.height) / 2;
+		v->y = parent->y + (pg.height - g.height + top) / 2;
 	} else {
 		int off = (s->cascade++ % 6) * 26 - 52;
 		v->x = w.x + (w.width - g.width) / 2 + off;
-		v->y = w.y + (w.height - g.height) / 2 + off * 7 / 10;
+		v->y = w.y + top + (w.height - top - g.height) / 2 + off * 7 / 10;
 	}
 	v->x = MAX(w.x, MIN(v->x, w.x + w.width - MIN(g.width, w.width)));
-	v->y = MAX(w.y, MIN(v->y, w.y + w.height - MIN(g.height, w.height)));
+	v->y = MAX(w.y + top, MIN(v->y, w.y + w.height - g.height));
 	v->placed = true;
 }
 
@@ -877,9 +1001,13 @@ static struct view *view_from_surface_tree(struct wlr_xdg_surface *xs) {
 	return t->node.data;
 }
 
+static bool x11_map(struct view *v);
+
 static void view_handle_map(struct wl_listener *l, void *data) {
 	struct view *v = wl_container_of(l, v, map);
 	struct server *s = v->server;
+	if (v->xs && !x11_map(v))
+		return; /* an X11 menu or tooltip */
 	v->mapped = true;
 	if (v->kind == VIEW_SHELL) {
 		v->x = s->screen.x;
@@ -909,14 +1037,21 @@ static void view_handle_map(struct wl_listener *l, void *data) {
 		send_window(s, "new", v);
 		v->announced = true;
 	}
-	wlr_log(WLR_INFO, "window %u (%s) opened", v->id, v->toplevel->app_id ? v->toplevel->app_id : "?");
+	wlr_log(WLR_INFO, "window %u (%s%s) opened", v->id, view_app_id(v) ? view_app_id(v) : "?", v->xs ? ", X11" : "");
 	set_focus(s, v);
 	update_copies(s, v, true);
 }
 
+static void x11_unmap(struct view *v);
+
 static void view_handle_unmap(struct wl_listener *l, void *data) {
 	struct view *v = wl_container_of(l, v, unmap);
 	struct server *s = v->server;
+	if (v->xs) {
+		x11_unmap(v);
+		if (v->x11_popup)
+			return;
+	}
 	v->mapped = false;
 	if (s->grab_view == v) {
 		s->cursor_mode = CURSOR_PASSTHROUGH;
@@ -942,7 +1077,7 @@ static void view_handle_unmap(struct wl_listener *l, void *data) {
 static void view_handle_commit(struct wl_listener *l, void *data) {
 	struct view *v = wl_container_of(l, v, commit);
 	struct server *s = v->server;
-	if (!v->mapped)
+	if (!v->mapped || v->x11_popup)
 		return;
 	if (v->kind == VIEW_SHELL)
 		return;
@@ -1071,7 +1206,7 @@ static void view_handle_set_title(struct wl_listener *l, void *data) {
 	struct jbuf j;
 	jb_begin(&j, "title");
 	jb_int(&j, "id", v->id);
-	jb_str(&j, "title", v->toplevel->title);
+	jb_str(&j, "title", view_title(v));
 	jb_send(v->server, &j);
 }
 
@@ -1082,7 +1217,7 @@ static void view_handle_set_app_id(struct wl_listener *l, void *data) {
 	struct jbuf j;
 	jb_begin(&j, "app");
 	jb_int(&j, "id", v->id);
-	jb_str(&j, "app", v->toplevel->app_id);
+	jb_str(&j, "app", view_app_id(v));
 	jb_send(v->server, &j);
 }
 
@@ -1291,12 +1426,43 @@ static struct wlr_surface *surface_at(struct server *s, double lx, double ly, do
 	return ss->surface;
 }
 
+/* The title bar and edges the desktop draws around an X11 window that wants a frame: a click there (where
+   nothing of the desktop's sits above that window) is a click on that window. */
+static struct view *frame_at(struct server *s, double lx, double ly) {
+	int px = (int)floor(lx), py = (int)floor(ly);
+	if (pixman_region32_contains_point(&s->top_region, px, py, NULL))
+		return NULL;
+	struct wlr_scene_node *node;
+	wl_list_for_each_reverse(node, &s->app_layer->children, link) {
+		struct view *v, *found = NULL;
+		wl_list_for_each(v, &s->views, link) {
+			if (&v->root->node == node) {
+				found = v;
+				break;
+			}
+		}
+		if (!found || !found->mapped || found->hidden || !found->deco_top || found->state == STATE_FULL)
+			continue;
+		struct wlr_box g = view_geometry(found);
+		struct wlr_box f = { found->x - 6, found->y - found->deco_top, g.width + 12, g.height + found->deco_top + 6 };
+		if (!wlr_box_contains_point(&f, lx, ly))
+			continue;
+		return pixman_region32_contains_point(&found->above_region, px, py, NULL) ? NULL : found;
+	}
+	return NULL;
+}
+
 static bool swallowed_take(struct server *s, uint32_t keycode);
 
-static void begin_grab(struct view *v, enum cursor_mode mode, uint32_t edges) {
+/* Move or resize a window with the pointer: asked by the program (its title bar or edges were dragged), or
+   by the desktop (the title bar it draws for X11 programs was dragged). */
+static void begin_grab(struct view *v, enum cursor_mode mode, uint32_t edges, bool by_desktop) {
 	struct server *s = v->server;
 	struct wlr_surface *focused = s->seat->pointer_state.focused_surface;
-	if (v->kind != VIEW_APP || !focused || wlr_surface_get_root_surface(focused) != v->toplevel->base->surface)
+	if (v->kind != VIEW_APP || v->x11_popup || !v->mapped || !focused || s->cursor_mode != CURSOR_PASSTHROUGH)
+		return;
+	if (by_desktop ? s->seat->pointer_state.button_count == 0 :
+			wlr_surface_get_root_surface(focused) != view_surface(v))
 		return;
 	if (mode == CURSOR_RESIZE && (v->state == STATE_MAX || v->state == STATE_FULL))
 		return;
@@ -1306,8 +1472,10 @@ static void begin_grab(struct view *v, enum cursor_mode mode, uint32_t edges) {
 	if (mode == CURSOR_RESIZE && v->state == STATE_SNAP) {
 		/* resizing a snapped window lets go of the snap and keeps its size */
 		v->state = STATE_NORMAL;
-		set_tiled(v->toplevel, false);
-		wlr_xdg_surface_schedule_configure(v->toplevel->base);
+		if (v->toplevel) {
+			set_tiled(v->toplevel, false);
+			wlr_xdg_surface_schedule_configure(v->toplevel->base);
+		}
 		view_report(v);
 	}
 	s->grab_view = v;
@@ -1323,13 +1491,13 @@ static void begin_grab(struct view *v, enum cursor_mode mode, uint32_t edges) {
 
 static void view_handle_request_move(struct wl_listener *l, void *data) {
 	struct view *v = wl_container_of(l, v, request_move);
-	begin_grab(v, CURSOR_MOVE, 0);
+	begin_grab(v, CURSOR_MOVE, 0, false);
 }
 
 static void view_handle_request_resize(struct wl_listener *l, void *data) {
 	struct view *v = wl_container_of(l, v, request_resize);
 	struct wlr_xdg_toplevel_resize_event *e = data;
-	begin_grab(v, CURSOR_RESIZE, e->edges);
+	begin_grab(v, CURSOR_RESIZE, e->edges, false);
 }
 
 static void send_moving(struct server *s, const char *ev) {
@@ -1374,7 +1542,7 @@ static void do_move(struct server *s, uint32_t time) {
 	struct wlr_box w = work_area(s);
 	int nx = s->grab_box.x + (int)dx, ny = s->grab_box.y + (int)dy;
 	nx = MAX(w.x - s->grab_box.width + 100, MIN(nx, w.x + w.width - 100));
-	ny = MAX(w.y, MIN(ny, w.y + w.height - 40));
+	ny = MAX(w.y + v->deco_top, MIN(ny, w.y + w.height - 40));
 	v->x = nx;
 	v->y = ny;
 	view_update_position(v);
@@ -1384,11 +1552,36 @@ static void do_move(struct server *s, uint32_t time) {
 	}
 }
 
+/* The smallest and largest sizes a program allows for its window (0: no limit) */
+static void view_size_limits(struct view *v, int *minw, int *minh, int *maxw, int *maxh) {
+	*minw = *minh = *maxw = *maxh = 0;
+	if (v->toplevel) {
+		struct wlr_xdg_toplevel_state *cur = &v->toplevel->current;
+		*minw = cur->min_width;
+		*minh = cur->min_height;
+		*maxw = cur->max_width;
+		*maxh = cur->max_height;
+		return;
+	}
+	xcb_size_hints_t *h = v->xs->size_hints;
+	if (!h)
+		return;
+	if (h->flags & XCB_ICCCM_SIZE_HINT_P_MIN_SIZE) {
+		*minw = h->min_width;
+		*minh = h->min_height;
+	}
+	if (h->flags & XCB_ICCCM_SIZE_HINT_P_MAX_SIZE) {
+		*maxw = h->max_width;
+		*maxh = h->max_height;
+	}
+}
+
 static void do_resize(struct server *s) {
 	struct view *v = s->grab_view;
 	double dx = s->cursor->x - s->grab_x, dy = s->cursor->y - s->grab_y;
 	struct wlr_box b = s->grab_box;
-	struct wlr_xdg_toplevel_state *cur = &v->toplevel->current;
+	int min_w, min_h, max_w, max_h;
+	view_size_limits(v, &min_w, &min_h, &max_w, &max_h);
 	if (s->grab_edges & WLR_EDGE_RIGHT)
 		b.width = s->grab_box.width + (int)dx;
 	if (s->grab_edges & WLR_EDGE_LEFT)
@@ -1398,15 +1591,22 @@ static void do_resize(struct server *s) {
 	if (s->grab_edges & WLR_EDGE_TOP) {
 		struct wlr_box w = work_area(s);
 		b.height = s->grab_box.height - (int)dy;
-		b.height = MIN(b.height, s->grab_box.y + s->grab_box.height - w.y);
+		b.height = MIN(b.height, s->grab_box.y + s->grab_box.height - w.y - v->deco_top);
 	}
-	int minw = MAX(cur->min_width, 120), minh = MAX(cur->min_height, 60);
-	b.width = MAX(b.width, minw);
-	b.height = MAX(b.height, minh);
-	if (cur->max_width > 0)
-		b.width = MIN(b.width, cur->max_width);
-	if (cur->max_height > 0)
-		b.height = MIN(b.height, cur->max_height);
+	b.width = MAX(b.width, MAX(min_w, 120));
+	b.height = MAX(b.height, MAX(min_h, 60));
+	if (max_w > 0)
+		b.width = MIN(b.width, max_w);
+	if (max_h > 0)
+		b.height = MIN(b.height, max_h);
+	if (v->xs) {
+		/* X11 windows are given their place with their size; the edge opposite the pointer stays put */
+		int x = s->grab_edges & WLR_EDGE_LEFT ? s->grab_box.x + s->grab_box.width - b.width : v->x;
+		int y = s->grab_edges & WLR_EDGE_TOP ? s->grab_box.y + s->grab_box.height - b.height : v->y;
+		if (b.width != v->xs->width || b.height != v->xs->height)
+			wlr_xwayland_surface_configure(v->xs, (int16_t)x, (int16_t)y, (uint16_t)b.width, (uint16_t)b.height);
+		return;
+	}
 	wlr_xdg_toplevel_set_size(v->toplevel, b.width, b.height);
 }
 
@@ -1496,7 +1696,15 @@ static void handle_cursor_button(struct wl_listener *l, void *data) {
 		if ((changed || covered) && v->announced)
 			send_simple(s, "focus", v->id);
 	} else if (v && v->kind == VIEW_SHELL) {
-		if (s->active) {
+		struct view *fv = frame_at(s, s->cursor->x, s->cursor->y);
+		if (fv) { /* the title bar the desktop draws for an X11 window: the window comes forward */
+			bool changed = s->active != fv;
+			if (!view_is_top(s, fv))
+				raise_view(s, fv);
+			set_focus(s, fv);
+			if (changed && fv->announced)
+				send_simple(s, "focus", fv->id);
+		} else if (s->active) {
 			set_focus(s, NULL);
 			send_simple(s, "focus", 0);
 		}
@@ -2073,6 +2281,394 @@ static void press_paste(struct server *s) {
 	wlr_seat_keyboard_notify_modifiers(s->seat, &kb->modifiers);
 }
 
+/* ---------- X11 programs (Xwayland) ---------- */
+/* Programs that only speak X11 (Steam, Discord, Battle.net and other Windows programs through Wine, most games)
+   draw through Xwayland. Their windows are views like Wayland programs' windows; menus, tooltips and splash
+   screens ("popups" here) are drawn where the program puts them, with the window they belong to. Windows that
+   ask the window manager for a frame get a title bar drawn by the desktop ("deco" in the window's events). */
+
+static bool x11_has_type(struct server *s, struct wlr_xwayland_surface *xs, enum x11_atom a) {
+	if (!s->x11_atoms[a])
+		return false;
+	for (size_t i = 0; i < xs->window_type_len; i++)
+		if (xs->window_type[i] == s->x11_atoms[a])
+			return true;
+	return false;
+}
+
+static bool x11_is_popup(struct view *v) {
+	if (v->xs->override_redirect)
+		return true;
+	for (int a = 0; a < X11_ATOMS; a++)
+		if (x11_has_type(v->server, v->xs, (enum x11_atom)a))
+			return true;
+	return false;
+}
+
+static bool x11_wants_deco(struct view *v) {
+	return !v->x11_popup && v->xs->decorations == WLR_XWAYLAND_SURFACE_DECORATIONS_ALL;
+}
+
+static void x11_send_deco(struct view *v) {
+	if (!v->announced)
+		return;
+	struct jbuf j;
+	jb_begin(&j, "deco");
+	jb_int(&j, "id", v->id);
+	jb_int(&j, "deco", v->deco_top);
+	jb_send(v->server, &j);
+}
+
+/* The window a popup belongs to: the one it names, else the active window or the top window of its program */
+static struct view *x11_owner(struct view *v) {
+	struct server *s = v->server;
+	for (struct wlr_xwayland_surface *p = v->xs->parent; p; p = p->parent) {
+		struct view *pv = p->data;
+		if (pv && pv->id && !pv->x11_popup && pv->mapped)
+			return pv;
+	}
+	pid_t pid = v->xs->pid;
+	struct view *a = s->active;
+	if (a && a->xs && a->mapped && (!pid || a->xs->pid == pid))
+		return a;
+	struct wlr_scene_node *node;
+	wl_list_for_each_reverse(node, &s->app_layer->children, link) {
+		struct view *o;
+		wl_list_for_each(o, &s->views, link)
+			if (&o->root->node == node && o->xs && o->mapped && !o->hidden && pid && o->xs->pid == pid)
+				return o;
+	}
+	return NULL;
+}
+
+static void x11_content_destroyed(struct wl_listener *l, void *data) {
+	struct view *v = wl_container_of(l, v, content_destroy);
+	unlisten(&v->content_destroy);
+	v->content = NULL;
+}
+
+static void x11_add_content(struct view *v, struct wlr_scene_tree *parent) {
+	v->content = wlr_scene_subsurface_tree_create(parent, v->xs->surface);
+	if (v->content)
+		hook(&v->content->node.events.destroy, &v->content_destroy, x11_content_destroyed);
+}
+
+static void x11_drop_content(struct view *v) {
+	if (!v->content)
+		return;
+	unlisten(&v->content_destroy);
+	wlr_scene_node_destroy(&v->content->node);
+	v->content = NULL;
+}
+
+static void x11_popup_map(struct view *v) {
+	struct server *s = v->server;
+	struct wlr_xwayland_surface *xs = v->xs;
+	struct view *owner = x11_owner(v);
+	x11_add_content(v, owner ? owner->root : s->x11_layer);
+	if (!v->content)
+		return;
+	if (owner) /* above its window, below the desktop's parts over that window */
+		wlr_scene_node_place_above(&v->content->node, &owner->tree->node);
+	if (x11_has_type(s, xs, TYPE_SPLASH) && !xs->x && !xs->y) {
+		struct wlr_box w = work_area(s);
+		wlr_xwayland_surface_configure(xs, (int16_t)(w.x + (w.width - xs->width) / 2),
+			(int16_t)(w.y + (w.height - xs->height) / 2), MAX(xs->width, 1), MAX(xs->height, 1));
+	}
+	wlr_scene_node_set_position(&v->content->node, xs->x, xs->y);
+	v->mapped = true;
+	/* menus don't take the keyboard (their window keeps it); other windows the program places itself may */
+	if (wlr_xwayland_or_surface_wants_focus(xs) && wlr_xwayland_icccm_input_model(xs) != WLR_ICCCM_INPUT_MODEL_NONE &&
+			!xs->override_redirect) {
+		kbd_enter(s, xs->surface);
+		v->kbd_popup = true;
+	}
+}
+
+/* Returns false for popups, which are on screen once this returns. */
+static bool x11_map(struct view *v) {
+	struct server *s = v->server;
+	struct wlr_xwayland_surface *xs = v->xs;
+	v->x11_popup = x11_is_popup(v) && !(v->id && !xs->override_redirect);
+	if (v->x11_popup) {
+		x11_popup_map(v);
+		return false;
+	}
+	if (!v->id) {
+		v->id = ++s->next_id;
+		v->root = wlr_scene_tree_create(s->app_layer);
+		v->tree = wlr_scene_tree_create(v->root);
+		v->above = wlr_scene_tree_create(v->root);
+		v->tree->node.data = v;
+		wlr_scene_node_set_enabled(&v->root->node, false);
+		wl_list_insert(s->views.prev, &v->link);
+	}
+	x11_add_content(v, v->tree);
+	v->deco_top = x11_wants_deco(v) ? DECO_TOP : 0;
+	if (!v->placed)
+		view_place_initial(v);
+	if (xs->fullscreen)
+		view_configure(v, STATE_FULL, s->screen);
+	else if (xs->maximized_horz && xs->maximized_vert)
+		view_configure(v, STATE_MAX, below_title(v, work_area(s)));
+	return true;
+}
+
+static void x11_unmap(struct view *v) {
+	struct server *s = v->server;
+	x11_drop_content(v);
+	if (!v->x11_popup)
+		return;
+	v->mapped = false;
+	if (v->kbd_popup) {
+		v->kbd_popup = false;
+		set_focus(s, s->active);
+	}
+}
+
+static void x11_handle_associate(struct wl_listener *l, void *data) {
+	struct view *v = wl_container_of(l, v, associate);
+	struct wlr_surface *surf = v->xs->surface;
+	hook(&surf->events.map, &v->map, view_handle_map);
+	hook(&surf->events.unmap, &v->unmap, view_handle_unmap);
+	hook(&surf->events.commit, &v->commit, view_handle_commit);
+}
+
+static void x11_handle_dissociate(struct wl_listener *l, void *data) {
+	struct view *v = wl_container_of(l, v, dissociate);
+	unlisten(&v->map);
+	unlisten(&v->unmap);
+	unlisten(&v->commit);
+}
+
+static void x11_handle_destroy(struct wl_listener *l, void *data) {
+	struct view *v = wl_container_of(l, v, destroy);
+	struct server *s = v->server;
+	struct wl_listener *all[] = { &v->map, &v->unmap, &v->commit, &v->destroy, &v->associate, &v->dissociate,
+		&v->request_configure, &v->request_move, &v->request_resize, &v->request_maximize, &v->request_fullscreen,
+		&v->request_minimize, &v->request_activate, &v->set_title, &v->set_app_id, &v->set_parent,
+		&v->set_decorations, &v->set_geometry };
+	for (size_t i = 0; i < sizeof all / sizeof all[0]; i++)
+		unlisten(all[i]);
+	x11_drop_content(v);
+	if (s->grab_view == v) {
+		s->cursor_mode = CURSOR_PASSTHROUGH;
+		s->grab_view = NULL;
+	}
+	if (s->active == v)
+		s->active = NULL;
+	if (v->id) {
+		if (v->announced)
+			send_simple(s, "gone", v->id);
+		wl_list_remove(&v->link);
+		wlr_scene_node_destroy(&v->root->node);
+	}
+	v->xs->data = NULL;
+	pixman_region32_fini(&v->above_region);
+	pixman_region32_fini(&v->copied);
+	free(v);
+}
+
+/* A program moves or resizes its own window */
+static void x11_handle_request_configure(struct wl_listener *l, void *data) {
+	struct view *v = wl_container_of(l, v, request_configure);
+	struct wlr_xwayland_surface_configure_event *e = data;
+	struct server *s = v->server;
+	if (!v->mapped || v->x11_popup) {
+		wlr_xwayland_surface_configure(v->xs, e->x, e->y, MAX(e->width, 1), MAX(e->height, 1));
+		if (v->x11_popup && v->content)
+			wlr_scene_node_set_position(&v->content->node, e->x, e->y);
+		if (!v->mapped && v->placed && (e->mask & (XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y))) {
+			v->x = e->x;
+			v->y = e->y;
+		}
+		return;
+	}
+	if (v->state != STATE_NORMAL || s->grab_view == v) {
+		/* maximized, snapped and full-screen windows stay as they are; the program is told so */
+		wlr_xwayland_surface_configure(v->xs, (int16_t)v->x, (int16_t)v->y, MAX(v->xs->width, 1), MAX(v->xs->height, 1));
+		return;
+	}
+	struct wlr_box w = work_area(s);
+	int x = e->mask & XCB_CONFIG_WINDOW_X ? e->x : v->x;
+	int y = e->mask & XCB_CONFIG_WINDOW_Y ? e->y : v->y;
+	x = MAX(w.x - e->width + 100, MIN(x, w.x + w.width - 100));
+	y = MAX(w.y + v->deco_top, MIN(y, w.y + w.height - 40));
+	v->x = x;
+	v->y = y;
+	wlr_xwayland_surface_configure(v->xs, (int16_t)x, (int16_t)y, MAX(e->width, 1), MAX(e->height, 1));
+	view_update_position(v);
+}
+
+static void x11_handle_request_resize(struct wl_listener *l, void *data) {
+	struct view *v = wl_container_of(l, v, request_resize);
+	struct wlr_xwayland_resize_event *e = data;
+	begin_grab(v, CURSOR_RESIZE, e->edges, false);
+}
+
+static void x11_handle_request_maximize(struct wl_listener *l, void *data) {
+	struct view *v = wl_container_of(l, v, request_maximize);
+	if (!v->mapped || v->x11_popup)
+		return; /* asked before the window shows: it opens maximized */
+	bool want = v->xs->maximized_horz && v->xs->maximized_vert;
+	if (want && v->state != STATE_MAX)
+		view_configure(v, STATE_MAX, below_title(v, work_area(v->server)));
+	else if (!want && v->state == STATE_MAX)
+		view_restore(v);
+	else
+		wlr_xwayland_surface_set_maximized(v->xs, v->state == STATE_MAX);
+	view_report(v);
+}
+
+static void x11_handle_request_fullscreen(struct wl_listener *l, void *data) {
+	struct view *v = wl_container_of(l, v, request_fullscreen);
+	struct server *s = v->server;
+	if (!v->mapped || v->x11_popup)
+		return;
+	if (v->xs->fullscreen && v->state != STATE_FULL) {
+		view_configure(v, STATE_FULL, s->screen);
+		raise_view(s, v);
+	} else if (!v->xs->fullscreen && v->state == STATE_FULL) {
+		view_restore(v);
+	} else {
+		wlr_xwayland_surface_set_fullscreen(v->xs, v->state == STATE_FULL);
+	}
+	view_report(v);
+}
+
+static void x11_handle_request_minimize(struct wl_listener *l, void *data) {
+	struct view *v = wl_container_of(l, v, request_minimize);
+	struct wlr_xwayland_minimize_event *e = data;
+	if (!v->mapped || v->x11_popup)
+		return;
+	if (!v->announced) {
+		wlr_xwayland_surface_set_minimized(v->xs, false);
+		return;
+	}
+	send_request(v, e->minimize ? "min" : "activate", 0, 0);
+}
+
+static void x11_handle_request_activate(struct wl_listener *l, void *data) {
+	struct view *v = wl_container_of(l, v, request_activate);
+	struct server *s = v->server;
+	if (!v->mapped || v->x11_popup)
+		return;
+	if (v->announced) {
+		send_request(v, "activate", 0, 0);
+	} else {
+		raise_view(s, v);
+		set_focus(s, v);
+	}
+}
+
+static void x11_handle_set_decorations(struct wl_listener *l, void *data) {
+	struct view *v = wl_container_of(l, v, set_decorations);
+	struct server *s = v->server;
+	if (!v->mapped || v->x11_popup)
+		return;
+	int top = x11_wants_deco(v) ? DECO_TOP : 0;
+	if (top == v->deco_top)
+		return;
+	v->deco_top = top;
+	if (v->state == STATE_MAX) {
+		view_configure(v, STATE_MAX, below_title(v, work_area(s)));
+	} else if (v->state == STATE_NORMAL && v->y - top < work_area(s).y) {
+		v->y = work_area(s).y + top;
+		view_update_position(v);
+	}
+	x11_send_deco(v);
+	view_report(v);
+}
+
+static void x11_handle_set_geometry(struct wl_listener *l, void *data) {
+	struct view *v = wl_container_of(l, v, set_geometry);
+	if (v->x11_popup && v->content)
+		wlr_scene_node_set_position(&v->content->node, v->xs->x, v->xs->y);
+}
+
+static void handle_new_xwayland_surface(struct wl_listener *l, void *data) {
+	struct server *s = wl_container_of(l, s, new_xwayland_surface);
+	struct wlr_xwayland_surface *xs = data;
+	struct view *v = calloc(1, sizeof *v);
+	if (!v)
+		return;
+	v->server = s;
+	v->kind = VIEW_APP;
+	v->xs = xs;
+	xs->data = v;
+	wl_list_init(&v->link);
+	pixman_region32_init(&v->above_region);
+	pixman_region32_init(&v->copied);
+	hook(&xs->events.destroy, &v->destroy, x11_handle_destroy);
+	hook(&xs->events.associate, &v->associate, x11_handle_associate);
+	hook(&xs->events.dissociate, &v->dissociate, x11_handle_dissociate);
+	hook(&xs->events.request_configure, &v->request_configure, x11_handle_request_configure);
+	hook(&xs->events.request_move, &v->request_move, view_handle_request_move);
+	hook(&xs->events.request_resize, &v->request_resize, x11_handle_request_resize);
+	hook(&xs->events.request_maximize, &v->request_maximize, x11_handle_request_maximize);
+	hook(&xs->events.request_fullscreen, &v->request_fullscreen, x11_handle_request_fullscreen);
+	hook(&xs->events.request_minimize, &v->request_minimize, x11_handle_request_minimize);
+	hook(&xs->events.request_activate, &v->request_activate, x11_handle_request_activate);
+	hook(&xs->events.set_title, &v->set_title, view_handle_set_title);
+	hook(&xs->events.set_class, &v->set_app_id, view_handle_set_app_id);
+	hook(&xs->events.set_parent, &v->set_parent, view_handle_set_parent);
+	hook(&xs->events.set_decorations, &v->set_decorations, x11_handle_set_decorations);
+	hook(&xs->events.set_geometry, &v->set_geometry, x11_handle_set_geometry);
+}
+
+/* X11 programs' own pointer image, for where they don't set one */
+static void x11_set_cursor(struct server *s) {
+	if (!s->xwayland || !s->xwayland->xwm || !wlr_xcursor_manager_load(s->cursor_mgr, 1))
+		return;
+	struct wlr_xcursor *xc = wlr_xcursor_manager_get_xcursor(s->cursor_mgr, "default", 1);
+	if (!xc)
+		xc = wlr_xcursor_manager_get_xcursor(s->cursor_mgr, "left_ptr", 1);
+	if (!xc || !xc->image_count)
+		return;
+	struct wlr_xcursor_image *img = xc->images[0];
+	wlr_xwayland_set_cursor(s->xwayland, img->buffer, img->width * 4, img->width, img->height,
+		(int32_t)img->hotspot_x, (int32_t)img->hotspot_y);
+}
+
+/* X11 programs keep their menus out of the taskbar with this */
+static void x11_set_workarea(struct server *s) {
+	if (!s->xwayland || !s->xwayland->xwm)
+		return;
+	struct wlr_box w = work_area(s);
+	wlr_xwayland_set_workareas(s->xwayland, &w, 1);
+}
+
+/* Xwayland started (it starts when the first X11 program does, and stops a while after the last one ends) */
+static void handle_xwayland_ready(struct wl_listener *l, void *data) {
+	struct server *s = wl_container_of(l, s, xwayland_ready_listener);
+	wlr_xwayland_set_seat(s->xwayland, s->seat);
+	x11_set_cursor(s);
+	x11_set_workarea(s);
+	xcb_connection_t *c = xcb_connect(s->xwayland->display_name, NULL);
+	if (xcb_connection_has_error(c)) {
+		wlr_log(WLR_ERROR, "cannot talk to Xwayland on %s", s->xwayland->display_name);
+		xcb_disconnect(c);
+		return;
+	}
+	xcb_intern_atom_cookie_t cookies[X11_ATOMS];
+	for (int i = 0; i < X11_ATOMS; i++)
+		cookies[i] = xcb_intern_atom(c, 0, (uint16_t)strlen(x11_atom_names[i]), x11_atom_names[i]);
+	for (int i = 0; i < X11_ATOMS; i++) {
+		xcb_intern_atom_reply_t *r = xcb_intern_atom_reply(c, cookies[i], NULL);
+		s->x11_atoms[i] = r ? r->atom : XCB_ATOM_NONE;
+		free(r);
+	}
+	xcb_disconnect(c);
+	wlr_log(WLR_INFO, "Xwayland is ready on DISPLAY=%s", s->xwayland->display_name);
+}
+
+static void view_close(struct view *v) {
+	if (v->xs)
+		wlr_xwayland_surface_close(v->xs);
+	else
+		wlr_xdg_toplevel_send_close(v->toplevel);
+}
+
 /* ---------- commands from the desktop ---------- */
 
 struct tok {
@@ -2255,7 +2851,7 @@ static void ipc_command(struct server *s, char *line) {
 	} else if (!strcmp(line, "close")) {
 		struct view *v = view_by_id(s, (uint32_t)tok_int(&t));
 		if (t.ok && v)
-			wlr_xdg_toplevel_send_close(v->toplevel);
+			view_close(v);
 	} else if (!strcmp(line, "show")) {
 		struct view *v = view_by_id(s, (uint32_t)tok_int(&t));
 		long on = tok_int(&t);
@@ -2263,8 +2859,15 @@ static void ipc_command(struct server *s, char *line) {
 			return;
 		v->hidden = !on;
 		wlr_scene_node_set_enabled(&v->root->node, v->mapped && !v->hidden);
+		if (v->xs) /* games pause when minimized */
+			wlr_xwayland_surface_set_minimized(v->xs, v->hidden);
 		if (v->hidden && s->active == v)
 			set_focus(s, NULL);
+	} else if (!strcmp(line, "grab")) {
+		struct view *v = view_by_id(s, (uint32_t)tok_int(&t));
+		long edges = tok_int(&t);
+		if (t.ok && v)
+			begin_grab(v, edges ? CURSOR_RESIZE : CURSOR_MOVE, (uint32_t)edges & 15, true);
 	} else if (!strcmp(line, "geom")) {
 		cmd_geom(s, &t);
 	} else if (!strcmp(line, "area")) {
@@ -2273,6 +2876,7 @@ static void ipc_command(struct server *s, char *line) {
 			return;
 		s->work = (struct wlr_box){ (int)x, (int)y, (int)w, (int)h };
 		s->work_set = true;
+		x11_set_workarea(s);
 	} else if (!strcmp(line, "overlay")) {
 		long dim = tok_int(&t), night = tok_int(&t);
 		if (!t.ok)
@@ -2351,6 +2955,7 @@ static void ipc_command(struct server *s, char *line) {
 		wlr_xcursor_manager_destroy(s->cursor_mgr);
 		s->cursor_mgr = mgr;
 		wlr_cursor_set_xcursor(s->cursor, s->cursor_mgr, "default");
+		x11_set_cursor(s);
 	} else if (!strcmp(line, "idle")) {
 		long screen = tok_int(&t), sleep = tok_int(&t);
 		if (!t.ok)
@@ -2606,7 +3211,7 @@ int main(int argc, char *argv[]) {
 		wlr_log(WLR_ERROR, "no allocator");
 		return 1;
 	}
-	wlr_compositor_create(s->display, 5, s->renderer);
+	s->compositor = wlr_compositor_create(s->display, 5, s->renderer);
 	wlr_subcompositor_create(s->display);
 	wlr_data_device_manager_create(s->display);
 	wlr_primary_selection_v1_device_manager_create(s->display);
@@ -2629,6 +3234,7 @@ int main(int argc, char *argv[]) {
 	s->content = wlr_scene_tree_create(&s->scene->tree);
 	s->shell_layer = wlr_scene_tree_create(s->content);
 	s->app_layer = wlr_scene_tree_create(s->content);
+	s->x11_layer = wlr_scene_tree_create(s->content);
 	s->top_copies = wlr_scene_tree_create(s->content);
 	s->top_layer = wlr_scene_tree_create(s->content);
 	s->drag_layer = wlr_scene_tree_create(&s->scene->tree);
@@ -2673,6 +3279,18 @@ int main(int argc, char *argv[]) {
 	}
 	update_capabilities(s);
 
+	/* X11 programs: Xwayland starts when the first one does */
+	s->xwayland = wlr_xwayland_create(s->display, s->compositor, true);
+	if (s->xwayland) {
+		hook(&s->xwayland->events.ready, &s->xwayland_ready_listener, handle_xwayland_ready);
+		hook(&s->xwayland->events.new_surface, &s->new_xwayland_surface, handle_new_xwayland_surface);
+		setenv("DISPLAY", s->xwayland->display_name, 1);
+		wlr_log(WLR_INFO, "X11 programs use DISPLAY=%s", s->xwayland->display_name);
+	} else {
+		wlr_log(WLR_ERROR, "no Xwayland: X11 programs won't start");
+		unsetenv("DISPLAY");
+	}
+
 	s->layout_timer = wl_event_loop_add_timer(s->loop, handle_layout_timeout, s);
 	s->idle_timer = wl_event_loop_add_timer(s->loop, handle_idle_timer, s);
 	s->last_input = now_msec();
@@ -2703,6 +3321,11 @@ int main(int argc, char *argv[]) {
 	if (s->shell_pid > 0)
 		kill(s->shell_pid, SIGTERM);
 	ipc_close(s);
+	if (s->xwayland) {
+		unlisten(&s->xwayland_ready_listener);
+		unlisten(&s->new_xwayland_surface);
+		wlr_xwayland_destroy(s->xwayland);
+	}
 	wl_display_destroy_clients(s->display);
 	wl_event_source_remove(s->layout_timer);
 	wl_event_source_remove(s->idle_timer);

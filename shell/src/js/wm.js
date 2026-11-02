@@ -21,14 +21,26 @@ const WM = (() => {
   }
   const snapRect = (f) => { const A = area(); return { x: Math.round(A.x + f[0] * A.w), y: Math.round(A.y + f[1] * A.h), w: Math.round(f[2] * A.w), h: Math.round(f[3] * A.h) }; };
   function rectFor(w) {
-    if (w.native) return { x: w.x, y: w.y, w: w.w, h: w.h }; // where the window manager says it is
+    if (w.native) { // where the window manager says it is, with the title bar Nimbus draws for some X11 programs
+      const top = w.deco && !w.full ? w.deco : 0;
+      return { x: w.x, y: w.y - top, w: w.w, h: w.h + top };
+    }
     if (w.state === 'max') return area(); if (w.snap) return snapRect(w.snap); return { x: w.x, y: w.y, w: w.w, h: w.h };
   }
   function place(w) {
     const r = rectFor(w); const s = w.el.style;
     s.left = r.x + 'px'; s.top = r.y + 'px'; s.width = r.w + 'px'; s.height = r.h + 'px';
     w.el.classList.toggle('max', w.state === 'max');
-    if (w.native) { w.el.classList.toggle('full', !!w.full); NativeWin.schedule(); return; }
+    if (w.native) {
+      w.el.classList.toggle('full', !!w.full);
+      if (w.deco) {
+        w.el.classList.toggle('snapped', !!w.snap && w.state !== 'max');
+        const restore = w.state === 'max' || !!w.snap;
+        w.bMax.innerHTML = ui(restore ? 'restore' : 'max');
+        w.bMax.setAttribute('aria-label', restore ? 'Restore' : 'Maximize');
+      }
+      NativeWin.schedule(); return;
+    }
     w.el.classList.toggle('snapped', !!w.snap && w.state !== 'max');
     const restore = w.state === 'max' || !!w.snap;
     w.bMax.innerHTML = ui(restore ? 'restore' : 'max');
@@ -177,7 +189,8 @@ const WM = (() => {
   function nativeApply(w) {
     const st = w.full ? 3 : w.state === 'max' ? 1 : w.snap ? 2 : 0;
     const back = w.normal || { x: w.x, y: w.y, w: w.w, h: w.h };
-    const r = st === 1 ? area() : st === 2 ? snapRect(w.snap) : back;
+    let r = st === 1 ? area() : st === 2 ? snapRect(w.snap) : back;
+    if (w.deco && (st === 1 || st === 2)) r = { x: r.x, y: r.y + w.deco, w: r.w, h: Math.max(1, r.h - w.deco) }; // below the title bar
     NativeWin.call('geom', { id: w.nid, x: r.x, y: r.y, w: r.w, h: r.h, state: st, rw: back.w, rh: back.h });
   }
   function snapTo(w, zone) {
@@ -413,11 +426,13 @@ const WM = (() => {
     const app = APPS[appId];
     const w = { id: 'n' + ev.id, nid: ev.id, native: true, appId, app, x: ev.x, y: ev.y, w: ev.w, h: ev.h,
       state: ev.state === 'max' ? 'max' : 'normal', snap: null, full: ev.state === 'full', min: !!ev.min, z: 0, onTop: false,
-      title: ev.title || app.name, parent: ev.parent || 0, pid: ev.pid || 0, cleanup: [], beforeClose: null, dirty: false, created: Date.now() };
+      title: ev.title || app.name, parent: ev.parent || 0, pid: ev.pid || 0, x11: !!ev.x11, deco: 0,
+      cleanup: [], beforeClose: null, dirty: false, created: Date.now() };
     if (ev.state === 'normal') w.normal = { x: ev.x, y: ev.y, w: ev.w, h: ev.h };
     const card = h('div', { class: 'nwin-card' }, h('span', { class: 'nwin-icon', html: appIcon(app.icon) }), h('span', { class: 'nwin-title', text: w.title }));
     const el = h('div', { class: 'win native', 'data-app': appId, 'aria-label': w.title }, card);
     Object.assign(w, { el, titleEl: card.querySelector('.nwin-title'), body: el });
+    if (ev.deco > 0) nativeFrame(w, ev.deco);
     w.api = { id: w.id, win: w, el, body: el, close: () => close(w), onClose(fn) { w.cleanup.push(fn); }, focus: () => focus(w), isActive: () => activeId === w.id, setTitle() {}, on: () => () => {}, every: () => 0 };
     wins.set(w.id, w);
     layer().append(el);
@@ -437,7 +452,55 @@ const WM = (() => {
   function nativeTitle(nid, title) {
     const w = byNid(nid); if (!w) return;
     w.title = title || w.app.name; w.titleEl.textContent = w.title; w.el.setAttribute('aria-label', w.title);
+    if (w.frameTitle) w.frameTitle.textContent = w.title;
     bus.emit('wm-title', w);
+  }
+  /* A title bar (and edges to resize by) for X11 programs that leave that to the window manager, as on
+     Windows: older Linux programs, and Windows programs through Wine. Dragging it lets the window manager
+     move the window (it follows the pointer itself); the window's content sits right below it. */
+  function nativeFrame(w, deco) {
+    w.deco = deco;
+    w.el.classList.add('deco');
+    if (w.tb) { w.tb.style.height = deco + 'px'; return; }
+    const tb = h('div', { class: 'win-titlebar', style: { height: deco + 'px' } });
+    const ic = h('span', { class: 'win-icon', html: appIcon(w.app.icon) });
+    const title = h('span', { class: 'win-title', text: w.title });
+    const bMin = h('button', { class: 'wc min', 'aria-label': 'Minimize', 'data-tip': 'Minimize', html: ui('min') });
+    const bMax = h('button', { class: 'wc max', 'aria-label': 'Maximize', html: ui('max') });
+    const bClose = h('button', { class: 'wc close', 'aria-label': 'Close', 'data-tip': 'Close', html: ui('x') });
+    tb.append(ic, title, h('div', { class: 'win-controls' }, bMin, bMax, bClose));
+    w.el.prepend(tb);
+    for (const d of ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']) w.el.append(h('div', { class: 'rz ' + d, 'data-dir': d }));
+    Object.assign(w, { tb, frameTitle: title, frameIcon: ic, bMax });
+    w.el.addEventListener('pointerdown', () => { if (activeId !== w.id) focus(w); }, true);
+    tb.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0 || e.target.closest('button') || w.full || osEl().classList.contains('tv')) return;
+      hideSnapFly();
+      NativeWin.call('grab', { id: w.nid, edges: 0 });
+    });
+    tb.addEventListener('dblclick', (e) => { if (!e.target.closest('button')) toggleMax(w); });
+    tb.addEventListener('contextmenu', (e) => { e.preventDefault(); titleMenu(w, e.clientX, e.clientY); });
+    bMin.addEventListener('click', (e) => { e.stopPropagation(); minimize(w); });
+    bMax.addEventListener('click', (e) => { e.stopPropagation(); hideSnapFly(); toggleMax(w); });
+    bClose.addEventListener('click', (e) => { e.stopPropagation(); close(w); });
+    const EDGES = { n: 1, s: 2, w: 4, e: 8, nw: 5, ne: 9, sw: 6, se: 10 };
+    w.el.querySelectorAll('.rz').forEach((r) => r.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0 || w.state === 'max' || w.full) return;
+      e.preventDefault(); e.stopPropagation();
+      if (w.snap) { w.snap = null; } // resizing lets go of the snap, as for Nimbus's windows
+      NativeWin.call('grab', { id: w.nid, edges: EDGES[r.dataset.dir] });
+    }));
+    let hoverT = 0;
+    bMax.addEventListener('pointerenter', (e) => { if (e.pointerType === 'touch') return; clearTimeout(hoverT); hoverT = setTimeout(() => showSnapFly(w), 480); });
+    bMax.addEventListener('pointerleave', () => clearTimeout(hoverT));
+  }
+  // The window manager says whether an X11 window wants Nimbus's title bar (programs can change their mind)
+  function nativeDeco(nid, deco) {
+    const w = byNid(nid); if (!w || (w.deco || 0) === (deco || 0)) return;
+    if (deco > 0) nativeFrame(w, deco);
+    else { w.deco = 0; w.el.classList.remove('deco'); }
+    place(w);
+    if (w.state === 'max' || w.snap) nativeApply(w);
   }
   function nativeGeom(ev) {
     const w = byNid(ev.id); if (!w) return;
@@ -463,7 +526,7 @@ const WM = (() => {
 
   return {
     open, focus, close, minimize, snapTo, toggleMax, taskView, showDesktop, keySnap, relayout, area, hideSnapFly,
-    openNative, nativeGone, nativeTitle, nativeGeom, nativeMoving, byNid, titleMenu,
+    openNative, nativeGone, nativeTitle, nativeGeom, nativeMoving, nativeDeco, byNid, titleMenu,
     zOf: (w) => w.z + (w.onTop ? 100000 : 0),
     list: () => [...wins.values()].sort((a, b) => a.created - b.created),
     get: (id) => wins.get(id),

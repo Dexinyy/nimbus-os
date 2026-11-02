@@ -81,8 +81,44 @@ shot 05-click-chrome
 # The taskbar stays above Chrome: clicking Chrome's taskbar button minimizes it
 wtype -k Super_L; sleep 1.5; wtype -k Escape; sleep 1.5
 shot 06-after-start
+
+# An X11 program (through Xwayland): xterm leaves its title bar to the window manager, so Nimbus draws one
+XDISP="$(grep -o 'X11 programs use DISPLAY=[^ ]*' "$OUT/wm.log" | head -1 | cut -d= -f2)"
+if [ -z "$XDISP" ]; then
+  note fail "X11 programs can start (no Xwayland)"
+elif ! command -v xterm >/dev/null; then
+  note fail "X11 programs can start (xterm is not installed)"
+else
+  DISPLAY="$XDISP" xterm -bg '#e8731a' -fg white -geometry 70x16+220+170 -T "X11 test window" -e sleep 300 >"$OUT/xterm.log" 2>&1 &
+  XTERM=$!
+  if wait_log "X11) opened" 40; then note ok "An X11 program opens a window (Xwayland)"; else note fail "An X11 program opens a window (Xwayland)"; fi
+  sleep 4
+  shot 07-x11
+  read -r ORANGE TITLE <<<"$(python3 - "$OUT/07-x11.png" <<'PY'
+import sys
+from PIL import Image
+im = Image.open(sys.argv[1]).convert("RGB"); W, H = im.size; px = im.load()
+pts = [(x, y) for x in range(0, W, 4) for y in range(0, H, 4)
+       if abs(px[x, y][0] - 0xe8) < 30 and abs(px[x, y][1] - 0x73) < 30 and abs(px[x, y][2] - 0x1a) < 30]
+if not pts:
+    print(0, 0); sys.exit()
+x0, x1 = min(p[0] for p in pts), max(p[0] for p in pts); y0 = min(p[1] for p in pts)
+# Nimbus's title bar: a plain grey strip (light or dark theme) right above the window, as wide as it
+strip = [px[x, y] for x in range(x0 + 60, max(x0 + 61, x1 - 160), 3) for y in range(max(0, y0 - 26), max(1, y0 - 6), 3)]
+med = [sorted(p[i] for p in strip)[len(strip) // 2] for i in range(3)]
+grey = max(med) - min(med) < 24
+same = sum(1 for p in strip if all(abs(p[i] - med[i]) < 16 for i in range(3))) * 100 // max(1, len(strip))
+print(round(100 * len(pts) / ((W // 4) * (H // 4))), same if grey else 0)
+PY
+)"
+  [ "${ORANGE:-0}" -gt 3 ] && note ok "The X11 window shows (${ORANGE}% of the screen)" || note fail "The X11 window shows (${ORANGE:-0}% of the screen)"
+  [ "${TITLE:-0}" -gt 70 ] && note ok "Nimbus draws a title bar above it" || note fail "Nimbus draws a title bar above it (${TITLE:-0}% of it plain grey)"
+  wtype -M alt -k F4 -m alt; sleep 3
+  if kill -0 "$XTERM" 2>/dev/null; then note fail "Alt+F4 closes the X11 window"; kill "$XTERM"; else note ok "Alt+F4 closes the X11 window"; fi
+  shot 08-x11-closed
+fi
 kill -0 "$SESSION" 2>/dev/null && note ok "The window manager is still running" || note fail "The window manager is still running"
-grep -E "window [0-9]+ \(|key |the desktop|screen " "$OUT/wm.log" | head -40
+grep -E "window [0-9]+ \(|key |the desktop|screen |Xwayland|X11" "$OUT/wm.log" | head -40
 kill "$SESSION" 2>/dev/null; wait "$SESSION" 2>/dev/null
 cat "$summary"
 exit "$FAILED"

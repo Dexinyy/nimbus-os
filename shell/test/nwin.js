@@ -141,6 +141,46 @@ window.webkit = { messageHandlers: { nimbus: { postMessage(json) {
     check(await page.$('#tb-apps [data-app="x:org.gnome.Calculator"]'), 'a program from Terminal has no taskbar button');
     check(!(await page.evaluate(() => [...document.querySelectorAll('#start .apps-all [data-app], #start [data-app]')].some((b) => b.dataset.app.startsWith('x:')))), 'programs from Terminal appear in Start');
 
+    // An X11 program that leaves its title bar to the window manager: Nimbus draws one right above its window
+    await event(page, { ev: 'new', id: 9, app: 'XTerm', title: 'xterm', x: 400, y: 300, w: 480, h: 300, state: 'normal', parent: 0, min: 0, pid: 77, x11: 1, deco: 32 });
+    await page.waitForTimeout(400);
+    const bar = () => page.$eval('#windows > .win.native.deco > .win-titlebar', (el) => { const r = el.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)]; });
+    const frame = await bar();
+    check(frame[0] === 400 && frame[1] === 268 && frame[2] === 480 && frame[3] === 32, 'title bar for an X11 window: ' + JSON.stringify(frame));
+    await page.screenshot({ path: path.join(OUT, 'w5-x11-frame.png') });
+    lay = await lastOf(page, 'layout');
+    const under = lay && lay.stack.find((x) => x[0] === 7);
+    check(under && under[1].some((r) => r[0] === 400 && r[1] === 268 && r[2] === 480 && r[3] === 32), 'the X11 title bar is not drawn above Chrome below it: ' + JSON.stringify(lay));
+    const own = lay && lay.stack.find((x) => x[0] === 9);
+    check(own && own[1].length === 0, 'the X11 window has things drawn over it: ' + JSON.stringify(own));
+    // dragging the title bar lets the window manager move the window
+    await page.mouse.move(560, 284); await page.mouse.down();
+    await page.waitForTimeout(150);
+    const grab = await lastOf(page, 'grab');
+    check(grab && grab.id === 9 && grab.edges === 0, 'dragging the X11 title bar did not start a move: ' + JSON.stringify(grab));
+    await page.mouse.up();
+    // its bottom right corner resizes it
+    await page.mouse.move(400 + 480 + 4, 300 + 300 + 4); await page.mouse.down(); await page.waitForTimeout(150); await page.mouse.up();
+    const rgrab = await lastOf(page, 'grab');
+    check(rgrab && rgrab.id === 9 && rgrab.edges === 10, 'the X11 window\'s corner did not start a resize: ' + JSON.stringify(rgrab));
+    // maximizing puts the window below the title bar
+    await page.click('#windows > .win.native.deco .wc.max');
+    await page.waitForTimeout(200);
+    const mg = await lastOf(page, 'geom');
+    check(mg && mg.id === 9 && mg.state === 1 && mg.y === 32 && mg.x === 0 && mg.w === 1280, 'maximizing the X11 window: ' + JSON.stringify(mg));
+    await event(page, { ev: 'geom', id: 9, x: 0, y: 32, w: 1280, h: mg.h, state: 'max' });
+    await page.waitForTimeout(200);
+    const mframe = await bar();
+    check(mframe[0] === 0 && mframe[1] === 0 && mframe[2] === 1280, 'title bar of the maximized X11 window: ' + JSON.stringify(mframe));
+    // full screen hides it; a program that starts drawing its own title bar loses ours
+    await event(page, { ev: 'geom', id: 9, x: 0, y: 0, w: 1280, h: 800, state: 'full' });
+    await page.waitForTimeout(150);
+    check(await page.$eval('#windows > .win.native.deco > .win-titlebar', (el) => getComputedStyle(el).display === 'none'), 'the title bar shows on a full-screen X11 window');
+    await event(page, { ev: 'deco', id: 9, deco: 0 });
+    await page.waitForTimeout(150);
+    check(!(await page.$('#windows > .win.native.deco')), 'the title bar stayed after the program stopped wanting it');
+    await event(page, { ev: 'gone', id: 9 });
+
     // Alt+F4 from Chrome asks it to close; it goes when the window manager says so
     await page.evaluate(() => __n.WM.focus(__n.WM.byNid(7)));
     await event(page, { ev: 'key', key: 'alt+f4', id: 7 });

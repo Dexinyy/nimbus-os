@@ -71,6 +71,7 @@ const NativeWin = {
       case 'title': WM.nativeTitle(ev.id, ev.title); break;
       case 'app': { const w = WM.byNid(ev.id); if (w) { w.appId = Apps.forWindow(ev.app); w.app = APPS[w.appId]; bus.emit('wm'); } break; }
       case 'parent': { const w = WM.byNid(ev.id); if (w) w.parent = ev.parent; break; }
+      case 'deco': WM.nativeDeco(ev.id, ev.deco); break;
       case 'geom': WM.nativeGeom(ev); break;
       case 'moving': WM.nativeMoving(ev, false); break;
       case 'moved': WM.nativeMoving(ev, true); break;
@@ -146,6 +147,12 @@ const NativeWin = {
     for (const el of document.querySelectorAll('#windows > .win:not(.native), #windows > .win.native.ghost, #snap-preview.show')) {
       if (!vis(el)) continue;
       layers.push({ z: parseInt(el.style.zIndex, 10) || 0, r: rect(el, el.classList.contains('max') ? 0 : null) });
+    }
+    // the title bars (and edges) Nimbus draws for X11 programs' windows go above the program windows below them
+    for (const el of document.querySelectorAll('#windows > .win.native.deco:not(.ghost):not(.full)')) {
+      if (!vis(el)) continue;
+      const z = parseInt(el.style.zIndex, 10) || 0;
+      for (const part of el.querySelectorAll(':scope > .win-titlebar, :scope > .rz')) if (vis(part)) layers.push({ z, r: rect(part, 0) });
     }
     const stack = natives.map((w) => [w.nid, layers.filter((l) => l.z > WM.zOf(w)).map((l) => l.r)]);
     return { top, stack };
