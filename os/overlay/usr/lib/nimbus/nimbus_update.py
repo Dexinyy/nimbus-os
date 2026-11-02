@@ -168,7 +168,14 @@ class UpdateMethods:
         bad, checked = [], 0
         for path, f in sorted(files.items()):
             full = "/" + path
-            if os.path.exists(full) and not os.access(full, os.R_OK):
+            try:
+                os.stat(full)
+                readable = os.access(full, os.R_OK)
+            except PermissionError:  # in a folder only root can open (polkit's rules)
+                readable = False
+            except OSError:
+                readable = True  # missing: that counts
+            if not readable:
                 continue  # root's own (the sudo rules)
             checked += 1
             if file_sha(full) != f.get("sha256"):

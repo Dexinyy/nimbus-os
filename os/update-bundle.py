@@ -33,8 +33,9 @@ MANIFEST = "nimbus-os-update.json"
 # for Chrome, and the files that name this version
 EXTRA = ["usr/share/nimbus", "usr/bin/nimbus-wm", "usr/share/fonts/truetype/nimbus", "usr/share/doc/nimbus-os",
          "usr/share/keyrings/google-chrome.gpg", "usr/lib/os-release", "etc/issue"]
-# Written per system: the version (the helper writes it from the description) and the list of files itself
-SKIP = {"usr/share/nimbus/build-info.json", "usr/share/nimbus/files.json"}
+# Written per system: the version (the helper writes it from the description) and the list of files itself. Also
+# /etc/default/locale: casper rewrites it at every start, so an update would only find it "changed here".
+SKIP = {"usr/share/nimbus/build-info.json", "usr/share/nimbus/files.json", "etc/default/locale"}
 MIGRATION = re.compile(r"^(\d{4}-[a-z0-9-]+)\.sh$")
 
 

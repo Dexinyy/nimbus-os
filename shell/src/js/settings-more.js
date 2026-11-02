@@ -261,7 +261,7 @@ const ISO_PAGE = 'https://github.com/Dexinyy/nimbus-os/releases/tag/latest';
 const updWorking = () => !!(Upd.job && (Upd.job.phase === 'download' || Upd.job.phase === 'install'));
 const updPendingInfo = () => (Upd.job && Upd.job.phase === 'done' ? Upd.job.result : (Upd.st && Upd.st.pending) || (Upd.local && Upd.local.pending) || null);
 const updPending = () => !!updPendingInfo();
-const updName = (v) => `${v.name || 'Nimbus OS ' + (v.version || '')} (build ${String(v.commit || '').slice(0, 7)})`.replace(/\s+/g, ' ');
+const updName = (v) => (v ? `${v.name || 'Nimbus OS ' + (v.version || '')} (build ${String(v.commit || '').slice(0, 7)})`.replace(/\s+/g, ' ') : 'Nimbus OS');
 function updChanged() {
   bus.emit('sys', 'update');
   const b = document.getElementById('start-power');
@@ -481,7 +481,8 @@ async function testUpdate() {
   const until = async (fn, ms) => { const end = Date.now() + ms; for (;;) { const v = fn(); if (v) return v; if (Date.now() > end) return null; await sleep(500); } };
   const page = async (name) => { log('page ' + name); await sleep(2500); };
   const win = () => document.querySelector('.app-settings');
-  const button = (label, root) => [...(root || document).querySelectorAll('button')].find((b) => b.textContent.trim() === label && !b.disabled);
+  // a button in that window or dialog only (Recovery has another "Restart now")
+  const button = (label, root) => (root ? [...root.querySelectorAll('button')].find((b) => b.textContent.trim() === label && !b.disabled) : null);
   const restart = async (why) => { S.set('updTest', why); Store.flushLocal(); await sleep(2000); log(why + ', restarting'); await sleep(500); };
   const files = (t) => `files ${t.checked - t.badCount}/${t.checked}${t.badCount ? ' (' + t.bad.join(', ') + ')' : ''}`;
   // A fresh look for updates (the page may have started one of its own: wait for whichever runs)
