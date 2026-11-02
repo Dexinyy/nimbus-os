@@ -459,3 +459,10 @@
   .wl-title { font-size: 1.6rem; }
   .wl-logo svg { width: 56px; height: 56px; }
 }
+
+/* Settings > Network & internet */
+.net-hero { display: flex; align-items: center; gap: 16px; padding: 18px 20px; border-radius: var(--r-md); background: var(--card); border: 1px solid var(--line); }
+.net-hero-ic { width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; background: rgba(var(--accent-rgb), .13); color: var(--accent-text); flex: none; }
+.net-hero-ic svg { width: 26px; height: 26px; }
+.net-hero-t { font-size: var(--fs-lg); font-weight: 600; margin-bottom: 2px; }
+.srow.net-wrap { display: block; padding: 6px; }

@@ -1,9 +1,10 @@
-// The person sitting at the computer can shut down, restart, sleep and
-// change the time zone without typing a password.
+// The person sitting at the computer can shut down, restart, sleep, change the
+// time zone and join networks without typing a password.
 polkit.addRule(function (action, subject) {
   if (!subject.local || !subject.active || subject.user !== "nimbus") return polkit.Result.NOT_HANDLED;
   if (action.id.indexOf("org.freedesktop.login1.") === 0) return polkit.Result.YES;
   if (action.id === "org.freedesktop.timedate1.set-timezone") return polkit.Result.YES;
   if (action.id === "org.freedesktop.timedate1.set-ntp") return polkit.Result.YES;
+  if (action.id.indexOf("org.freedesktop.NetworkManager.") === 0) return polkit.Result.YES;
   return polkit.Result.NOT_HANDLED;
 });

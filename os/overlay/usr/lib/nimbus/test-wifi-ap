@@ -1,0 +1,30 @@
+#!/bin/sh
+# Boot tests only (runs when "nimbus.test=wifi" is on the kernel command line):
+# a simulated Wi-Fi access point called NimbusTestAP, password nimbus-test-123.
+# The kernel's mac80211_hwsim makes two radios; the second one becomes the access point,
+# in its own network namespace so the desktop only sees it as a network in range.
+set -eu
+modprobe mac80211_hwsim radios=2
+for _ in $(seq 50); do [ -e /sys/class/net/wlan1/phy80211 ] && break; sleep 0.2; done
+phy=$(basename "$(readlink -f /sys/class/net/wlan1/phy80211)")
+ip netns add nimbus-ap
+iw phy "$phy" set netns name nimbus-ap
+ip netns exec nimbus-ap ip link set lo up
+ip netns exec nimbus-ap ip addr add 10.42.99.1/24 dev wlan1
+ip netns exec nimbus-ap ip link set wlan1 up
+cat > /run/nimbus-test-ap.conf <<'CONF'
+network={
+  ssid="NimbusTestAP"
+  mode=2
+  frequency=2437
+  key_mgmt=WPA-PSK
+  proto=RSN
+  pairwise=CCMP
+  group=CCMP
+  psk="nimbus-test-123"
+}
+CONF
+ip netns exec nimbus-ap wpa_supplicant -B -i wlan1 -c /run/nimbus-test-ap.conf -P /run/nimbus-test-ap.pid
+ip netns exec nimbus-ap dnsmasq --interface=wlan1 --bind-interfaces --except-interface=lo \
+  --dhcp-range=10.42.99.10,10.42.99.50,1h --no-resolv --no-hosts --pid-file=/run/nimbus-test-dnsmasq.pid
+echo "NimbusTestAP is up on $phy"

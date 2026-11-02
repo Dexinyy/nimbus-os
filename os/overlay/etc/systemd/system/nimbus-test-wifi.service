@@ -1,0 +1,13 @@
+[Unit]
+Description=Simulated Wi-Fi access point for boot tests
+ConditionKernelCommandLine=nimbus.test=wifi
+After=NetworkManager.service
+Wants=NetworkManager.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/lib/nimbus/test-wifi-ap
+
+[Install]
+WantedBy=multi-user.target

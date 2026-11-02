@@ -1,6 +1,7 @@
 /* ========== Settings ========== */
 const SETTINGS_PAGES = [
-  ['system', 'System', 'desktop'], ['personalization', 'Personalization', 'palette'], ['taskbar', 'Taskbar', 'layout'],
+  ['system', 'System', 'desktop'], ...(IS_NATIVE ? [['network', 'Network & internet', 'wifi']] : []),
+  ['personalization', 'Personalization', 'palette'], ['taskbar', 'Taskbar', 'layout'],
   ['apps', 'Apps', 'apps'], ['accounts', 'Accounts and sync', 'person'], ['privacy', 'Privacy and security', 'shield'],
   ['accessibility', 'Accessibility', 'access'], ['about', 'About', 'info'],
 ];
@@ -21,7 +22,10 @@ const SETTINGS_INDEX = [
   ['reduceMotion', 'Reduce motion', 'accessibility', 'animations', 'activity'], ['shortcuts', 'Keyboard shortcuts', 'accessibility', 'keys hotkeys', 'keyboard'],
   ['osName', 'Rename your OS', 'about', 'name os', 'pencil'], ['deviceName', 'Rename this PC', 'about', 'device computer name', 'desktop'],
   ['specs', 'Device specifications', 'about', 'cpu memory ram processor version', 'cpu'],
-].map(([id, name, page, keywords, icon]) => ({ id, name, page, keywords, icon, pageName: (SETTINGS_PAGES.find((p) => p[0] === page) || [])[1] }));
+  ['wifi', 'Wi-Fi', 'network', 'wifi wlan wireless internet network ssid password connect', 'wifi'],
+  ['airplane', 'Airplane mode', 'network', 'flight offline radio', 'airplane'], ['ethernet', 'Ethernet', 'network', 'wired cable lan internet', 'ethernet'],
+].map(([id, name, page, keywords, icon]) => ({ id, name, page, keywords, icon, pageName: (SETTINGS_PAGES.find((p) => p[0] === page) || [])[1] }))
+  .filter((s) => s.pageName);
 const ACCENTS = ['#4a74f5', '#2b88d8', '#0f9fa8', '#1f9d61', '#6f8f1f', '#d18f0b', '#e2671d', '#d83b45', '#d6337f', '#9b5de5', '#6a4ff0', '#5f6b7a'];
 function browserName() {
   const brands = (navigator.userAgentData?.brands || []).filter((x) => !/Not.?A.?Brand|Chromium/i.test(x.brand));
@@ -34,7 +38,7 @@ function browserName() {
   return 'Your browser';
 }
 function mountSettings(root, api, args) {
-  let page = args.page || 'system', syncs = [];
+  let page = args.page || 'system', syncs = [], nets = null;
   root.classList.add('app-settings');
   root.innerHTML = `<aside class="st-side"><div class="st-user"></div><label class="st-search searchbox">${ui('search')}<input type="search" id="${api.id}-find" placeholder="Find a setting" aria-label="Find a setting"></label><nav class="st-nav" aria-label="Settings pages"></nav></aside><main class="st-main" tabindex="-1"></main>`;
   const nav = root.querySelector('.st-nav'), main = root.querySelector('.st-main'), find = root.querySelector('.st-search input');
@@ -79,8 +83,46 @@ function mountSettings(root, api, args) {
   const section = (title, ...rows) => h('section', { class: 'st-sec' }, title ? h('h2', { text: title }) : null, ...rows);
   const tzSelect = () => buildTzSelect(cid('tz'));
   const pct = (v) => v + '%';
+  function netSwitch(get, label, set) {
+    const b = h('button', { class: 'switch', role: 'switch', 'aria-label': label });
+    const lab = h('span', { class: 'switch-label' }, h('span'), b);
+    const sync = () => { const on = get(); b.setAttribute('aria-checked', String(on)); lab.firstChild.textContent = on ? 'On' : 'Off'; b.disabled = !!Net.busy; };
+    b.addEventListener('click', () => set(!get()));
+    syncs.push(sync); sync();
+    return lab;
+  }
+  function networkPage() {
+    if (!Net.ready) return [section('', h('p', { class: 'muted', text: 'The network service isn’t running, so networks can’t be shown.' }))];
+    const st = () => Net.status;
+    const hero = h('div', { class: 'net-hero' });
+    const paintHero = () => {
+      const s = st(); const c = s.connectivity;
+      const sub = s.airplane ? 'Wi-Fi is off while airplane mode is on.' : (s.wifi.ssid || s.wired.connected)
+        ? (c === 'full' ? 'Connected to the internet' : c === 'portal' ? 'This network needs you to sign in on a web page' : c === 'limited' || c === 'none' ? 'Connected, but there’s no internet' : 'Connected')
+        : (s.wifi.present ? 'Choose a Wi-Fi network below.' : 'Plug in a network cable to get online.');
+      hero.innerHTML = `<span class="net-hero-ic">${Net.icon()}</span><div><div class="net-hero-t">${esc(Net.label().replace(/ \((no internet|sign-in needed)\)$/, ''))}</div><div class="muted">${esc(sub)}</div></div>`;
+    };
+    syncs.push(paintHero); paintHero();
+    const out = [section('', hero)];
+    if (st().wifi.present) {
+      nets = nets || netList();
+      out.push(section('Wi-Fi',
+        row({ id: 'wifi', icon: 'wifi', title: 'Wi-Fi', desc: 'Find and join wireless networks. Saved networks join by themselves.', ctl: netSwitch(() => st().wifi.enabled && !st().airplane, 'Wi-Fi', (v) => Net.setWifi(v)) }),
+        h('div', { class: 'srow net-wrap' }, nets.el)));
+    }
+    const wired = h('div', { class: 'srow-d' });
+    const paintWired = () => { const s = st(); wired.textContent = !s.wired.present ? 'This PC has no Ethernet port.' : s.wired.connected ? `Connected (${s.wired.name})` : 'No cable plugged in'; };
+    syncs.push(paintWired); paintWired();
+    const wiredRow = row({ id: 'ethernet', icon: 'ethernet', title: 'Ethernet' });
+    wiredRow.querySelector('.srow-txt').append(wired);
+    out.push(section('More',
+      row({ id: 'airplane', icon: 'airplane', title: 'Airplane mode', desc: 'Turns off Wi-Fi and mobile broadband.', ctl: netSwitch(() => st().airplane, 'Airplane mode', (v) => Net.setAirplane(v)) }),
+      wiredRow));
+    return out;
+  }
   // ---- pages ----
   const PAGES = {
+    network: networkPage,
     system: () => [
       section('Display',
         row({ id: 'brightness', icon: 'sun', title: 'Brightness', desc: 'Dims the whole screen of this OS.', ctl: slider('brightness', 30, 100, 1, pct, 'Brightness') }),
@@ -269,6 +311,7 @@ function mountSettings(root, api, args) {
   }
   function render(focusId) {
     syncs = [];
+    if (nets && page !== 'network') { nets.destroy(); nets = null; }
     renderNav();
     main.innerHTML = '';
     if (find.value.trim()) {
@@ -296,6 +339,8 @@ function mountSettings(root, api, args) {
   api.on('caps', () => render());
   api.on('native-info', () => { if (['about', 'system', 'privacy', 'accounts'].includes(page)) render(); });
   api.on('fs', () => { if (page === 'about') render(); });
+  api.on('net', () => { if (page === 'network') syncs.forEach((f) => { try { f(); } catch {} }); });
+  api.onClose(() => { if (nets) nets.destroy(); });
   api.onArgs = (a) => { if (a.page) { find.value = ''; go(a.page, a.focus); } };
   go(page, args.focus);
 }

@@ -142,6 +142,8 @@ const UI_ICONS = {
   grid: '<rect x="4" y="4" width="7" height="7" rx="1.6"/><rect x="13" y="4" width="7" height="7" rx="1.6"/><rect x="4" y="13" width="7" height="7" rx="1.6"/><rect x="13" y="13" width="7" height="7" rx="1.6"/>',
   list: '<path d="M9 6.5h11M9 12h11M9 17.5h11M4.5 6.5h.01M4.5 12h.01M4.5 17.5h.01"/>',
   wifi: '<path d="M2.8 9.2a13.5 13.5 0 0 1 18.4 0M5.9 12.6a9 9 0 0 1 12.2 0M9 16a4.5 4.5 0 0 1 6 0M12 19.3h.01"/>',
+  airplane: '<path d="M10.5 13.5L4 15.5v-2l6.5-4.2V4.8a1.5 1.5 0 0 1 3 0v4.5L20 13.5v2l-6.5-2v4.2l2.2 1.6v1.6L12 19.8l-3.7 1.1v-1.6l2.2-1.6z"/>',
+  ethernet: '<rect x="4" y="4.5" width="16" height="11" rx="2"/><path d="M8.5 8.5v3M12 8.5v3M15.5 8.5v3M12 15.5v4M8 19.5h8"/>',
   wifiOff: '<path d="M2.8 9.2a13.5 13.5 0 0 1 18.4 0M5.9 12.6a9 9 0 0 1 12.2 0M9 16a4.5 4.5 0 0 1 6 0M12 19.3h.01M3.5 3.5l17 17"/>',
   volume: '<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/>',
   mute: '<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/>',

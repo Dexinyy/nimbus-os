@@ -73,7 +73,15 @@ function boot() {
     // This page is the desktop of a real computer: show the startup screen and read the hardware.
     Power.boot();
     bus.on('native-info', applyEffects);
-    Native.refresh().then(() => bus.emit('store'));
+    Native.refresh().then((info) => {
+      bus.emit('store');
+      if (!info) return;
+      // "nimbus.open=app[:page]" on the kernel command line opens an app at startup
+      if (info.open) { const [app, pg] = info.open.split(':'); if (APPS[app]) WM.open(app, pg ? { page: pg } : {}); }
+      // Boot tests: "nimbus.test=wifi" joins the simulated access point the way the Wi-Fi menu does
+      if (info.test === 'wifi') testWifi();
+    });
+    Net.refresh();
   } else if (S.data.lockOnStart) Power.lock();
   if (!S.data.setupDone) WM.open('welcome');
   Store.ready();

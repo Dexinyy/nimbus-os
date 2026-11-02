@@ -386,6 +386,7 @@ const Flyouts = {
     if (!this.cur) return;
     const name = this.cur; this.cur = null;
     const el = document.getElementById(name);
+    if (name === 'qs' && QS.list) { QS.list.destroy(); QS.list = null; }
     el.classList.remove('open');
     $$(`[data-fly="${name}"]`).forEach((b) => b.classList.remove('open-fly'));
     setTimeout(() => { if (this.cur !== name) el.hidden = true; }, 230);
@@ -565,10 +566,20 @@ const Search = {
 
 /* ========== Quick settings ========== */
 const QS = {
-  open() { this.render(); },
+  view: 'main', list: null,
+  open(opts) { this.view = (opts && opts.view) || 'main'; this.render(); },
+  show(view) { this.view = view; this.render(); },
+  netTiles() {
+    if (!Net.ready) return [];
+    const s = Net.status, out = [];
+    if (s.wifi.present) out.push({ id: 'wifi', html: Net.icon(), label: s.wifi.enabled && !s.airplane ? (s.wifi.ssid || 'Wi-Fi') : 'Wi-Fi', on: s.wifi.enabled && !s.airplane,
+      run: () => Net.setWifi(!(s.wifi.enabled && !s.airplane)), more: () => this.show('wifi'), moreLabel: 'Wi-Fi networks' });
+    out.push({ id: 'airplane', icon: 'airplane', label: 'Airplane mode', on: s.airplane, run: () => Net.setAirplane(!s.airplane) });
+    return out;
+  },
   tiles() {
     const dark = effectiveTheme() === 'dark';
-    return [
+    return [...this.netTiles(),
       { icon: 'contrast', label: 'Dark mode', on: dark, run: () => S.set('theme', dark ? 'light' : 'dark') },
       { icon: 'sunset', label: 'Night light', on: S.data.nightLight, run: () => S.set('nightLight', !S.data.nightLight) },
       { icon: 'bellOff', label: 'Focus', on: S.data.dnd, run: () => S.set('dnd', !S.data.dnd) },
@@ -579,11 +590,15 @@ const QS = {
   },
   render() {
     const el = document.getElementById('qs'); el.innerHTML = '';
+    if (this.list) { this.list.destroy(); this.list = null; }
+    if (this.view === 'wifi' && Net.hasWifi) return this.renderWifi(el);
+    this.view = 'main';
     const grid = h('div', { class: 'qs-grid' });
     this.tiles().forEach((t, i) => {
-      const b = h('button', { class: 'qb', 'aria-pressed': String(!!t.on), 'aria-label': t.label, html: ui(t.icon) });
+      const b = h('button', { class: 'qb', 'aria-pressed': String(!!t.on), 'aria-label': t.label, html: t.html || ui(t.icon) });
       b.addEventListener('click', () => { this.tiles()[i].run(); this.sync(); });
-      grid.append(h('div', { class: 'qtile' + (t.on ? ' on' : ''), 'data-i': i }, b, h('span', { text: t.label })));
+      const more = t.more ? h('button', { class: 'qb-more', 'aria-label': t.moreLabel, 'data-tip': t.moreLabel, html: ui('chevR'), onclick: () => this.tiles()[i].more() }) : null;
+      grid.append(h('div', { class: 'qtile' + (t.on ? ' on' : '') + (more ? ' split' : ''), 'data-i': i }, more ? h('div', { class: 'qb-wrap' }, b, more) : b, h('span', { text: t.label })));
     });
     const slider = (icon, key, min, label) => {
       const inp = h('input', { type: 'range', min, max: 100, value: S.data[key], 'aria-label': label, id: 'qs-' + key });
@@ -592,24 +607,41 @@ const QS = {
       if (key === 'volume') inp.addEventListener('change', () => Sound.play('tick'));
       return h('div', { class: 'qs-slider' }, h('span', { html: ui(icon) }), inp, v);
     };
-    const online = navigator.onLine !== false; const bat = Taskbar.bat;
+    const bat = Taskbar.bat;
     const st = Store.cloudLabel();
     const foot = h('div', { class: 'qs-foot' },
-      h('span', { class: 'st', html: ui(online ? 'wifi' : 'wifiOff') + `<span>${online ? 'Online' : 'Offline'}</span>` }),
+      h('span', { class: 'st qs-net', html: Net.icon() + `<span>${esc(Net.label())}</span>` }),
       bat ? h('span', { class: 'st', html: batteryIcon(bat.level, bat.charging) + `<span>${Math.round(bat.level * 100)}%${bat.charging ? ', charging' : ''}</span>` }) : null,
       h('span', { class: 'st', 'data-tip': st.title, html: ui(st.icon) + `<span>${Store.shortLabel()}</span>` }),
       h('span', { class: 'grow' }),
       h('button', { class: 'ibtn', 'aria-label': 'All settings', 'data-tip': 'All settings', html: ui('settings'), onclick: () => { Flyouts.close(); WM.open('settings'); } }));
     el.append(grid, slider('sun', 'brightness', 30, 'Brightness'), slider('volume', 'volume', 0, 'Volume'), foot);
   },
+  renderWifi(el) {
+    const s = Net.status, on = s.wifi.enabled && !s.airplane;
+    const sw = h('button', { class: 'switch', role: 'switch', 'aria-checked': String(on), 'aria-label': 'Wi-Fi', onclick: () => Net.setWifi(!on) });
+    const head = h('div', { class: 'qs-head' },
+      h('button', { class: 'ibtn', 'aria-label': 'Back', html: ui('chevL'), onclick: () => this.show('main') }),
+      h('h3', { text: 'Wi-Fi' }), h('span', { class: 'grow' }), sw);
+    this.list = netList();
+    const foot = h('div', { class: 'qs-foot' },
+      h('button', { class: 'linkbtn', text: 'More Wi-Fi settings', onclick: () => { Flyouts.close(); WM.open('settings', { page: 'network' }); } }),
+      h('span', { class: 'grow' }),
+      h('button', { class: 'ibtn', 'aria-label': 'Look for networks again', 'data-tip': 'Look for networks again', html: ui('refresh'), onclick: () => Net.scan(true) }));
+    el.append(head, h('div', { class: 'qs-nets' }, this.list.el), foot);
+  },
   sync() {
     if (Flyouts.cur !== 'qs') return;
+    if (this.view === 'wifi') { const sw = $('#qs .qs-head .switch'); const s = Net.status; if (sw && s) sw.setAttribute('aria-checked', String(s.wifi.enabled && !s.airplane)); return; }
     const tiles = this.tiles();
-    $$('#qs .qtile').forEach((t, i) => { const d = tiles[i]; t.classList.toggle('on', !!d.on); const b = t.querySelector('.qb'); b.setAttribute('aria-pressed', String(!!d.on)); b.innerHTML = ui(d.icon); });
+    if ($$('#qs .qtile').length !== tiles.length) { this.render(); return; }
+    $$('#qs .qtile').forEach((t, i) => { const d = tiles[i]; t.classList.toggle('on', !!d.on); const b = t.querySelector('.qb'); b.setAttribute('aria-pressed', String(!!d.on)); b.innerHTML = d.html || ui(d.icon); t.querySelector(':scope > span').textContent = d.label; });
+    const net = $('#qs .qs-net'); if (net) net.innerHTML = Net.icon() + `<span>${esc(Net.label())}</span>`;
     for (const key of ['brightness', 'volume']) { const inp = document.getElementById('qs-' + key); if (inp && document.activeElement !== inp) { inp.value = S.data[key]; inp.nextElementSibling.textContent = S.data[key] + '%'; } }
   },
 };
 bus.on('settings', () => QS.sync());
+bus.on('net', () => { QS.sync(); Taskbar.tray(); });
 function batteryIcon(level, charging) {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="7" width="17" height="10" rx="2.5"/><path d="M21.5 10.5v3"/><rect x="4.6" y="9.1" width="${Math.max(1, 12.8 * level).toFixed(1)}" height="5.8" rx="1.2" fill="currentColor" stroke="none"/>${charging ? '<path d="M11.6 8.2l-2.6 4h2.6l-.8 3.6 3-4.4h-2.6z" fill="var(--surface)" stroke="none"/>' : ''}</svg>`;
 }
@@ -751,12 +783,12 @@ const Taskbar = {
     $('#tb-clock').setAttribute('aria-label', `${fmtDT(Date.now(), { dateStyle: 'full' })}, ${fmtTime(false)}. Notifications and calendar.`);
   },
   tray() {
-    const online = navigator.onLine !== false; const vol = S.data.sounds && S.data.volume > 0;
-    let htm = ui(online ? 'wifi' : 'wifiOff') + ui(vol ? 'volume' : 'mute');
+    const net = Net.label(); const vol = S.data.sounds && S.data.volume > 0;
+    let htm = Net.icon() + ui(vol ? 'volume' : 'mute');
     if (this.bat) htm += batteryIcon(this.bat.level, this.bat.charging);
-    const t = $('#tb-tray'); t.innerHTML = htm;
-    t.setAttribute('aria-label', `Quick settings. ${online ? 'Online' : 'Offline'}. Sounds ${vol ? S.data.volume + '%' : 'off'}.${this.bat ? ' Battery ' + Math.round(this.bat.level * 100) + '%.' : ''}`);
-    t.setAttribute('data-tip', `${online ? 'Online' : 'Offline'} · ${vol ? 'Volume ' + S.data.volume + '%' : 'Sounds off'}${this.bat ? ' · Battery ' + Math.round(this.bat.level * 100) + '%' : ''}`);
+    const t = $('#tb-tray'); if (!t) return; t.innerHTML = htm;
+    t.setAttribute('aria-label', `Quick settings. ${net}. Sounds ${vol ? S.data.volume + '%' : 'off'}.${this.bat ? ' Battery ' + Math.round(this.bat.level * 100) + '%.' : ''}`);
+    t.setAttribute('data-tip', `${net} · ${vol ? 'Volume ' + S.data.volume + '%' : 'Sounds off'}${this.bat ? ' · Battery ' + Math.round(this.bat.level * 100) + '%' : ''}`);
   },
   badge() { const b = $('#tb-badge'); const n = Notif.unread; b.hidden = !n || Flyouts.cur === 'nc'; b.textContent = n > 9 ? '9+' : String(n); },
   focusChip() {

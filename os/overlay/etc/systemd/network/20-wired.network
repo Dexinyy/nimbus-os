@@ -1,7 +1,0 @@
-# Wired network connections get an address automatically.
-[Match]
-Name=en* eth*
-Type=ether
-
-[Network]
-DHCP=yes

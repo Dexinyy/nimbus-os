@@ -111,6 +111,7 @@ PACKAGES=(
   "$KIMAGE" ${KEXTRA:+"$KEXTRA"} linux-firmware intel-microcode amd64-microcode
   casper user-setup initramfs-tools
   systemd-sysv systemd-resolved systemd-timesyncd udev dbus dbus-user-session libpam-systemd polkitd kmod
+  network-manager wpasupplicant wireless-regdb iw dnsmasq-base
   sudo locales tzdata kbd iproute2 ca-certificates less nano
   procps psmisc htop neofetch curl wget vim-tiny bash-completion
   cage libgl1-mesa-dri libegl1 libegl-mesa0 libgles2 libgbm1
@@ -138,7 +139,7 @@ echo "Etc/UTC" > "$CHROOT/etc/timezone"
 
 # Copy our files in as root, without touching the owner or rights of existing folders like /etc.
 tar -C "$HERE/overlay" --owner=0 --group=0 -cf - . | tar -C "$CHROOT" --no-overwrite-dir -xf -
-chmod 755 "$CHROOT/usr/bin/nimbus-shell" "$CHROOT/usr/bin/nimbus-session" "$CHROOT/usr/lib/nimbus/shell-debug"
+chmod 755 "$CHROOT/usr/bin/nimbus-shell" "$CHROOT/usr/bin/nimbus-session" "$CHROOT/usr/lib/nimbus/shell-debug" "$CHROOT/usr/lib/nimbus/test-wifi-ap"
 mkdir -p "$CHROOT/usr/share/nimbus" "$CHROOT/usr/share/fonts/truetype/nimbus" "$CHROOT/usr/share/doc/nimbus-os"
 cp -a "$WORK/shell" "$CHROOT/usr/share/nimbus/shell"
 cp "$HERE/fonts/"*.ttf "$HERE/fonts/"*-OFL.txt "$CHROOT/usr/share/fonts/truetype/nimbus/"
@@ -162,8 +163,10 @@ echo "nimbus" > "$CHROOT/etc/hostname"
 printf '127.0.0.1 localhost\n127.0.1.1 nimbus\n::1 localhost ip6-localhost ip6-loopback\n' > "$CHROOT/etc/hosts"
 
 in_chroot systemctl set-default graphical.target
-in_chroot systemctl enable nimbus-session.service systemd-networkd.service systemd-resolved.service systemd-timesyncd.service
-in_chroot systemctl mask systemd-networkd-wait-online.service
+in_chroot systemctl enable nimbus-session.service NetworkManager.service systemd-resolved.service systemd-timesyncd.service \
+  nimbus-test-wifi.service
+in_chroot systemctl disable systemd-networkd.service systemd-networkd.socket >/dev/null 2>&1 || true
+in_chroot systemctl mask systemd-networkd-wait-online.service NetworkManager-wait-online.service
 # The ISO has no checksum list to verify, so this check would only report a failure at startup.
 in_chroot systemctl mask casper-md5check.service
 

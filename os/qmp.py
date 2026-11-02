@@ -4,6 +4,7 @@
 usage: qmp.py SOCKET OUTDIR NAME SLOWNESS SCENARIO
   SCENARIO  full  - boot, open Start, Terminal and Settings, Alt+Tab, then shut down
             short - boot to the desktop, then shut down
+            wifi  - boot with nimbus.test=wifi, check the desktop joined NimbusTestAP, then shut down
             logs  - boot, take one screenshot, leave the serial log for reading
 
 Screenshots go to OUTDIR/NAME-*.png and results are appended to OUTDIR/summary.md.
@@ -11,6 +12,7 @@ Exit status is 1 when a check fails.
 """
 import json
 import os
+import re
 import socket
 import sys
 import time
@@ -189,7 +191,7 @@ def main():
         vm.type("neofetch\n")
         time.sleep(3 * slow)
         vm.type("echo $USER on $(uname -sr), sudo says $(sudo -n whoami)\n")
-        time.sleep(1.5 * slow)
+        time.sleep(4 * slow)
         snap("04-terminal")
         vm.key("meta_l")
         time.sleep(1.2 * slow)
@@ -204,6 +206,23 @@ def main():
         snap("06-alt-tab")
         vm.press("alt", False)
         time.sleep(1.2 * slow)
+
+    if scenario == "wifi":
+        serial = os.path.join(outdir, f"{name}-serial.log")
+        ok, detail, end = False, "no result in the system log", time.time() + 150 * slow
+        while time.time() < end:
+            text = open(serial, errors="replace").read() if os.path.exists(serial) else ""
+            if "test wifi: connected" in text:
+                ok, detail = True, ""
+                break
+            m = re.search(r"test wifi: failed: ([^\r\n]*)", text)
+            if m:
+                detail = m.group(1)
+                break
+            time.sleep(2)
+        time.sleep(3 * slow)
+        snap("08-wifi")
+        note("Joins a Wi-Fi network with its password", ok, detail)
 
     # Alt+F4 closes each window, then on the empty desktop it asks what to do; Enter picks "Shut down".
     for _ in range(4):

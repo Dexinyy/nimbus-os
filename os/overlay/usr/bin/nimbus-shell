@@ -19,6 +19,7 @@ import time
 import gi
 
 sys.path.insert(0, os.environ.get("NIMBUS_LIB_DIR", "/usr/lib/nimbus"))
+import nimbus_net  # noqa: E402
 import nimbus_term  # noqa: E402
 
 gi.require_version("Gdk", "3.0")
@@ -97,6 +98,14 @@ def battery():
     return None
 
 
+def cmdline_value(key):
+    """The value of key=value on the kernel command line, or ""."""
+    for part in read("/proc/cmdline").split():
+        if part.startswith(key + "="):
+            return part.split("=", 1)[1]
+    return ""
+
+
 def is_live():
     cmd = read("/proc/cmdline")
     return "boot=casper" in cmd or os.path.isdir("/run/casper") or os.path.isdir("/cdrom/casper")
@@ -139,6 +148,8 @@ def info():
         "battery": battery(),
         "software": SOFTWARE,
         "debug": DEBUG,
+        "open": cmdline_value("nimbus.open"),  # app[:page] to open at startup
+        "test": cmdline_value("nimbus.test"),  # boot tests (os/test-boot.sh)
     }
 
 
@@ -200,6 +211,8 @@ class Shell:
         self.view.grab_focus()  # keys go to the desktop from the first press
         uri = GLib.filename_to_uri(os.path.join(SHELL_DIR, "index.html"), None)
         self.view.load_uri(uri + ("?debug=1" if DEBUG else ""))
+        self.net_due = False
+        self.watch_network()
 
     def debug_key(self, window, event):
         focus = window.get_focus()
@@ -279,6 +292,66 @@ class Shell:
 
     def m_termClose(self, args):
         return self.terminals.close(args.get("id"))
+
+    # ---- network (NetworkManager, see nimbus_net.py) ----
+    def m_netStatus(self, _args):
+        return nimbus_net.status()
+
+    def m_wifiList(self, args):
+        return nimbus_net.networks(rescan=bool(args.get("rescan")))
+
+    def m_wifiConnect(self, args):
+        return nimbus_net.connect(args.get("ssid", ""), args.get("password") or None)
+
+    def m_wifiDisconnect(self, _args):
+        return nimbus_net.disconnect()
+
+    def m_wifiForget(self, args):
+        return nimbus_net.forget(args.get("ssid", ""))
+
+    def m_wifiRadio(self, args):
+        return nimbus_net.set_wifi(bool(args.get("on")))
+
+    def m_airplane(self, args):
+        return nimbus_net.set_airplane(bool(args.get("on")))
+
+    def watch_network(self):
+        """Follow `nmcli monitor` and tell the page when the network changes."""
+        if not nimbus_net.available():
+            return
+        try:
+            self.net_monitor = subprocess.Popen(["nmcli", "monitor"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                                                env=dict(os.environ, LC_ALL="C"))
+        except OSError:
+            return
+        GLib.io_add_watch(self.net_monitor.stdout.fileno(), GLib.PRIORITY_DEFAULT_IDLE, GLib.IO_IN | GLib.IO_HUP,
+                          self.on_network_change)
+
+    def on_network_change(self, fd, condition):
+        try:
+            data = os.read(fd, 4096)
+        except OSError:
+            data = b""
+        if not data:  # the monitor stopped (NetworkManager restarting): try again shortly
+            GLib.timeout_add_seconds(5, lambda: self.watch_network() and False)
+            return False
+        if not self.net_due:
+            self.net_due = True
+            GLib.timeout_add(400, self.send_network_status)
+        return True
+
+    def send_network_status(self):
+        self.net_due = False
+
+        def run():
+            try:
+                data = nimbus_net.status()
+            except Exception as exc:  # report nothing rather than break the page
+                print("nimbus-shell: network status:", exc, file=sys.stderr)
+                return
+            GLib.idle_add(lambda: self.emit("net", data) and False)
+        threading.Thread(target=run, daemon=True).start()
+        return False
 
     def m_info(self, _args):
         return info()
