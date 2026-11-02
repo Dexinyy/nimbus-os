@@ -3111,9 +3111,8 @@ static int handle_sigchld(int sig, void *data) {
 	struct server *s = data;
 	int status;
 	pid_t pid;
-	while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
-		if (pid != s->shell_pid)
-			continue;
+	/* only the desktop: wlroots waits for the process that starts Xwayland itself */
+	while (s->shell_pid > 0 && (pid = waitpid(s->shell_pid, &status, WNOHANG)) > 0) {
 		s->shell_pid = 0;
 		if (s->quitting)
 			continue;
