@@ -89,9 +89,10 @@ def fw_load():
 
 def fw_save(c):
     os.makedirs(os.path.dirname(FW_CONF), exist_ok=True)
-    with open(FW_CONF + ".tmp", "w") as f:
+    tmp = "%s.%d.tmp" % (FW_CONF, os.getpid())
+    with open(tmp, "w") as f:
         json.dump(c, f)
-    os.replace(FW_CONF + ".tmp", FW_CONF)
+    os.replace(tmp, FW_CONF)
 
 
 def fw_profile(p):
@@ -164,6 +165,10 @@ def fw_status():
 def firewall(args):
     if not args:
         die("firewall what?")
+    # one change at a time: the desktop may ask twice at once (a new network while a setting changes)
+    import fcntl
+    lock = open("/run/nimbus-firewall.lock", "w")
+    fcntl.flock(lock, fcntl.LOCK_EX)
     c = fw_load()
     what = args[0]
     if what == "status":
