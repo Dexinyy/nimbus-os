@@ -340,7 +340,7 @@ function mountSettings(root, api, args) {
     }
     const title = (SETTINGS_PAGES.find((p) => p[0] === page) || SETTINGS_PAGES[0])[1];
     api.setTitle(title + ' – Settings');
-    main.append(h('h1', { text: title }), ...PAGES[page]());
+    main.append(h('h1', { text: title }), ...PAGES[page]().filter(Boolean)); // sections that don't apply here are null
     main.scrollTop = 0;
     if (focusId) requestAnimationFrame(() => { const el = main.querySelector(`[data-sid="${focusId}"]`); if (el) { el.scrollIntoView({ block: 'center' }); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 1400); } });
   }

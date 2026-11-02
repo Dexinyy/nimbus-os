@@ -766,7 +766,9 @@ const Taskbar = {
     const existing = new Map([...box.children].map((b) => [b.dataset.app, b]));
     ids.forEach((id, i) => {
       let b = existing.get(id);
-      if (!b) b = h('button', { class: 'tbtn app', 'data-app': id, html: `<span class="ic">${appIcon(APPS[id].icon)}</span><span class="ind"></span>` });
+      if (!b) b = h('button', { class: 'tbtn app', 'data-app': id, html: '<span class="ic"></span><span class="ind"></span>' });
+      // icons can change: Chrome's own replaces the stand-in once it is installed
+      if (b._icon !== APPS[id].icon) { b._icon = APPS[id].icon; b.querySelector('.ic').innerHTML = appIcon(APPS[id].icon); }
       existing.delete(id);
       const ws = running.filter((w) => tbId(w) === id);
       b.classList.toggle('running', ws.length > 0);

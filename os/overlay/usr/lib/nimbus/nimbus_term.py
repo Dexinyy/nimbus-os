@@ -774,7 +774,9 @@ class Session:
         set_size(slave, cols, rows)
         env = dict(os.environ if env is None else env)
         env.update(TERM="xterm-256color", COLORTERM="truecolor")
-        for key in ("WAYLAND_DEBUG", "PYTHONUNBUFFERED", "NIMBUS_DEBUG"):
+        # NIMBUS_WM_FD and WAYLAND_SOCKET are the desktop's own connections to the window manager:
+        # programs started here connect through WAYLAND_DISPLAY like any other.
+        for key in ("WAYLAND_DEBUG", "PYTHONUNBUFFERED", "NIMBUS_DEBUG", "NIMBUS_WM_FD", "WAYLAND_SOCKET", "NIMBUS_TEST"):
             env.pop(key, None)
         argv = argv or ["bash", "--login"]
         cwd = cwd or env.get("HOME") or "/"
