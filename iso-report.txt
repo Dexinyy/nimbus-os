@@ -1,0 +1,112 @@
+== partition table
+label: gpt
+label-id: 5E601A84-C0CD-4DDB-96C3-CDE68132152F
+device: out/nimbus-os-0.1-amd64.iso
+unit: sectors
+first-lba: 64
+last-lba: 1843980
+table-length: 248
+sector-size: 512
+
+out/nimbus-os-0.1-amd64.iso1 : start=          64, size=     1835124, type=EBD0A0A2-B9E5-4433-87C0-68B6B72699C7, uuid=5E601A84-C0CD-4DDB-96C2-CDE68132152F, name="ISO9660", attrs="RequiredPartition GUID:60"
+out/nimbus-os-0.1-amd64.iso2 : start=     1835188, size=        8192, type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B, uuid=5E601A84-C0CD-4DDB-96C1-CDE68132152F, name="Appended2"
+out/nimbus-os-0.1-amd64.iso3 : start=     1843380, size=         600, type=EBD0A0A2-B9E5-4433-87C0-68B6B72699C7, uuid=5E601A84-C0CD-4DDB-96C0-CDE68132152F, name="Gap1", attrs="RequiredPartition GUID:60"
+
+== xorriso system area
+libisofs: NOTE : Found hidden El-Torito image for EFI.
+libisofs: NOTE : EFI image start and size: 458797 * 2048 , 8192 * 512
+xorriso : NOTE : Detected El-Torito boot information which currently is set to be discarded
+Drive current: -indev 'out/nimbus-os-0.1-amd64.iso'
+Media current: stdio file, overwriteable
+Media status : is written , is appendable
+Boot record  : El Torito , MBR protective-msdos-label grub2-mbr cyl-align-off GPT
+Media summary: 1 session, 461011 data blocks,  900m data, 98.8g free
+Volume id    : 'NIMBUS_OS'
+System area options: 0x00004201
+System area summary: MBR protective-msdos-label grub2-mbr cyl-align-off GPT
+ISO image size/512 : 1844044
+Partition offset   : 16
+MBR heads per cyl  : 64
+MBR secs per head  : 32
+MBR partition table:   N Status  Type        Start       Blocks
+MBR partition      :   1   0x00  0xee            1      1844043
+MBR partition      :   2   0x80  0x00            0            1
+GPT                :   N  Info
+GPT disk GUID      :      841a605ecdc0db4d96c3cde68132152f
+GPT entry array    :      2  248  separated
+GPT lba range      :      64  1843980  1844043
+GPT partition name :   1  490053004f003900360036003000
+GPT partname local :   1  ISO9660
+GPT partition GUID :   1  841a605ecdc0db4d96c2cde68132152f
+GPT type GUID      :   1  a2a0d0ebe5b9334487c068b6b72699c7
+GPT partition flags:   1  0x1000000000000001
+GPT start and size :   1  64  1835124
+GPT partition name :   2  41007000700065006e006400650064003200
+GPT partname local :   2  Appended2
+GPT partition GUID :   2  841a605ecdc0db4d96c1cde68132152f
+GPT type GUID      :   2  28732ac11ff8d211ba4b00a0c93ec93b
+GPT partition flags:   2  0x0000000000000000
+GPT start and size :   2  1835188  8192
+GPT partition name :   3  4700610070003100
+GPT partname local :   3  Gap1
+GPT partition GUID :   3  841a605ecdc0db4d96c0cde68132152f
+GPT type GUID      :   3  a2a0d0ebe5b9334487c068b6b72699c7
+GPT partition flags:   3  0x1000000000000001
+GPT start and size :   3  1843380  600
+
+== casper persistence
+11:home_persistence="home-rw"
+35:            showmounts|show-cow)
+37:            persistent)
+38:                export PERSISTENT="Yes" ;;
+39:            nopersistent)
+40:                export PERSISTENT="" NOPERSISTENT="Yes" ;;
+41:            persistent-path=*)
+42:                export PERSISTENT_PATH="${x#persistent-path=}" ;;
+177:        # it should be a writable block device
+517:        dev=$(find_cow_device "${snap_label}")
+541:    echo "export ${snap_type}SNAP="/cow${snap_mount#$rootmnt}":${snapdev}:${snapfile}" >> /etc/casper.conf # for resync on reboot/halt
+549:    # Mount up the writable layer, if it is persistent then it may well
+551:    mkdir -p /cow
+552:    cowdevice="tmpfs"
+553:    cow_fstype="tmpfs"
+554:    cow_mountopt="rw,noatime,mode=755"
+556:    # Looking for "$(root_persistence_label)" device or file
+557:    if [ -n "${PERSISTENT}" ]; then
+558:        cowprobe=$(find_cow_device "$(root_persistence_label)")
+559:        if [ -b "${cowprobe}" ]; then
+560:            cowdevice=${cowprobe}
+561:            cow_fstype=$(get_fstype "${cowprobe}")
+562:            cow_mountopt="rw,noatime"
+564:            [ "$quiet" != "y" ] && log_warning_msg "Unable to find the persistent medium"
+570:        mount -t ${cow_fstype} -o ${cow_mountopt} ${cowdevice} /cow && break
+573:    grep -qs " /cow " /proc/mounts || panic "Can not mount $cowdevice on /cow"
+577:    if [ ! -d /cow/upper ]; then
+578:        mkdir -p /cow/upper
+579:        for cow_content in /cow/*
+581:            case "$cow_content" in
+582:            /cow/lost+found|/cow/upper|/cow/log|/cow/crash|/cow/install-logs-*)     continue ;;
+585:            mv "$cow_content" /cow/upper
+588:    mkdir -p /cow/work
+590:    modprobe "${MP_QUIET}" -b overlay || panic "/cow format specified as 'overlay' and no support found"
+688:    mount -t overlay -o "upperdir=/cow/upper,lowerdir=$mounts,workdir=/cow/work" "/cow" "$rootmnt" || panic "overlay mount failed"
+691:    if [ -n "${PERSISTENT}" ]; then
+694:        homecow=$(find_cow_device "${home_persistence}" )
+695:        if [ -b "${homecow}" ]; then
+696:            mount -t $(get_fstype "${homecow}") -o rw,noatime "${homecow}" "${rootmnt}/home"
+699:            [ "$quiet" != "y" ] && log_warning_msg "Unable to find the persistent home medium"
+761:            if [ -n "$parentdev" ] && [ -z "$NOPERSISTENT" ]; then
+763:                find_or_create_persistent_partition $parentdev 1>&2
+853:setup_auto_log_persistence() {
+854:    # If there is a writable (or casper-rw) filesystem on a partition
+856:    # we're not already using it for persistence, use it for logs and
+864:    # where a partition called "writable" on the disk the user wanted
+866:    if [ -n "$PERSISTENT" ] || [ -n "$NOPERSISTENT" ]; then
+869:    if [ ! -e "/dev/disk/by-label/$(root_persistence_label)" ]; then
+881:    pers_dev=$(readlink -f "/dev/disk/by-label/$(root_persistence_label)")
+890:    mkdir /log-persistence
+891:    if mount -w "/dev/disk/by-label/$(root_persistence_label)" /log-persistence; then
+894:            pdir=/log-persistence/install-logs-$d.$i
+939:    if [ "${live_dest}" ] && [ -z "$PERSISTENT" ]; then
+940:        NOPERSISTENT="Yes"
+986:    setup_auto_log_persistence

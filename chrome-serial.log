@@ -1,0 +1,1730 @@
+[    0.000000] Linux version 7.0.0-42-generic (buildd@lcy02-amd64-051) (x86_64-linux-gnu-gcc-13 (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0, GNU ld (GNU Binutils for Ubuntu) 2.42) #42~24.04.1-Ubuntu SMP PREEMPT_DYNAMIC Mon Oct 19 14:43:01 UTC 2 (Ubuntu 7.0.0-42.42~24.04.1-generic 7.0.14)
+[    0.000000] Command line: boot=casper noprompt nimbus.debug nimbus.test=chrome console=tty0 console=ttyS0,115200 systemd.journald.forward_to_console=1 systemd.show_status=1
+[    0.000000] KERNEL supported cpus:
+[    0.000000]   Intel GenuineIntel
+[    0.000000]   AMD AuthenticAMD
+[    0.000000]   Hygon HygonGenuine
+[    0.000000]   Centaur CentaurHauls
+[    0.000000]   zhaoxin   Shanghai  
+[    0.000000] BIOS-provided physical RAM map:
+[    0.000000] BIOS-e820: [mem 0x0000000000000000-0x000000000009fbff]  System RAM
+[    0.000000] BIOS-e820: [mem 0x000000000009fc00-0x000000000009ffff]  device reserved
+[    0.000000] BIOS-e820: [gap 0x00000000000a0000-0x00000000000effff]
+[    0.000000] BIOS-e820: [mem 0x00000000000f0000-0x00000000000fffff]  device reserved
+[    0.000000] BIOS-e820: [mem 0x0000000000100000-0x000000007ffddfff]  System RAM
+[    0.000000] BIOS-e820: [mem 0x000000007ffde000-0x000000007fffffff]  device reserved
+[    0.000000] BIOS-e820: [gap 0x0000000080000000-0x00000000afffffff]
+[    0.000000] BIOS-e820: [mem 0x00000000b0000000-0x00000000bfffffff]  device reserved
+[    0.000000] BIOS-e820: [gap 0x00000000c0000000-0x00000000fed1bfff]
+[    0.000000] BIOS-e820: [mem 0x00000000fed1c000-0x00000000fed1ffff]  device reserved
+[    0.000000] BIOS-e820: [gap 0x00000000fed20000-0x00000000feffbfff]
+[    0.000000] BIOS-e820: [mem 0x00000000feffc000-0x00000000feffffff]  device reserved
+[    0.000000] BIOS-e820: [gap 0x00000000ff000000-0x00000000fffbffff]
+[    0.000000] BIOS-e820: [mem 0x00000000fffc0000-0x00000000ffffffff]  device reserved
+[    0.000000] BIOS-e820: [mem 0x0000000100000000-0x000000017fffffff]  System RAM
+[    0.000000] BIOS-e820: [gap 0x0000000180000000-0x000000fcffffffff]
+[    0.000000] BIOS-e820: [mem 0x000000fd00000000-0x000000ffffffffff]  device reserved
+[    0.000000] NX (Execute Disable) protection: active
+[    0.000000] APIC: Static calls initialized
+[    0.000000] SMBIOS 3.0.0 present.
+[    0.000000] DMI: QEMU Standard PC (Q35 + ICH9, 2009), BIOS 1.16.3-debian-1.16.3-2 04/01/2014
+[    0.000000] DMI: Memory slots populated: 1/1
+[    0.000000] Hypervisor detected: KVM
+[    0.000000] last_pfn = 0x7ffde max_arch_pfn = 0x400000000
+[    0.000000] kvm-clock: Using msrs 4b564d01 and 4b564d00
+[    0.000001] kvm-clock: using sched offset of 378895506 cycles
+[    0.000003] clocksource: kvm-clock: mask: 0xffffffffffffffff max_cycles: 0x1cd42e4dffb, max_idle_ns: 881590591483 ns
+[    0.000005] tsc: Detected 2445.430 MHz processor
+[    0.000828] last_pfn = 0x180000 max_arch_pfn = 0x400000000
+[    0.001010] MTRR map: 4 entries (3 fixed + 1 variable; max 19), built from 8 variable MTRRs
+[    0.001017] x86/PAT: Configuration [0-7]: WB  WC  UC- UC  WB  WP  UC- WT  
+[    0.001237] last_pfn = 0x7ffde max_arch_pfn = 0x400000000
+[    0.003234] found SMP MP-table at [mem 0x000f5470-0x000f547f]
+[    0.003244] Using GB pages for direct mapping
+[    0.003373] RAMDISK: [mem 0x7c281000-0x7ffcffff]
+[    0.003845] ACPI: Early table checksum verification disabled
+[    0.003849] ACPI: RSDP 0x00000000000F5290 000014 (v00 BOCHS )
+[    0.003854] ACPI: RSDT 0x000000007FFE238B 000038 (v01 BOCHS  BXPC     00000001 BXPC 00000001)
+[    0.003858] ACPI: FACP 0x000000007FFE217B 0000F4 (v03 BOCHS  BXPC     00000001 BXPC 00000001)
+[    0.003863] ACPI: DSDT 0x000000007FFE0040 00213B (v01 BOCHS  BXPC     00000001 BXPC 00000001)
+[    0.003866] ACPI: FACS 0x000000007FFE0000 000040
+[    0.003867] ACPI: APIC 0x000000007FFE226F 000080 (v03 BOCHS  BXPC     00000001 BXPC 00000001)
+[    0.003869] ACPI: HPET 0x000000007FFE22EF 000038 (v01 BOCHS  BXPC     00000001 BXPC 00000001)
+[    0.003871] ACPI: MCFG 0x000000007FFE2327 00003C (v01 BOCHS  BXPC     00000001 BXPC 00000001)
+[    0.003873] ACPI: WAET 0x000000007FFE2363 000028 (v01 BOCHS  BXPC     00000001 BXPC 00000001)
+[    0.003875] ACPI: Reserving FACP table memory at [mem 0x7ffe217b-0x7ffe226e]
+[    0.003876] ACPI: Reserving DSDT table memory at [mem 0x7ffe0040-0x7ffe217a]
+[    0.003877] ACPI: Reserving FACS table memory at [mem 0x7ffe0000-0x7ffe003f]
+[    0.003877] ACPI: Reserving APIC table memory at [mem 0x7ffe226f-0x7ffe22ee]
+[    0.003878] ACPI: Reserving HPET table memory at [mem 0x7ffe22ef-0x7ffe2326]
+[    0.003878] ACPI: Reserving MCFG table memory at [mem 0x7ffe2327-0x7ffe2362]
+[    0.003879] ACPI: Reserving WAET table memory at [mem 0x7ffe2363-0x7ffe238a]
+[    0.004500] No NUMA configuration found
+[    0.004502] Faking a node at [mem 0x0000000000000000-0x000000017fffffff]
+[    0.004508] NODE_DATA(0) allocated [mem 0x17ffd5280-0x17fffffff]
+[    0.005540] ACPI: PM-Timer IO Port: 0x608
+[    0.005567] ACPI: LAPIC_NMI (acpi_id[0xff] dfl dfl lint[0x1])
+[    0.005639] IOAPIC[0]: apic_id 0, version 17, address 0xfec00000, GSI 0-23
+[    0.005641] ACPI: INT_SRC_OVR (bus 0 bus_irq 0 global_irq 2 dfl dfl)
+[    0.005642] ACPI: INT_SRC_OVR (bus 0 bus_irq 5 global_irq 5 high level)
+[    0.005643] ACPI: INT_SRC_OVR (bus 0 bus_irq 9 global_irq 9 high level)
+[    0.005644] ACPI: INT_SRC_OVR (bus 0 bus_irq 10 global_irq 10 high level)
+[    0.005645] ACPI: INT_SRC_OVR (bus 0 bus_irq 11 global_irq 11 high level)
+[    0.005648] ACPI: Using ACPI (MADT) for SMP configuration information
+[    0.005649] ACPI: HPET id: 0x8086a201 base: 0xfed00000
+[    0.005651] TSC deadline timer available
+[    0.005653] CPU topo: Max. logical packages:   1
+[    0.005654] CPU topo: Max. logical nodes:      1
+[    0.005654] CPU topo: Num. nodes per package:  1
+[    0.005656] CPU topo: Max. logical dies:       1
+[    0.005657] CPU topo: Max. dies per package:   1
+[    0.005660] CPU topo: Max. threads per core:   1
+[    0.005661] CPU topo: Num. cores per package:     2
+[    0.005661] CPU topo: Num. threads per package:   2
+[    0.005661] CPU topo: Allowing 2 present CPUs plus 0 hotplug CPUs
+[    0.005687] kvm-guest: APIC: eoi() replaced with kvm_guest_apic_eoi_write()
+[    0.005717] kvm-guest: KVM setup pv remote TLB flush
+[    0.005732] kvm-guest: setup PV sched yield
+[    0.005737] PM: hibernation: Registered nosave memory: [mem 0x00000000-0x00000fff]
+[    0.005739] PM: hibernation: Registered nosave memory: [mem 0x0009f000-0x000fffff]
+[    0.005740] PM: hibernation: Registered nosave memory: [mem 0x7ffde000-0xffffffff]
+[    0.005741] [gap 0xc0000000-0xfed1bfff] available for PCI devices
+[    0.005742] Booting paravirtualized kernel on KVM
+[    0.005744] clocksource: refined-jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 1910969940391419 ns
+[    0.005758] Zone ranges:
+[    0.005758]   DMA      [mem 0x0000000000001000-0x0000000000ffffff]
+[    0.005760]   DMA32    [mem 0x0000000001000000-0x00000000ffffffff]
+[    0.005761]   Normal   [mem 0x0000000100000000-0x000000017fffffff]
+[    0.005762]   Device   empty
+[    0.005763] Movable zone start for each node
+[    0.005764] Early memory node ranges
+[    0.005764]   node   0: [mem 0x0000000000001000-0x000000000009efff]
+[    0.005765]   node   0: [mem 0x0000000000100000-0x000000007ffddfff]
+[    0.005766]   node   0: [mem 0x0000000100000000-0x000000017fffffff]
+[    0.005767] Initmem setup node 0 [mem 0x0000000000001000-0x000000017fffffff]
+[    0.005887] On node 0, zone DMA: 1 pages in unavailable ranges
+[    0.005898] On node 0, zone DMA: 97 pages in unavailable ranges
+[    0.011830] On node 0, zone Normal: 34 pages in unavailable ranges
+[    0.011851] setup_percpu: NR_CPUS:8192 nr_cpumask_bits:2 nr_cpu_ids:2 nr_node_ids:1
+[    0.012060] percpu: Embedded 85 pages/cpu s225280 r8192 d114688 u1048576
+[    0.012142] kvm-guest: PV spinlocks enabled
+[    0.012144] PV qspinlock hash table entries: 256 (order: 0, 4096 bytes, linear)
+[    0.012147] Kernel command line: boot=casper noprompt nimbus.debug nimbus.test=chrome console=tty0 console=ttyS0,115200 systemd.journald.forward_to_console=1 systemd.show_status=1
+[    0.012250] Unknown kernel command line parameters "noprompt boot=casper", will be passed to user space.
+[    0.012267] random: crng init done
+[    0.012268] printk: log buffer data + meta data: 262144 + 1114112 = 1376256 bytes
+[    0.012601] Dentry cache hash table entries: 524288 (order: 10, 4194304 bytes, linear)
+[    0.012765] Inode-cache hash table entries: 262144 (order: 9, 2097152 bytes, linear)
+[    0.012837] software IO TLB: area num 2.
+[    0.021408] Fallback order for Node 0: 0 
+[    0.021414] Built 1 zonelists, mobility grouping on.  Total pages: 1048444
+[    0.021416] Policy zone: Normal
+[    0.021427] mem auto-init: stack:all(zero), heap alloc:on, heap free:off
+[    0.027039] SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=2, Nodes=1
+[    0.040421] ftrace: allocating 64018 entries in 252 pages
+[    0.040423] ftrace: allocated 252 pages with 6 groups
+[    0.041223] Dynamic Preempt: lazy
+[    0.041393] rcu: Preemptible hierarchical RCU implementation.
+[    0.041394] rcu: 	RCU restricting CPUs from NR_CPUS=8192 to nr_cpu_ids=2.
+[    0.041395] 	Trampoline variant of Tasks RCU enabled.
+[    0.041396] 	Rude variant of Tasks RCU enabled.
+[    0.041396] 	Tracing variant of Tasks RCU enabled.
+[    0.041397] rcu: RCU calculated value of scheduler-enlistment delay is 100 jiffies.
+[    0.041398] rcu: Adjusting geometry for rcu_fanout_leaf=16, nr_cpu_ids=2
+[    0.041406] RCU Tasks: Setting shift to 1 and lim to 1 rcu_task_cb_adjust=1 rcu_task_cpu_ids=2.
+[    0.041408] RCU Tasks Rude: Setting shift to 1 and lim to 1 rcu_task_cb_adjust=1 rcu_task_cpu_ids=2.
+[    0.044425] NR_IRQS: 524544, nr_irqs: 440, preallocated irqs: 16
+[    0.044686] rcu: srcu_init: Setting srcu_struct sizes based on contention.
+[    0.044700] clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 1911260446275000 ns
+[    0.067093] Console: colour VGA+ 80x25
+[    0.067097] printk: legacy console [tty0] enabled
+[    0.167852] printk: console [ttyS0] enabled
+[    0.371568] ACPI: Core revision 20251212
+[    0.373266] clocksource: hpet: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 19112604467 ns
+[    0.376549] APIC: Switch to symmetric I/O mode setup
+[    0.379173] x2apic enabled
+[    0.381132] APIC: Switched APIC routing to: physical x2apic
+[    0.383224] kvm-guest: APIC: send_IPI_mask() replaced with kvm_send_ipi_mask()
+[    0.385998] kvm-guest: APIC: send_IPI_mask_allbutself() replaced with kvm_send_ipi_mask_allbutself()
+[    0.389331] kvm-guest: setup PV IPIs
+[    0.394043] ..TIMER: vector=0x30 apic1=0 pin1=2 apic2=-1 pin2=-1
+[    0.396278] clocksource: tsc-early: mask: 0xffffffffffffffff max_cycles: 0x233fdbaba77, max_idle_ns: 440795254155 ns
+[    0.408054] Calibrating delay loop (skipped) preset value.. 4890.86 BogoMIPS (lpj=2445430)
+[    0.411179] x86/cpu: User Mode Instruction Prevention (UMIP) activated
+[    0.413380] Last level iTLB entries: 4KB 512, 2MB 255, 4MB 127
+[    0.415052] Last level dTLB entries: 4KB 512, 2MB 255, 4MB 127, 1GB 0
+[    0.417078] mitigations: Enabled attack vectors: user_kernel, user_user, guest_host, guest_guest, SMT mitigations: auto
+[    0.419053] Speculative Store Bypass: Vulnerable
+[    0.421055] Speculative Return Stack Overflow: IBPB-extending microcode not applied!
+[    0.423052] Speculative Return Stack Overflow: WARNING: See https://kernel.org/doc/html/latest/admin-guide/hw-vuln/srso.html for mitigation options.
+[    0.423054] Transient Scheduler Attacks: Vulnerable: No microcode
+[    0.426767] Spectre V2 : Mitigation: Retpolines
+[    0.428645] Speculative Return Stack Overflow: Vulnerable: Safe RET, no microcode
+[    0.430052] Spectre V1 : Mitigation: usercopy/swapgs barriers and __user pointer sanitization
+[    0.432052] Spectre V2 : Spectre v2 / SpectreRSB: Filling RSB on context switch and VMEXIT
+[    0.434053] active return thunk: srso_alias_return_thunk
+[    0.436126] x86/fpu: Supporting XSAVE feature 0x001: 'x87 floating point registers'
+[    0.438052] x86/fpu: Supporting XSAVE feature 0x002: 'SSE registers'
+[    0.440052] x86/fpu: Supporting XSAVE feature 0x004: 'AVX registers'
+[    0.442053] x86/fpu: xstate_offset[2]:  576, xstate_sizes[2]:  256
+[    0.444052] x86/fpu: Enabled xstate features 0x7, context size is 832 bytes, using 'compacted' format.
+[    0.486240] Freeing SMP alternatives memory: 56K
+[    0.488085] pid_max: default: 32768 minimum: 301
+[    0.490225] landlock: Up and running.
+[    0.492053] Yama: becoming mindful.
+[    0.494275] AppArmor: AppArmor initialized
+[    0.496053] AppArmor: AppArmor secmark mediation reserved: ready to be enabled
+[    0.499301] LSM support for eBPF active
+[    0.501305] Mount-cache hash table entries: 8192 (order: 4, 65536 bytes, linear)
+[    0.503056] Mountpoint-cache hash table entries: 8192 (order: 4, 65536 bytes, linear)
+[    0.505211] VFS: Finished mounting rootfs on nullfs
+[    0.508372] smpboot: CPU0: AMD EPYC 7763 64-Core Processor (family: 0x19, model: 0x1, stepping: 0x1)
+[    0.510368] Performance Events: PMU not available due to virtualization, using software events only.
+[    0.512146] signal: max sigframe size: 1776
+[    0.513902] rcu: Hierarchical SRCU implementation.
+[    0.515061] rcu: 	Max phase no-delay instances is 400.
+[    0.515976] Timer migration: 1 hierarchy levels; 8 children per group; 1 crossnode level
+[    0.526468] NMI watchdog: Perf NMI watchdog permanently disabled
+[    0.528125] smp: Bringing up secondary CPUs ...
+[    0.530194] smpboot: x86: Booting SMP configuration:
+[    0.531022] .... node  #0, CPUs:      #1
+[    0.534168] smp: Brought up 1 node, 2 CPUs
+[    0.537068] smpboot: Total of 2 processors activated (9781.72 BogoMIPS)
+[    0.539188] Memory: 3022132K/4193776K available (23261K kernel code, 4945K rwdata, 16652K rodata, 5436K init, 5724K bss, 1164888K reserved, 0K cma-reserved)
+[    0.541379] devtmpfs: initialized
+[    0.542156] x86/mm: Memory block size: 128MB
+[    0.544339] posixtimers hash table entries: 1024 (order: 2, 16384 bytes, linear)
+[    0.545070] futex hash table entries: 512 (32768 bytes on 1 NUMA nodes, total 32 KiB, linear).
+[    0.546609] PM: RTC time: 21:40:32, date: 2026-11-02
+[    0.550253] NET: Registered PF_NETLINK/PF_ROUTE protocol family
+[    0.551437] DMA: preallocated 512 KiB GFP_KERNEL pool for atomic allocations
+[    0.552089] DMA: preallocated 512 KiB GFP_KERNEL|GFP_DMA pool for atomic allocations
+[    0.553117] DMA: preallocated 512 KiB GFP_KERNEL|GFP_DMA32 pool for atomic allocations
+[    0.554069] audit: initializing netlink subsys (disabled)
+[    0.555313] thermal_sys: Registered thermal governor 'fair_share'
+[    0.555316] thermal_sys: Registered thermal governor 'bang_bang'
+[    0.556064] audit: type=2000 audit(1793655633.180:1): state=initialized audit_enabled=0 res=1
+[    0.557063] thermal_sys: Registered thermal governor 'step_wise'
+[    0.557066] thermal_sys: Registered thermal governor 'user_space'
+[    0.558057] thermal_sys: Registered thermal governor 'power_allocator'
+[    0.559062] cpuidle: using governor ladder
+[    0.561064] cpuidle: using governor menu
+[    0.573865] acpiphp: ACPI Hot Plug PCI Controller Driver version: 0.5
+[    0.574430] PCI: ECAM [mem 0xb0000000-0xbfffffff] (base 0xb0000000) for domain 0000 [bus 00-ff]
+[    0.575061] PCI: ECAM [mem 0xb0000000-0xbfffffff] reserved as E820 entry
+[    0.576073] PCI: Using configuration type 1 for base access
+[    0.579149] kprobes: kprobe jump-optimization is enabled. All kprobes are optimized if possible.
+[    0.580384] HugeTLB: registered 1.00 GiB page size, pre-allocated 0 pages
+[    0.581065] HugeTLB: 16380 KiB vmemmap can be freed for a 1.00 GiB page
+[    0.582060] HugeTLB: registered 2.00 MiB page size, pre-allocated 0 pages
+[    0.583058] HugeTLB: 28 KiB vmemmap can be freed for a 2.00 MiB page
+[    0.604228] ACPI: Added _OSI(Module Device)
+[    0.605011] ACPI: Added _OSI(Processor Device)
+[    0.607059] ACPI: Added _OSI(Processor Aggregator Device)
+[    0.615304] ACPI: 1 ACPI AML tables successfully acquired and loaded
+[    0.624066] ACPI: \_SB_: platform _OSC: OS support mask [006e7eff]
+[    0.626798] ACPI: Interpreter enabled
+[    0.627081] ACPI: PM: (supports S0 S3 S4 S5)
+[    0.627934] ACPI: Using IOAPIC for interrupt routing
+[    0.628318] PCI: Using host bridge windows from ACPI; if necessary, use "pci=nocrs" and report a bug
+[    0.629058] PCI: Using E820 reservations for host bridge windows
+[    0.630290] ACPI: Enabled 2 GPEs in block 00 to 3F
+[    0.636444] ACPI: PCI Root Bridge [PCI0] (domain 0000 [bus 00-ff])
+[    0.637063] acpi PNP0A08:00: _OSC: OS supports [ExtendedConfig ASPM ClockPM Segments MSI EDR HPX-Type3]
+[    0.638207] acpi PNP0A08:00: _OSC: platform does not support [PCIeHotplug LTR DPC]
+[    0.639241] acpi PNP0A08:00: _OSC: OS now controls [SHPCHotplug PME AER PCIeCapability]
+[    0.640533] PCI host bridge to bus 0000:00
+[    0.641064] pci_bus 0000:00: root bus resource [io  0x0000-0x0cf7 window]
+[    0.642060] pci_bus 0000:00: root bus resource [io  0x0d00-0xffff window]
+[    0.643059] pci_bus 0000:00: root bus resource [mem 0x000a0000-0x000bffff window]
+[    0.644059] pci_bus 0000:00: root bus resource [mem 0x80000000-0xafffffff window]
+[    0.645059] pci_bus 0000:00: root bus resource [mem 0xc0000000-0xfebfffff window]
+[    0.646059] pci_bus 0000:00: root bus resource [mem 0x380000000000-0x3807ffffffff window]
+[    0.647059] pci_bus 0000:00: root bus resource [bus 00-ff]
+[    0.648134] pci 0000:00:00.0: [8086:29c0] type 00 class 0x060000 conventional PCI endpoint
+[    0.651106] pci 0000:00:01.0: [1af4:1000] type 00 class 0x020000 conventional PCI endpoint
+[    0.654016] pci 0000:00:01.0: BAR 0 [io  0xc040-0xc05f]
+[    0.654199] pci 0000:00:01.0: BAR 4 [mem 0x380000000000-0x380000003fff 64bit pref]
+[    0.655109] pci 0000:00:01.0: ROM [mem 0xfeb00000-0xfeb7ffff pref]
+[    0.657921] pci 0000:00:02.0: [1234:1111] type 00 class 0x030000 conventional PCI endpoint
+[    0.660301] pci 0000:00:02.0: BAR 0 [mem 0xfd000000-0xfdffffff pref]
+[    0.661119] pci 0000:00:02.0: BAR 2 [mem 0xfeb98000-0xfeb98fff]
+[    0.662168] pci 0000:00:02.0: ROM [mem 0xfeb80000-0xfeb8ffff pref]
+[    0.663230] pci 0000:00:02.0: Video device with shadowed ROM at [mem 0x000c0000-0x000dffff]
+[    0.664877] pci 0000:00:03.0: [1b36:000d] type 00 class 0x0c0330 PCIe Root Complex Integrated Endpoint
+[    0.666359] pci 0000:00:03.0: BAR 0 [mem 0xfeb90000-0xfeb93fff 64bit]
+[    0.668989] pci 0000:00:04.0: [8086:2668] type 00 class 0x040300 conventional PCI endpoint
+[    0.670365] pci 0000:00:04.0: BAR 0 [mem 0xfeb94000-0xfeb97fff]
+[    0.718242] pci 0000:00:1f.0: [8086:2918] type 00 class 0x060100 conventional PCI endpoint
+[    0.720330] pci 0000:00:1f.0: quirk: [io  0x0600-0x067f] claimed by ICH6 ACPI/GPIO/TCO
+[    0.721902] pci 0000:00:1f.2: [8086:2922] type 00 class 0x010601 conventional PCI endpoint
+[    0.724050] pci 0000:00:1f.2: BAR 4 [io  0xc060-0xc07f]
+[    0.724084] pci 0000:00:1f.2: BAR 5 [mem 0xfeb99000-0xfeb99fff]
+[    0.726286] pci 0000:00:1f.3: [8086:2930] type 00 class 0x0c0500 conventional PCI endpoint
+[    0.728752] pci 0000:00:1f.3: BAR 4 [io  0x0700-0x073f]
+[    0.734253] ACPI: PCI: Interrupt link LNKA configured for IRQ 10
+[    0.735336] ACPI: PCI: Interrupt link LNKB configured for IRQ 10
+[    0.736282] ACPI: PCI: Interrupt link LNKC configured for IRQ 11
+[    0.737287] ACPI: PCI: Interrupt link LNKD configured for IRQ 11
+[    0.738295] ACPI: PCI: Interrupt link LNKE configured for IRQ 10
+[    0.739293] ACPI: PCI: Interrupt link LNKF configured for IRQ 10
+[    0.740303] ACPI: PCI: Interrupt link LNKG configured for IRQ 11
+[    0.741284] ACPI: PCI: Interrupt link LNKH configured for IRQ 11
+[    0.742145] ACPI: PCI: Interrupt link GSIA configured for IRQ 16
+[    0.743081] ACPI: PCI: Interrupt link GSIB configured for IRQ 17
+[    0.744079] ACPI: PCI: Interrupt link GSIC configured for IRQ 18
+[    0.745079] ACPI: PCI: Interrupt link GSID configured for IRQ 19
+[    0.746080] ACPI: PCI: Interrupt link GSIE configured for IRQ 20
+[    0.747078] ACPI: PCI: Interrupt link GSIF configured for IRQ 21
+[    0.748078] ACPI: PCI: Interrupt link GSIG configured for IRQ 22
+[    0.749079] ACPI: PCI: Interrupt link GSIH configured for IRQ 23
+[    0.750705] iommu: Default domain type: Translated
+[    0.751060] iommu: DMA domain TLB invalidation policy: lazy mode
+[    0.754392] SCSI subsystem initialized
+[    0.755153] ACPI: bus type USB registered
+[    0.756073] usbcore: registered new interface driver usbfs
+[    0.757050] usbcore: registered new interface driver hub
+[    0.758014] usbcore: registered new device driver usb
+[    0.758101] pps_core: LinuxPPS API ver. 1 registered
+[    0.759068] pps_core: Software ver. 5.3.6 - Copyright 2005-2007 Rodolfo Giometti <giometti@linux.it>
+[    0.760065] PTP clock support registered
+[    0.761133] EDAC MC: Ver: 3.0.0
+[    0.763583] NetLabel: Initializing
+[    0.764059] NetLabel:  domain hash size = 128
+[    0.764920] NetLabel:  protocols = UNLABELED CIPSOv4 CALIPSO
+[    0.765095] NetLabel:  unlabeled traffic allowed by default
+[    0.766106] mctp: management component transport protocol core
+[    0.767067] NET: Registered PF_MCTP protocol family
+[    0.768028] PCI: Using ACPI for IRQ routing
+[    1.396011] e820: register RAM buffer resource [mem 0x0009fc00-0x0009ffff]
+[    1.396059] e820: register RAM buffer resource [mem 0x7ffde000-0x7fffffff]
+[    1.397177] pci 0000:00:02.0: vgaarb: setting as boot VGA device
+[    1.398050] pci 0000:00:02.0: vgaarb: bridge control possible
+[    1.398050] pci 0000:00:02.0: vgaarb: VGA device added: decodes=io+mem,owns=io+mem,locks=none
+[    1.398061] vgaarb: loaded
+[    1.398938] hpet0: at MMIO 0xfed00000, IRQs 2, 8, 0
+[    1.399060] hpet0: 3 comparators, 64-bit 100.000000 MHz counter
+[    1.404918] clocksource: Switched to clocksource kvm-clock
+[    1.410728] VFS: Disk quotas dquot_6.6.0
+[    1.411509] VFS: Dquot-cache hash table entries: 512 (order 0, 4096 bytes)
+[    1.415712] AppArmor: AppArmor Filesystem Enabled
+[    1.416600] acpi PNP0C01:00: Reserved [mem 0xb0000000-0xbfffffff]
+[    1.417693] pnp: PnP ACPI init
+[    1.419289] pnp: PnP ACPI: found 4 devices
+[    1.427258] clocksource: acpi_pm: mask: 0xffffff max_cycles: 0xffffff, max_idle_ns: 2085701024 ns
+[    1.428690] NET: Registered PF_INET protocol family
+[    1.429823] IP idents hash table entries: 65536 (order: 7, 524288 bytes, linear)
+[    1.453829] tcp_listen_portaddr_hash hash table entries: 2048 (order: 3, 32768 bytes, linear)
+[    1.455180] Table-perturb hash table entries: 65536 (order: 6, 262144 bytes, linear)
+[    1.457277] TCP established hash table entries: 32768 (order: 6, 262144 bytes, linear)
+[    1.459486] TCP bind hash table entries: 32768 (order: 8, 1048576 bytes, linear)
+[    1.461029] TCP: Hash tables configured (established 32768 bind 32768)
+[    1.462185] MPTCP token hash table entries: 4096 (order: 5, 98304 bytes, linear)
+[    1.463475] UDP hash table entries: 2048 (order: 5, 131072 bytes, linear)
+[    1.464626] UDP-Lite hash table entries: 2048 (order: 5, 131072 bytes, linear)
+[    1.465964] NET: Registered PF_UNIX/PF_LOCAL protocol family
+[    1.466997] NET: Registered PF_XDP protocol family
+[    1.467897] pci_bus 0000:00: resource 4 [io  0x0000-0x0cf7 window]
+[    1.468960] pci_bus 0000:00: resource 5 [io  0x0d00-0xffff window]
+[    1.469994] pci_bus 0000:00: resource 6 [mem 0x000a0000-0x000bffff window]
+[    1.471131] pci_bus 0000:00: resource 7 [mem 0x80000000-0xafffffff window]
+[    1.472258] pci_bus 0000:00: resource 8 [mem 0xc0000000-0xfebfffff window]
+[    1.473387] pci_bus 0000:00: resource 9 [mem 0x380000000000-0x3807ffffffff window]
+[    1.475313] ACPI: \_SB_.GSIH: Enabled at IRQ 23
+[    1.477402] PCI: CLS 0 bytes, default 64
+[    1.478418] PCI-DMA: Using software bounce buffering for IO (SWIOTLB)
+[    1.479491] software IO TLB: mapped [mem 0x0000000078281000-0x000000007c281000] (64MB)
+[    1.480959] clocksource: tsc: mask: 0xffffffffffffffff max_cycles: 0x233fdbaba77, max_idle_ns: 440795254155 ns
+[    1.481519] Trying to unpack rootfs image as initramfs...
+[    1.483151] Initialise system trusted keyrings
+[    1.484235] Key type blacklist registered
+[    1.485128] workingset: timestamp_bits=36 max_order=20 bucket_order=0
+[    1.486677] squashfs: version 4.0 (2009/01/31) Phillip Lougher
+[    1.487852] fuse: init (API version 7.45)
+[    1.500198] integrity: Platform Keyring initialized
+[    1.501132] integrity: Machine keyring initialized
+[    1.515121] Key type asymmetric registered
+[    1.515974] Asymmetric key parser 'x509' registered
+[    1.516917] Block layer SCSI generic (bsg) driver version 0.4 loaded (major 242)
+[    1.518289] io scheduler mq-deadline registered
+[    1.528923] ledtrig-cpu: registered to indicate activity on CPUs
+[    1.532188] input: Power Button as /devices/platform/LNXPWRBN:00/input/input0
+[    1.535710] ACPI: button: Power Button [PWRF]
+[    1.539278] ACPI: \_SB_.GSIF: Enabled at IRQ 21
+[    1.544423] Serial: 8250/16550 driver, 32 ports, IRQ sharing enabled
+[    1.575218] 00:03: ttyS0 at I/O 0x3f8 (irq = 4, base_baud = 115200) is a 16550A
+[    1.582733] Linux agpgart interface v0.103
+[    1.587623] loop: module loaded
+[    1.589690] ACPI: bus type drm_connector registered
+[    1.592662] tun: Universal TUN/TAP device driver, 1.6
+[    1.597095] PPP generic driver version 2.4.2
+[    1.600350] xhci_hcd 0000:00:03.0: xHCI Host Controller
+[    1.603001] xhci_hcd 0000:00:03.0: new USB bus registered, assigned bus number 1
+[    1.607341] xhci_hcd 0000:00:03.0: hcc params 0x00087001 hci version 0x100 quirks 0x0000000000000010
+[    1.613220] xhci_hcd 0000:00:03.0: xHCI Host Controller
+[    1.615878] xhci_hcd 0000:00:03.0: new USB bus registered, assigned bus number 2
+[    1.619511] xhci_hcd 0000:00:03.0: Host supports USB 3.0 SuperSpeed
+[    1.622762] usb usb1: New USB device found, idVendor=1d6b, idProduct=0002, bcdDevice= 7.00
+[    1.626799] usb usb1: New USB device strings: Mfr=3, Product=2, SerialNumber=1
+[    1.630415] usb usb1: Product: xHCI Host Controller
+[    1.631231] usb usb1: Manufacturer: Linux 7.0.0-42-generic xhci-hcd
+[    1.635951] usb usb1: SerialNumber: 0000:00:03.0
+[    1.638516] hub 1-0:1.0: USB hub found
+[    1.639306] hub 1-0:1.0: 4 ports detected
+[    1.643204] usb usb2: We don't know the algorithms for LPM for this host, disabling LPM.
+[    1.647342] usb usb2: New USB device found, idVendor=1d6b, idProduct=0003, bcdDevice= 7.00
+[    1.651339] usb usb2: New USB device strings: Mfr=3, Product=2, SerialNumber=1
+[    1.654989] usb usb2: Product: xHCI Host Controller
+[    1.657450] usb usb2: Manufacturer: Linux 7.0.0-42-generic xhci-hcd
+[    1.660491] usb usb2: SerialNumber: 0000:00:03.0
+[    1.663024] hub 2-0:1.0: USB hub found
+[    1.665179] hub 2-0:1.0: 4 ports detected
+[    1.667851] i8042: PNP: PS/2 Controller [PNP0303:KBD,PNP0f13:MOU] at 0x60,0x64 irq 1,12
+[    1.673569] serio: i8042 KBD port at 0x60,0x64 irq 1
+[    1.676113] serio: i8042 AUX port at 0x60,0x64 irq 12
+[    1.678867] mousedev: PS/2 mouse device common for all mice
+[    1.682479] input: AT Translated Set 2 keyboard as /devices/platform/i8042/serio0/input/input1
+[    1.686869] rtc_cmos PNP0B00:00: RTC can wake from S4
+[    1.691268] rtc_cmos PNP0B00:00: registered as rtc0
+[    1.694014] rtc_cmos PNP0B00:00: setting system clock to 2026-11-02T21:40:34 UTC (1793655634)
+[    1.694430] Freeing initrd memory: 62780K
+[    1.696555] rtc_cmos PNP0B00:00: alarms up to one day, y3k, 242 bytes nvram, hpet irqs
+[    1.697912] i2c_dev: i2c /dev entries driver
+[    1.698801] device-mapper: core: CONFIG_IMA_DISABLE_HTABLE is disabled. Duplicate IMA measurements will not be recorded in the IMA log.
+[    1.700603] device-mapper: uevent: version 1.0.3
+[    1.702446] device-mapper: ioctl: 4.50.0-ioctl (2025-04-28) initialised: dm-devel@lists.linux.dev
+[    1.703944] amd_pstate: the _CPC object is not present in SBIOS or ACPI disabled
+[    1.705386] drop_monitor: Initializing network drop monitor service
+[    1.706775] NET: Registered PF_INET6 protocol family
+[    1.708400] Segment Routing with IPv6
+[    1.709202] In-situ OAM (IOAM) with IPv6
+[    1.710048] NET: Registered PF_PACKET protocol family
+[    1.711412] Key type dns_resolver registered
+[    1.713190] IPI shorthand broadcast: enabled
+[    1.717865] sched_clock: Marking stable (1367031642, 350350361)->(1841389805, -124007802)
+[    1.722426] registered taskstats version 1
+[    1.730185] Loading compiled-in X.509 certificates
+[    1.731865] Loaded X.509 cert 'Build time autogenerated kernel key: 4577687626f07d20ebf7bb300bf1b3dcb9d4195f'
+[    1.733833] Loaded X.509 cert 'Canonical Ltd. Live Patch Signing 2025 Kmod: d541cef61dc7e793b7eb7e899970a2eef0b5dc8c'
+[    1.735864] Loaded X.509 cert 'Canonical Ltd. Live Patch Signing: 14df34d1a87cf37625abec039ef2bf521249b969'
+[    1.737805] Loaded X.509 cert 'Canonical Ltd. Kernel Module Signing 2025 Kmod: 4627603d2357a2a3f81006370894c221175893e9'
+[    1.739858] Loaded X.509 cert 'Canonical Ltd. Kernel Module Signing: 88f752e560a1e0737e31163a466ad7b70a850c19'
+[    1.741407] blacklist: Loading compiled-in revocation X.509 certificates
+[    1.742550] Loaded X.509 cert 'Canonical Ltd. Secure Boot Signing: 61482aa2830d0ab2ad5af10b7250da9033ddcef0'
+[    1.744096] Loaded X.509 cert 'Canonical Ltd. Secure Boot Signing (2017): 242ade75ac4a15e50d50c84b0d45ff3eae707a03'
+[    1.745745] Loaded X.509 cert 'Canonical Ltd. Secure Boot Signing (ESM 2018): 365188c1d374d6b07c3c8f240f8ef722433d6a8b'
+[    1.747378] Loaded X.509 cert 'Canonical Ltd. Secure Boot Signing (2019): c0746fd6c5da3ae827864651ad66ae47fe24b3e8'
+[    1.748995] Loaded X.509 cert 'Canonical Ltd. Secure Boot Signing (2021 v1): a8d54bbb3825cfb94fa13c9f8a594a195c107b8d'
+[    1.750595] Loaded X.509 cert 'Canonical Ltd. Secure Boot Signing (2021 v2): 4cf046892d6fd3c9a5b03f98d845f90851dc6a8c'
+[    1.752209] Loaded X.509 cert 'Canonical Ltd. Secure Boot Signing (2021 v3): 100437bb6de6e469b581e61cd66bce3ef4ed53af'
+[    1.753984] Loaded X.509 cert 'Canonical Ltd. Secure Boot Signing (Ubuntu Core 2019): c1d57b8f6b743f23ee41f4f7ee292f06eecadfb9'
+[    1.766408] Demotion targets for Node 0: null
+[    1.770446] Key type .fscrypt registered
+[    1.771250] Key type fscrypt-provisioning registered
+[    1.772287] Key type big_key registered
+[    1.806385] Key type encrypted registered
+[    1.807149] AppArmor: AppArmor sha256 policy hashing enabled
+[    1.808104] ima: No TPM chip found, activating TPM-bypass!
+[    1.809113] Loading compiled-in module X.509 certificates
+[    1.810578] Loaded X.509 cert 'Build time autogenerated kernel key: 4577687626f07d20ebf7bb300bf1b3dcb9d4195f'
+[    1.812141] ima: Allocated hash algorithm: sha256
+[    1.813065] ima: No architecture policies found
+[    1.813973] evm: Initialising EVM extended attributes:
+[    1.814920] evm: security.selinux
+[    1.815734] evm: security.SMACK64
+[    1.816482] evm: security.SMACK64EXEC
+[    1.817238] evm: security.SMACK64TRANSMUTE
+[    1.818073] evm: security.SMACK64MMAP
+[    1.818858] evm: security.apparmor
+[    1.819660] evm: security.ima
+[    1.820340] evm: security.capability
+[    1.821134] evm: HMAC attrs: 0x1
+[    1.822223] PM:   Magic number: 2:542:701
+[    1.823595] RAS: Correctable Errors collector initialized.
+[    1.824860] clk: Disabling unused clocks
+[    1.825718] PM: genpd: Disabling unused power domains
+[    1.839005] Freeing unused decrypted memory: 2028K
+[    1.841687] Freeing unused kernel image (initmem) memory: 5436K
+[    1.842663] Write protecting the kernel read-only data: 43008k
+[    1.845647] Freeing unused kernel image (text/rodata gap) memory: 1312K
+[    1.848514] Freeing unused kernel image (rodata/data gap) memory: 1780K
+[    1.903418] usb 1-1: new high-speed USB device number 2 using xhci_hcd
+[    1.912376] x86/mm: Checked W+X mappings: passed, no W+X pages found.
+[    1.913388] Run /init as init process
+Loading, please wait...
+Starting systemd-udevd version 255.4-1ubuntu8.18
+[    2.031508] usb 1-1: New USB device found, idVendor=0627, idProduct=0001, bcdDevice= 0.00
+[    2.037100] usb 1-1: New USB device strings: Mfr=1, Product=3, SerialNumber=10
+[    2.042086] usb 1-1: Product: QEMU USB Tablet
+[    2.043158] usb 1-1: Manufacturer: QEMU
+[    2.044204] virtio_net virtio0 enp0s1: renamed from eth0
+[    2.050321] usb 1-1: SerialNumber: 28754-0000:00:03.0-1
+[    2.058030] ACPI: \_SB_.GSIA: Enabled at IRQ 16
+[    2.063668] input: VirtualPS/2 VMware VMMouse as /devices/platform/i8042/serio1/input/input4
+[    2.064253] ahci 0000:00:1f.2: AHCI vers 0001.0000, 32 command slots, 1.5 Gbps, SATA mode
+[    2.066425] ahci 0000:00:1f.2: 6/6 ports implemented (port mask 0x3f)
+[    2.067552] ahci 0000:00:1f.2: flags: 64bit ncq only 
+[    2.071283] scsi host0: ahci
+[    2.073084] scsi host1: ahci
+[    2.074879] input: VirtualPS/2 VMware VMMouse as /devices/platform/i8042/serio1/input/input3
+[    2.080006] scsi host2: ahci
+[    2.082420] scsi host3: ahci
+[    2.084427] scsi host4: ahci
+[    2.088559] scsi host5: ahci
+[    2.089307] ata1: SATA max UDMA/133 abar m4096@0xfeb99000 port 0xfeb99100 irq 27 lpm-pol 1
+[    2.093190] ata2: SATA max UDMA/133 abar m4096@0xfeb99000 port 0xfeb99180 irq 27 lpm-pol 1
+[    2.096323] ata3: SATA max UDMA/133 abar m4096@0xfeb99000 port 0xfeb99200 irq 27 lpm-pol 1
+[    2.096801] hid: raw HID events driver (C) Jiri Kosina
+[    2.100630] ata4: SATA max UDMA/133 abar m4096@0xfeb99000 port 0xfeb99280 irq 27 lpm-pol 1
+[    2.103711] ata5: SATA max UDMA/133 abar m4096@0xfeb99000 port 0xfeb99300 irq 27 lpm-pol 1
+[    2.106783] ata6: SATA max UDMA/133 abar m4096@0xfeb99000 port 0xfeb99380 irq 27 lpm-pol 1
+[    2.110772] usbcore: registered new interface driver usbhid
+[    2.111779] usbhid: USB HID core driver
+[    2.426601] ata5: SATA link down (SStatus 0 SControl 300)
+[    2.429623] ata1: SATA link down (SStatus 0 SControl 300)
+[    2.431422] ata6: SATA link down (SStatus 0 SControl 300)
+[    2.433722] ata2: SATA link down (SStatus 0 SControl 300)
+[    2.436415] ata3: SATA link up 1.5 Gbps (SStatus 113 SControl 300)
+[    2.438870] ata4: SATA link down (SStatus 0 SControl 300)
+[    2.440168] ata3.00: ATAPI: QEMU DVD-ROM, 2.5+, max UDMA/100
+[    2.441209] ata3.00: applying bridge limits
+[    2.442733] ata3.00: configured for UDMA/100
+[    2.445077] scsi 2:0:0:0: CD-ROM            QEMU     QEMU DVD-ROM     2.5+ PQ: 0 ANSI: 5
+[    2.459213] sr 2:0:0:0: [sr0] scsi3-mmc drive: 4x/4x cd/rw xa/form2 tray
+[    2.476670] cdrom: Uniform CD-ROM driver Revision: 3.20
+[    2.492802] sr 2:0:0:0: Attached scsi generic sg0 type 5
+[    2.499546] input: QEMU QEMU USB Tablet as /devices/pci0000:00/0000:00:03.0/usb1/1-1/1-1:1.0/0003:0627:0001.0001/input/input5
+[    2.501585] hid-generic 0003:0627:0001.0001: input,hidraw0: USB HID v0.01 Mouse [QEMU QEMU USB Tablet] on usb-0000:00:03.0-1/input0
+Begin: Loading essential drivers ... done.
+Begin: Running /scripts/init-premount ... done.
+Begin: Mounting root file system ... Begin: Running /scripts/nfs-top ... done.
+Begin: Running /scripts/nfs-premount ... done.
+[    2.649644] loop0: detected capacity change from 0 to 1660400
+[    2.664806] overlayfs: null uuid in non-single lower fs '/', falling back to xino=off,index=off,nfs_export=off.
+[    2.832823] evm: overlay not supported
+Begin: Running /scripts/casper-premount ... done.
+done.
+touch: /root/var/crash/crash.init: No such file or directory
+rm: can't remove '/root/var/crash/crash.init': No such file or directory
+done.
+Begin: Creating debconf-communicate fifo mechanism ... done.
+Begin: Running /scripts/casper-bottom ... Begin: Moving mount points... ... done.
+Begin: Configuring fstab... ... done.
+Begin: Setting up swap... ... done.
+Begin: Setting up locales... ... done.
+Begin: Setting up automatic login... ... done.
+Begin: Setting hostname... ... done.
+Begin: Setting up console keyboard... ... done.
+Begin: Applying desktop settings... ... chroot: can't execute 'glib-compile-schemas': No such file or directory
+done.
+Begin: Regenerating SSL certificate... ... hostname: Name or service not known
+make-ssl-cert: Could not get FQDN, using '(none)'.
+make-ssl-cert: You may want to fix your /etc/hosts and/or DNS setup and run
+make-ssl-cert: 'make-ssl-cert generate-default-snakeoil --force-overwrite'
+make-ssl-cert: again.
+done.
+Begin: Loading preseed file... ... done.
+Begin: Adding live session user... ... passwd: password changed.
+done.
+Begin: Setting up init... ... done.
+done.
+Begin: Running /scripts/nfs-bottom ... done.
+Begin: Running /scripts/init-bottom ... done.
+[    7.999429] systemd[1]: Inserted module 'autofs4'
+[    8.096536] systemd[1]: systemd 255.4-1ubuntu8.18 running in system mode (+PAM +AUDIT +SELINUX +APPARMOR +IMA +SMACK +SECCOMP +GCRYPT -GNUTLS +OPENSSL +ACL +BLKID +CURL +ELFUTILS +FIDO2 +IDN2 -IDN +IPTC +KMOD +LIBCRYPTSETUP +LIBFDISK +PCRE2 -PWQUALITY +P11KIT +QRENCODE +TPM2 +BZIP2 +LZ4 +XZ +ZLIB +ZSTD -BPF_FRAMEWORK -XKBCOMMON +UTMP +SYSVINIT default-hierarchy=unified)
+[    8.100636] systemd[1]: Detected virtualization kvm.
+[    8.102209] systemd[1]: Detected architecture x86-64.
+
+Welcome to [1mNimbus OS 0.1[0m!
+
+[    8.137457] systemd[1]: Hostname set to <nimbus>.
+[    8.139950] systemd[1]: Initializing machine ID from random generator.
+[   10.140591] systemd[1]: Queued start job for default target graphical.target.
+[   10.170878] systemd[1]: Created slice system-modprobe.slice - Slice /system/modprobe.
+[[0;32m  OK  [0m] Created slice [0;1;39msystem-modprobe.slice[0m - Slice /system/modprobe.
+[   10.176283] systemd[1]: Created slice system-serial\x2dgetty.slice - Slice /system/serial-getty.
+[[0;32m  OK  [0m] Created slice [0;1;39msystem-serial\x2dget…slice[0m - Slice /system/serial-getty.
+[   10.182103] systemd[1]: Created slice user.slice - User and Session Slice.
+[[0;32m  OK  [0m] Created slice [0;1;39muser.slice[0m - User and Session Slice.
+[   10.186608] systemd[1]: Started systemd-ask-password-console.path - Dispatch Password Requests to Console Directory Watch.
+[[0;32m  OK  [0m] Started [0;1;39msystemd-ask-password-conso…[0mequests to Console Directory Watch.
+[   10.192806] systemd[1]: Started systemd-ask-password-wall.path - Forward Password Requests to Wall Directory Watch.
+[[0;32m  OK  [0m] Started [0;1;39msystemd-ask-password-wall.…[0md Requests to Wall Directory Watch.
+[   10.199295] systemd[1]: Set up automount proc-sys-fs-binfmt_misc.automount - Arbitrary Executable File Formats File System Automount Point.
+[[0;32m  OK  [0m] Set up automount [0;1;39mproc-sys-fs-binfm…[0mormats File System Automount Point.
+[   10.206100] systemd[1]: Expecting device dev-ttyS0.device - /dev/ttyS0...
+         Expecting device [0;1;39mdev-ttyS0.device[0m - /dev/ttyS0...
+[   10.210285] systemd[1]: Reached target cryptsetup.target - Local Encrypted Volumes.
+[[0;32m  OK  [0m] Reached target [0;1;39mcryptsetup.target[0m - Local Encrypted Volumes.
+[   10.215246] systemd[1]: Reached target integritysetup.target - Local Integrity Protected Volumes.
+[[0;32m  OK  [0m] Reached target [0;1;39mintegritysetup.targ…[0m Local Integrity Protected Volumes.
+[   10.220999] systemd[1]: Reached target remote-fs.target - Remote File Systems.
+[[0;32m  OK  [0m] Reached target [0;1;39mremote-fs.target[0m - Remote File Systems.
+[   10.225709] systemd[1]: Reached target slices.target - Slice Units.
+[[0;32m  OK  [0m] Reached target [0;1;39mslices.target[0m - Slice Units.
+[   10.229906] systemd[1]: Reached target swap.target - Swaps.
+[[0;32m  OK  [0m] Reached target [0;1;39mswap.target[0m - Swaps.
+[   10.233710] systemd[1]: Reached target veritysetup.target - Local Verity Protected Volumes.
+[[0;32m  OK  [0m] Reached target [0;1;39mveritysetup.target[0m - Local Verity Protected Volumes.
+[   10.239106] systemd[1]: Listening on systemd-initctl.socket - initctl Compatibility Named Pipe.
+[[0;32m  OK  [0m] Listening on [0;1;39msystemd-initctl.socke…[0m- initctl Compatibility Named Pipe.
+[   10.245507] systemd[1]: Listening on systemd-journald-dev-log.socket - Journal Socket (/dev/log).
+[[0;32m  OK  [0m] Listening on [0;1;39msystemd-journald-dev-…socket[0m - Journal Socket (/dev/log).
+[[0;32m  OK  [[   10.251195] systemd[1]: Listening on systemd-journald.socket - Journal Socket.
+0m] Listening on [0;1;39msystemd-journald.socket[0m - Journal Socket.
+[   10.255909] systemd[1]: systemd-pcrextend.socket - TPM2 PCR Extension (Varlink) was skipped because of an unmet condition check (ConditionSecurity=measured-uki).
+[   10.261876] systemd[1]: Listening on systemd-udevd-control.socket - udev Control Socket.
+[[0;32m  OK  [0m] Listening on [0;1;39msystemd-udevd-control.socket[0m - udev Control Socket.
+[   10.267208] systemd[1]: Listening on systemd-udevd-kernel.socket - udev Kernel Socket.
+[[0;32m  OK  [0m] Listening on [0;1;39msystemd-udevd-kernel.socket[0m - udev Kernel Socket.
+[   10.277487] systemd[1]: Mounting dev-hugepages.mount - Huge Pages File System...
+         Mounting [0;1;39mdev-hugepages.mount[0m - Huge Pages File System...
+[   10.284492] systemd[1]: Mounting dev-mqueue.mount - POSIX Message Queue File System...
+         Mounting [0;1;39mdev-mqueue.mount[0m - POSIX Message Queue File System...
+[   10.290261] systemd[1]: Mounting sys-kernel-debug.mount - Kernel Debug File System...
+         Mounting [0;1;39msys-kernel-debug.mount[0m - Kernel Debug File System...
+[   10.296465] systemd[1]: Mounting sys-kernel-tracing.mount - Kernel Trace File System...
+         Mounting [0;1;39msys-kernel-tracing.mount[0m - Kernel Trace File System...
+         Starting [0;1;39msyste[   10.307512] systemd[1]: Starting systemd-journald.service - Journal Service...
+md-journald.service[0m - Journal Service...
+[   10.321464] systemd[1]: Starting keyboard-setup.service - Set the console keyboard layout...
+         Starting [0;1;39mkeyboard-setup.service[0m - Set the console keyboard layout...
+[   10.361785] systemd[1]: Starting kmod-static-nodes.service - Create List of Static Device Nodes...
+         Starting [0;1;39mkmod-static-nodes.service[0m…eate List of Static Device Nodes...
+[   10.367901] systemd[1]: Starting modprobe@configfs.service - Load Kernel Module configfs...
+         Starting [0;1;39mmodprobe@configfs.service[0m - Load Kernel Module configfs...
+[   10.383259] systemd[1]: Starting modprobe@dm_mod.service - Load Kernel Module dm_mod...
+         Starting [0;1;39mmodprobe@dm_mod.service[0m - Load Kernel Module dm_mod...
+[   10.388665] systemd[1]: Starting modprobe@drm.service - Load Kernel Module drm...
+         Starting [0;1;39mmodprobe@drm.service[0m - Load Kernel Module drm...
+[   10.402484] systemd[1]: Starting modprobe@efi_pstore.service - Load Kernel Module efi_pstore...
+         Starting [0;1;39mmodprobe@efi_pstore.servi…[0m - Load Kernel Module efi_pstore...
+[   10.412238] systemd[1]: Starting modprobe@fuse.service - Load Kernel Module fuse...
+         Starting [0;1;39mmodprobe@fuse.service[0m - Load Kernel Module fuse...
+         Startin[   10.424724] systemd[1]: Starting modprobe@loop.service - Load Kernel Module loop...
+g [0;1;39mmodprobe@loop.service[0m - Load Kernel Module loop...
+[   10.442530] systemd[1]: Starting systemd-modules-load.service - Load Kernel Modules...
+         Starting [0;1;39msystemd-modules-load.service[0m - Load Kernel Modules...
+[   10.448205] systemd[1]: systemd-pcrmachine.service - TPM2 PCR Machine ID Measurement was skipped because of an unmet condition check (ConditionSecurity=measured-uki).
+[   10.457531] systemd[1]: Starting systemd-remount-fs.service - Remount Root and Kernel File Systems...
+         Starting [0;1;39msystemd-remount-fs.servic…[0munt Root and Kernel File Systems...
+[   10.462590] systemd[1]: systemd-tpm2-setup-early.service - TPM2 SRK Setup (Early) was skipped because of an unmet condition check (ConditionSecurity=measured-uki).
+[   10.469511] systemd[1]: Starting systemd-udev-trigger.service - Coldplug All udev Devices...
+         Starting [0;1;39msystemd-udev-trigger.service[0m - Coldplug All udev Devices...
+[[0;32m  OK  [[   10.476921] systemd[1]: Mounted dev-hugepages.mount - Huge Pages File System.
+0m] Mounted [0;1;39mdev-hugepages.mount[0m - Huge Pages File System.
+[[0;32m  OK  [0m] Mounted [0;1;39mdev-mqueue.[   10.481459] systemd[1]: Mounted dev-mqueue.mount - POSIX Message Queue File System.
+mount[0m - POSIX Message Queue File System.
+[[0;32m  OK  [0m] Mounted [0;1;39msys-kernel-[   10.486238] systemd[1]: Mounted sys-kernel-debug.mount - Kernel Debug File System.
+debug.mount[0m - Kernel Debug File System.
+[   10.490993] systemd[1]: Mounted sys-kernel-tracing.mount - Kernel Trace File System.
+[   10.503842] systemd-journald[568]: Collecting audit messages is disabled.
+[[0;32m  OK  [0m] Mounted [0;1;39msys-kernel-tracing.mount[0m - Kernel Trace File System.
+[   10.511092] systemd[1]: Finished kmod-static-nodes.service - Create List of Static Device Nodes.
+[[0;32m  OK  [0m] Finished [0;1;39mkmod-static-nodes.service[0m…Create List of Static Device Nodes.
+[   10.517166] systemd[1]: modprobe@configfs.service: Deactivated successfully.
+[   10.519219] systemd[1]: Finished modprobe@configfs.service - Load Kernel Module configfs.
+[[0;32m  OK  [0m] Finished [0;1;39mmodprobe@configfs.service[0m - Load Kernel Module configfs.
+[   10.529862] systemd[1]: modprobe@dm_mod.service: Deactivated successfully.
+[   10.533468] systemd[1]: Finished modprobe@dm_mod.service - Load Kernel Module dm_mod.
+[[0;32m  OK  [0m] Finished [0;1;39mmodprobe@dm_mod.service[0m - Load Kernel Module dm_mod.
+[[0;32m  OK  [0m] Started [0;1;39msystemd-jou[   10.540540] systemd[1]: Started systemd-journald.service - Journal Service.
+rnald.service[0m - Journal Service.
+[   10.195338] systemd[1]: modprobe@drm.service: Deactivated successfully.
+[[0;32m  OK  [0m] Finished [0;1;39mmodprobe@drm.service[0m - Load Kernel Module drm.
+[   10.199247] systemd[1]: Finished modprobe@drm.service - Load Kernel Module drm.
+[[0;32m  OK  [0m] Finished [0;1;39mmodprobe@efi_pstore.service[0m - Load Kernel Module efi_pstore.
+[   10.203973] systemd[1]: modprobe@efi_pstore.service: Deactivated successfully.
+[[0;32m  OK  [0m] Finished [0;1;39mmodprobe@fuse.service[0m - Load Kernel Module fuse.
+[   10.209135] systemd[1]: Finished modprobe@efi_pstore.service - Load Kernel Module efi_pstore.
+[[0;32m  OK  [0m] Finished [0;1;39mmodprobe@loop.service[0m - Load Kernel Module loop.
+[   10.215111] systemd[1]: modprobe@fuse.service: Deactivated successfully.
+[   10.215783] systemd[1]: Finished modprobe@fuse.service - Load Kernel Module fuse.
+[   10.216384] systemd[1]: modprobe@loop.service: Deactivated successfully.
+[   10.216707] systemd[1]: Finished modprobe@loop.service - Load Kernel Module loop.
+         Mounting [0;1;39msys-fs-fuse-connections.mount[0m - FUSE Control File System...
+[   10.235221] systemd[1]: Mounting sys-fs-fuse-connections.mount - FUSE Control File System...
+[   10.242385] systemd[1]: Mounting sys-kernel-config.mount - Kernel Configuration File System...
+         Mounting [0;1;39msys-kernel-config.mount[0m - Kernel Configuration File System...
+[   10.313830] systemd[1]: systemd-repart.service - Repartition Root Disk was skipped because no trigger condition checks were met.
+         Starting [0;1;39msystemd-tmpfiles-setup-de…[0m Device Nodes in /dev gracefully...
+[   10.329160] systemd[1]: Starting systemd-tmpfiles-setup-dev-early.service - Create Static Device Nodes in /dev gracefully...
+[[0;32m  OK  [0m] Finished [0;1;39msystemd-remount-fs.servic…[0mmount Root and Kernel File Systems.
+[[0;32m  OK  [0m] Mounted [0;1;39msys-fs-fuse-connections.mount[0m - FUSE Control File System.
+[   10.347301] systemd[1]: Finished systemd-remount-fs.service - Remount Root and Kernel File Systems.
+[[0;32m  OK  [0m] Mounted [0;1;39msys-kernel-config.mount[0m - Kernel Configuration File System.
+[   10.355119] systemd[1]: Mounted sys-fs-fuse-connections.mount - FUSE Control File System.
+[   10.366588] systemd[1]: Mounted sys-kernel-config.mount - Kernel Configuration File System.
+[   10.745028] lp: driver loaded but no devices found
+[   10.397091] systemd[1]: systemd-hwdb-update.service - Rebuild Hardware Database was skipped because no trigger condition checks were met.
+[   10.404618] systemd[1]: Starting systemd-journal-flush.service - Flush Journal to Persistent Storage...
+[   10.415387] systemd-modules-load[578]: Inserted module 'lp'
+         Starting [0;1;39msystemd-journal-flush.ser…[0msh Journal to Persistent Storage...
+[   10.424139] systemd[1]: systemd-pstore.service - Platform Persistent Storage Archival was skipped because of an unmet condition check (ConditionDirectoryNotEmpty=/sys/fs/pstore).
+         Starting [0;1;39msystemd-random-seed.service[0m - Load/Save OS Random Seed...
+[   10.440306] systemd[1]: Starting systemd-random-seed.service - Load/Save OS Random Seed...
+[   10.446314] systemd[1]: systemd-tpm2-setup.service - TPM2 SRK Setup was skipped because of an unmet condition check (ConditionSecurity=measured-uki).
+[[0;32m  OK  [0m] Finished [0;1;39msystemd-udev-trigger.service[0m - Coldplug All udev Devices.
+[   10.457360] systemd[1]: Finished systemd-udev-trigger.service - Coldplug All udev Devices.[   10.817392] ppdev: user-space parallel port driver
+
+[   10.469364] systemd-modules-load[578]: Inserted module 'ppdev'
+[   10.497383] systemd[1]: Finished keyboard-setup.service - Set the console keyboard layout.
+[[0;32m  OK  [0m] Finished [0;1;39mkeyboard-setup.service[0m - Set the console keyboard layout.
+[   10.872044] parport_pc 00:02: reported by Plug and Play ACPI
+[   10.873986] parport0: PC-style at 0x378, irq 7 [PCSPP,TRISTATE]
+[   10.875444] systemd-journald[568]: Received client request to flush runtime journal.
+[[0;32m  OK  [0m] Finished [0;1;39msystemd-random-seed.service[0m - Load/Save OS Random Seed.
+[   10.541077] systemd[1]: Finished systemd-random-seed.service - Load/Save OS Random Seed.
+[   10.543577] systemd[1]: Finished systemd-journal-flush.service - Flush Journal to Persistent Storage.
+[[0;32m  OK  [0m] Finished [0;1;39msystemd-journal-flush.ser…[0mlush Journal to Persistent Storage.
+[   10.567214] systemd[1]: Finished systemd-tmpfiles-setup-dev-early.service - Create Static Device Nodes in /dev gracefully.
+[[0;32m  OK  [0m] Finished [0;1;39msystemd-tmpfiles-setup-de…[0mic Device Nodes in /dev gracefully.
+         Starting [0;1;39msystemd-sysusers.service[0m - Create System Users...
+[   10.576142] systemd[1]: Starting systemd-sysusers.service - Create System Users...
+[   10.609425] systemd[1]: Finished systemd-sysusers.service - Create System Users.
+[[0;32m  OK  [0m] Finished [0;1;39msystemd-sysusers.service[0m - Create System Users.
+         Starting [0;1;39msystemd-tmpfiles-setup-de…[0meate Static Device Nodes in /dev...
+[   10.618893] systemd[1]: Starting systemd-tmpfiles-setup-dev.service - Create Static Device Nodes in /dev...
+[   10.976606] lp0: using parport0 (interrupt-driven).
+[   10.628375] systemd-modules-load[578]: Inserted module 'parport_pc'
+[[0;32m  OK  [0m] Finished [0;1;39msystemd-tmpfiles-setup-de…[0mCreate Static Device Nodes in /dev.
+[[0;32m  OK  [0m] Reached target [0;1;39mlocal-fs-pre.target[0m…Preparation for Local File Systems.
+[   10.635969] systemd[1]: Finished systemd-tmpfiles-setup-dev.service - Create Static Device Nodes in /dev.
+[   10.638886] systemd[1]: Reached target local-fs-pre.target - Preparation for Local File Systems.
+[   10.640981] systemd[1]: [0;1;39mtmp.mount: Directory /tmp to mount over is not empty, mounting anyway.[0m
+         Mounting [0;1;39mtmp.mount[0m - /tmp...
+[   10.650417] systemd[1]: Mounting tmp.mount - /tmp...
+[   10.653308] systemd[1]: Starting systemd-udevd.service - Rule-based Manager for Device Events and Files...
+         Starting [0;1;39msystemd-udevd.service[0m - R…ager for Device Events and Files...
+[[0;32m  OK  [0m] Mounted [0;1;39mtmp.mount[0m - /tmp.
+[   10.676261] systemd[1]: Mounted tmp.mount - /tmp.
+[   10.678078] systemd[1]: Finished systemd-modules-load.service - Load Kernel Modules.
+[[0;32m  OK  [0m] Finished [0;1;39msystemd-modules-load.service[0m - Load Kernel Modules.
+[   10.683107] systemd[1]: Reached target local-fs.target - Local File Systems.
+[[0;32m  OK  [0m] Reached target [0;1;39mlocal-fs.target[0m - Local File Systems.
+[   10.713275] systemd[1]: Listening on systemd-sysext.socket - System Extension Image Management (Varlink).
+[[0;32m  OK  [0m] Listening on [0;1;39msystemd-sysext.socket[0m…tension Image Management (Varlink).
+[   10.723174] systemd[1]: Starting console-setup.service - Set console font and keymap...
+         Starting [0;1;39mconsole-setup.service[0m - Set console font and keymap...
+[   10.732206] systemd[1]: Starting finalrd.service - Create final runtime dir for shutdown pivot root...
+         Starting [0;1;39mfinalrd.service[0m - Create …time dir for shutdown pivot root...
+         Starting [0;1;39mldconfig.service[0m - Rebuild Dynamic Linker Cache...
+[   10.741769] systemd-udevd[622]: Using default interface naming scheme 'v255'.
+[   10.748144] systemd[1]: Starting ldconfig.service - Rebuild Dynamic Linker Cache...
+         Starting [0;1;39msystemd-binfmt.service[0m - Set Up Additional Binary Formats...
+[   10.773897] systemd[1]: Starting systemd-binfmt.service - Set Up Additional Binary Formats...
+[   10.786693] systemd[1]: Starting systemd-sysctl.service - Apply Kernel Variables...
+         Starting [0;1;39msystemd-sysctl.service[0m - Apply Kernel Variables...
+         Starting [0;1;39msystemd-tmpfiles-setup.se…[0me Volatile Files and Directories...
+[   10.797386] systemd[1]: Starting systemd-tmpfiles-setup.service - Create Volatile Files and Directories...
+         Starting [0;1;39mufw.service[0m - Uncomplicated firewall...
+[   10.803092] systemd[1]: Starting ufw.service - Uncomplicated firewall...
+[   10.811438] systemd[1]: Finished finalrd.service - Create final runtime dir for shutdown pivot root.
+[[0;32m  OK  [0m] Finished [0;1;39mfinalrd.service[0m - Create …untime dir for shutdown pivot root.
+[   10.926389] systemd[1]: proc-sys-fs-binfmt_misc.automount: Got automount request for /proc/sys/fs/binfmt_misc, triggered by 629 (systemd-binfmt)
+[   10.933319] systemd[1]: Mounting proc-sys-fs-binfmt_misc.mount - Arbitrary Executable File Formats File System...
+         Mounting [0;1;39mproc-sys-fs-binfmt_misc.m…[0mcutable File Formats File System...
+[   11.078875] systemd[1]: Mounted proc-sys-fs-binfmt_misc.mount - Arbitrary Executable File Formats File System.
+[[0;32m  OK  [0m] Mounted [0;1;39mproc-sys-fs-binfmt_misc.mo…[0mxecutable File Formats File System.
+[   11.142698] systemd[1]: Finished systemd-binfmt.service - Set Up Additional Binary Formats.
+[[0;32m  OK  [0m] Finished [0;1;39msystemd-binfmt.service[0m - Set Up Additional Binary Formats.
+[[0;32m  OK  [0m] Finished [0;1;39msystemd-tmpfiles-setup.se…[0mate Volatile Files and Directories.
+[   11.261711] systemd[1]: Finished systemd-tmpfiles-setup.service - Create Volatile Files and Directories.
+[   11.265380] systemd[1]: systemd-firstboot.service - First Boot Wizard was skipped because of an unmet condition check (ConditionFirstBoot=yes).
+[   11.269108] systemd[1]: first-boot-complete.target - First Boot Complete was skipped because of an unmet condition check (ConditionFirstBoot=yes).
+         Starting [0;1;39msystemd-journal-catalog-u…ervice[0m - Rebuild Journal Catalog...
+[   11.321211] systemd[1]: Starting systemd-journal-catalog-update.service - Rebuild Journal Catalog...
+[   11.325308] systemd[1]: systemd-machine-id-commit.service - Commit a transient machine-id on disk was skipped because of an unmet condition check (ConditionPathIsMountPoint=/etc/machine-id).
+[   11.333383] systemd[1]: Starting systemd-timesyncd.service - Network Time Synchronization...
+         Starting [0;1;39msystemd-timesyncd.service[0m - Network Time Synchronization...
+[   11.343714] systemd[1]: Starting systemd-update-utmp.service - Record System Boot/Shutdown in UTMP...
+         Starting [0;1;39msystemd-update-utmp.servi…[0mord System Boot/Shutdown in UTMP...
+[   11.522684] systemd[1]: Finished systemd-update-utmp.service - Record System Boot/Shutdown in UTMP.
+[[0;32m  OK  [0m] Finished [0;1;39msystemd-update-utmp.servi…[0mecord System Boot/Shutdown in UTMP.
+[[0;32m  OK  [0m] Started [0;1;39msystemd-timesyncd.service[0m - Network Time Synchronization.
+[   11.674749] systemd[1]: Started systemd-timesyncd.service - Network Time Synchronization.
+[[0;32m  OK  [0m] Reached target [0;1;39mtime-set.target[0m - System Time Set.
+[   11.677324] systemd[1]: Reached target time-set.target - System Time Set.
+[[0;32m  OK  [0m] Finished [0;1;39msystemd-journal-catalog-u….service[0m - Rebuild Journal Catalog.
+[   11.943290] systemd[1]: Finished systemd-journal-catalog-update.service - Rebuild Journal Catalog.
+[[0;32m  OK  [0m] Finished [0;1;39msystemd-sysctl.service[0m - Apply Kernel Variables.
+[   11.956694] systemd[1]: Finished systemd-sysctl.service - Apply Kernel Variables.
+         Starting [0;1;39msystemd-resolved.service[0m - Network Name Resolution...
+[   11.967200] systemd[1]: Starting systemd-resolved.service - Network Name Resolution...
+[   12.170678] systemd-resolved[673]: Positive Trust Anchors:
+[   12.172752] systemd-resolved[673]: . IN DS 20326 8 2 e06d44b80b8f1d39a95c0b0d7c65d08458e880409bbc683457104237c7f8ec8d
+[   12.175858] systemd-resolved[673]: . IN DS 38696 8 2 683d2d0acb8c9b712a1948b27f741219298d0a450d612c483af444a4c0fb2b16
+[   12.178554] systemd-resolved[673]: Negative trust anchors: home.arpa 10.in-addr.arpa 16.172.in-addr.arpa 17.172.in-addr.arpa 18.172.in-addr.arpa 19.172.in-addr.arpa 20.172.in-addr.arpa 21.172.in-addr.arpa 22.172.in-addr.arpa 23.172.in-addr.arpa 24.172.in-addr.arpa 25.172.in-addr.arpa 26.172.in-addr.arpa 27.172.in-addr.arpa 28.172.in-addr.arpa 29.172.in-addr.arpa 30.172.in-addr.arpa 31.172.in-addr.arpa 170.0.0.192.in-addr.arpa 171.0.0.192.in-addr.arpa 168.192.in-addr.arpa d.f.ip6.arpa ipv4only.arpa corp home internal intranet lan local private test
+[   12.266699] systemd-resolved[673]: Using system hostname 'nimbus'.
+[[0;32m  OK  [0m] Started [0;1;39msystemd-resolved.service[0m - Network Name Resolution.
+[[0;32m  OK  [0m] Reached target [0;1;39mnss-lookup.target[0m - Host and Network Name Lookups.
+[   12.273245] systemd[1]: Started systemd-resolved.service - Network Name Resolution.
+[   12.277626] systemd[1]: Reached target nss-lookup.target - Host and Network Name Lookups.
+[[0;32m  OK  [0m] Started [0;1;39msystemd-udevd.service[0m - Ru…anager for Device Events and Files.
+[   12.532802] systemd[1]: Started systemd-udevd.service - Rule-based Manager for Device Events and Files.
+[[0;32m  OK  [0m] Found device [0;1;39mdev-ttyS0.device[0m - /dev/ttyS0.
+[   13.142075] systemd[1]: Found device dev-ttyS0.device - /dev/ttyS0.
+[[0;32m  OK  [0m] Listening on [0;1;39msystemd-rfkill.socket[0m…ll Switch Status /dev/rfkill Watch.
+[   13.366817] systemd[1]: Listening on systemd-rfkill.socket - Load/Save RF Kill Switch Status /dev/rfkill Watch.
+[   13.374178] systemd[1]: Starting modprobe@dm_mod.service - Load Kernel Module dm_mod...
+         Starting [0;1;39mmodprobe@dm_mod.service[0m - Load Kernel Module dm_mod...
+[   13.381168] systemd[1]: Starting modprobe@efi_pstore.service - Load Kernel Module efi_pstore...
+         Starting [0;1;39mmodprobe@efi_pstore.servi…[0m - Load Kernel Module efi_pstore...
+         Starting [0;1;39mmodprobe@loop.service[0m - Load Kernel Module loop...
+[   13.402037] systemd[1]: Starting modprobe@loop.service - Load Kernel Module loop...
+[   13.404648] systemd[1]: systemd-firstboot.service - First Boot Wizard was skipped because of an unmet condition check (ConditionFirstBoot=yes).
+[   13.408215] systemd[1]: first-boot-complete.target - First Boot Complete was skipped because of an unmet condition check (ConditionFirstBoot=yes).
+[   13.411362] systemd[1]: systemd-hwdb-update.service - Rebuild Hardware Database was skipped because no trigger condition checks were met.
+[   13.414349] systemd[1]: systemd-machine-id-commit.service - Commit a transient machine-id on disk was skipped because of an unmet condition check (ConditionPathIsMountPoint=/etc/machine-id).
+[   13.418357] systemd[1]: systemd-pcrmachine.service - TPM2 PCR Machine ID Measurement was skipped because of an unmet condition check (ConditionSecurity=measured-uki).
+[   13.423172] systemd[1]: systemd-tpm2-setup-early.service - TPM2 SRK Setup (Early) was skipped because of an unmet condition check (ConditionSecurity=measured-uki).
+[   13.429086] systemd[1]: systemd-tpm2-setup.service - TPM2 SRK Setup was skipped because of an unmet condition check (ConditionSecurity=measured-uki).
+[   13.553460] systemd[1]: modprobe@efi_pstore.service: Deactivated successfully.
+[   13.611798] systemd[1]: Finished modprobe@efi_pstore.service - Load Kernel Module efi_pstore.
+[[0;32m  OK  [0m] Finished [0;1;39mmodprobe@efi_pstore.service[0m - Load Kernel Module efi_pstore.
+[[0;32m  OK  [0m] Finished [0;1;39mmodprobe@dm_mod.service[0m - Load Kernel Module dm_mod.
+[[0;32m  OK  [0m] Finished [0;1;39mmodprobe@loop.service[0m - Load Kernel Module loop.
+[   13.711073] systemd[1]: modprobe@dm_mod.service: Deactivated successfully.
+[   13.715368] systemd[1]: Finished modprobe@dm_mod.service - Load Kernel Module dm_mod.
+[   13.719250] systemd[1]: modprobe@loop.service: Deactivated successfully.
+[   13.724231] systemd[1]: Finished modprobe@loop.service - Load Kernel Module loop.
+[   13.727798] systemd[1]: systemd-pstore.service - Platform Persistent Storage Archival was skipped because of an unmet condition check (ConditionDirectoryNotEmpty=/sys/fs/pstore).
+[   13.731720] systemd[1]: systemd-repart.service - Repartition Root Disk was skipped because no trigger condition checks were met.
+[   14.144199] systemd[1]: Finished console-setup.service - Set console font and keymap.
+[[0;32m  OK  [0m] Finished [0;1;39mconsole-setup.service[0m - Set console font and keymap.
+[   14.318485] systemd[1]: Reached target sound.target - Sound Card.
+[[0;32m  OK  [0m] Reached target [0;1;39msound.target[0m - Sound Card.
+[[0;32m  OK  [0m] Finished [0;1;39mufw.service[0m - Uncomplicated firewall.
+[   14.756148] systemd[1]: Finished ufw.service - Uncomplicated firewall.
+[[0;32m  OK  [0m] Reached target [0;1;39mnetwork-pre.target[0m - Preparation for Network.
+[   14.760512] systemd[1]: Reached target network-pre.target - Preparation for Network.
+[[0m[0;31m*     [0m] Job ldconfig.service/start running (3s / no limit)
+M[K[[0;1;31m*[0m[0;31m*    [0m] Job ldconfig.service/start running (4s / no limit)
+M[K[[0;31m*[0;1;31m*[0m[0;31m*   [0m] Job ldconfig.service/start running (4s / no limit)
+M[K[[0;32m  OK  [0m] Finished [0;1;39mldconfig.service[0m - Rebuild Dynamic Linker Cache.
+[K[   18.058806] systemd[1]: Finished ldconfig.service - Rebuild Dynamic Linker Cache.
+[   18.066262] systemd[1]: Starting systemd-update-done.service - Update is Completed...
+         Starting [0;1;39msystemd-update-done.service[0m - Update is Completed...
+[   18.093842] systemd[1]: Finished systemd-update-done.service - Update is Completed.
+[[0;32m  OK  [0m] Finished [0;1;39msystemd-update-done.service[0m - Update is Completed.
+[   18.098466] systemd[1]: Reached target sysinit.target - System Initialization.
+[[0;32m  OK  [0m] Reached target [0;1;39msysinit.target[0m - System Initialization.
+[[0;32m  OK  [0m] Started [0;1;39mcups.path[0m - CUPS Scheduler.
+[   18.102809] systemd[1]: Started cups.path - CUPS Scheduler.
+[[0;32m  OK  [0m] Started [0;1;39mapt-daily.timer[0m - Daily apt download activities.
+[   18.106430] systemd[1]: Started apt-daily.timer - Daily apt download activities.
+[[0;32m  OK  [0m] Started [0;1;39mapt-daily-upgrade.timer[0m - …y apt upgrade and clean activities.
+[   18.110221] systemd[1]: Started apt-daily-upgrade.timer - Daily apt upgrade and clean activities.
+[[0;32m  OK  [0m] Started [0;1;39mdpkg-db-backup.timer[0m - Daily dpkg database backup timer.
+[   18.114763] systemd[1]: Started dpkg-db-backup.timer - Daily dpkg database backup timer.
+[[0;32m  OK  [0m] Started [0;1;39me2scrub_all.timer[0m - Period…Metadata Check for All Filesystems.
+[   18.119072] systemd[1]: Started e2scrub_all.timer - Periodic ext4 Online Metadata Check for All Filesystems.
+[[0;32m  OK  [0m] Started [0;1;39mfstrim.timer[0m - Discard unused filesystem blocks once a week.
+[   18.123920] systemd[1]: Started fstrim.timer - Discard unused filesystem blocks once a week.
+[[0;32m  OK  [0m] Started [0;1;39mlogrotate.timer[0m - Daily rotation of log files.
+[   18.128313] systemd[1]: Started logrotate.timer - Daily rotation of log files.
+[[0;32m  OK  [0m] Started [0;1;39mmotd-news.timer[0m - Message of the Day.
+[   18.132150] systemd[1]: Started motd-news.timer - Message of the Day.
+[[0;32m  OK  [0m] Started [0;1;39msystemd-tmpfiles-clean.tim…[0my Cleanup of Temporary Directories.
+[   18.135429] systemd[1]: Started systemd-tmpfiles-clean.timer - Daily Cleanup of Temporary Directories.
+[[0;32m  OK  [0m] Reached target [0;1;39mpaths.target[0m - Path Units.
+[   18.139871] systemd[1]: Reached target paths.target - Path Units.
+[[0;32m  OK  [0m] Reached target [0;1;39mtimers.target[0m - Timer Units.
+[   18.143059] systemd[1]: Reached target timers.target - Timer Units.
+[[0;32m  OK  [0m] Listening on [0;1;39mavahi-daemon.socket[0m -…DNS/DNS-SD Stack Activation Socket.
+[   18.147302] systemd[1]: Listening on avahi-daemon.socket - Avahi mDNS/DNS-SD Stack Activation Socket.
+[[0;32m  OK  [0m] Listening on [0;1;39mcups.socket[0m - CUPS Scheduler.
+[   18.151976] systemd[1]: Listening on cups.socket - CUPS Scheduler.
+[[0;32m  OK  [0m] Listening on [0;1;39mdbus.socket[0m - D-Bus System Message Bus Socket.
+[   18.156989] systemd[1]: Listening on dbus.socket - D-Bus System Message Bus Socket.
+[[0;32m  OK  [0m] Listening on [0;1;39muuidd.socket[0m - UUID daemon activation socket.
+[   18.161907] systemd[1]: Listening on uuidd.socket - UUID daemon activation socket.
+[[0;32m  OK  [0m] Reached target [0;1;39msockets.target[0m - Socket Units.
+[   18.165728] systemd[1]: Reached target sockets.target - Socket Units.
+[   18.169091] systemd[1]: systemd-pcrphase-sysinit.service - TPM2 PCR Barrier (Initialization) was skipped because of an unmet condition check (ConditionSecurity=measured-uki).
+[[0;32m  OK  [0m] Reached target [0;1;39mbasic.target[0m - Basic System.
+[   18.172890] systemd[1]: Reached target basic.target - Basic System.
+         Starting [0;1;39mavahi-daemon.service[0m - Avahi mDNS/DNS-SD Stack...
+[   18.181059] systemd[1]: Starting avahi-daemon.service - Avahi mDNS/DNS-SD Stack...
+         Starting [0;1;39mdbus.service[0m - D-Bus System Message Bus...
+[   18.188320] systemd[1]: Starting dbus.service - D-Bus System Message Bus...
+[   18.196190] systemd[1]: Starting e2scrub_reap.service - Remove Stale Online ext4 Metadata Check Snapshots...
+         Starting [0;1;39me2scrub_reap.service[0m - Re…ne ext4 Metadata Check Snapshots...
+[   18.201328] systemd[1]: getty-static.service - getty on tty2-tty6 if dbus and logind are not available was skipped because of an unmet condition check (ConditionPathExists=!/usr/bin/dbus-daemon).
+[   18.245245] systemd[1]: nimbus-update-boot.service - Finish a Nimbus OS update that was interrupted was skipped because of an unmet condition check (ConditionPathExists=/var/lib/nimbus/update/state.json).
+         Starting [0;1;39mpower-profiles-daemon.service[0m - Power Profiles daemon...
+[   18.254818] systemd[1]: Starting power-profiles-daemon.service - Power Profiles daemon...
+[   18.260083] systemd[1]: ssl-cert.service - Generate snakeoil SSL keypair was skipped because of an unmet condition check (ConditionPathExists=!/etc/ssl/private/ssl-cert-snakeoil.key).
+[   18.269620] systemd[1]: Starting systemd-logind.service - User Login Management...
+         Starting [0;1;39msystemd-logind.service[0m - User Login Management...
+[   18.274101] systemd[1]: systemd-pcrphase.service - TPM2 PCR Barrier (User) was skipped because of an unmet condition check (ConditionSecurity=measured-uki).
+[   18.295599] avahi-daemon[1001]: Found user 'avahi' (UID 106) and group 'avahi' (GID 111).
+[   18.298095] avahi-daemon[1001]: Successfully dropped root privileges.
+[   18.300135] avahi-daemon[1001]: avahi-daemon 0.8 starting up.
+[   18.426101] systemd-logind[1005]: New seat seat0.
+[[0;32m  OK  [0m] Started [0;1;39msystemd-logind.service[0m - User Login Management.
+[   18.430064] systemd-logind[1005]: Watching system buttons on /dev/input/event0 (Power Button)
+[   18.432418] systemd-logind[1005]: Watching system buttons on /dev/input/event1 (AT Translated Set 2 keyboard)
+[   18.434844] systemd[1]: Started systemd-logind.service - User Login Management.
+[   18.450993] systemd[1]: e2scrub_reap.service: Deactivated successfully.
+[[0;32m  OK  [0m] Finished [0;1;39me2scrub_reap.service[0m - Re…line ext4 Metadata Check Snapshots.
+[   18.455387] systemd[1]: Finished e2scrub_reap.service - Remove Stale Online ext4 Metadata Check Snapshots.
+[   18.465143] dbus-daemon[1002]: dbus[1002]: Unknown username "whoopsie" in message bus configuration file
+[   18.483738] dbus-daemon[1002]: [system] AppArmor D-Bus mediation is enabled
+[   18.485744] systemd[1]: Started dbus.service - D-Bus System Message Bus.
+[[0;32m  OK  [0m] Started [0;1;39mdbus.service[0m - D-Bus System Message Bus.
+[   18.489718] avahi-daemon[1001]: Successfully called chroot().
+[   18.491523] avahi-daemon[1001]: Successfully dropped remaining capabilities.
+[   18.493306] avahi-daemon[1001]: No service file found in /etc/avahi/services.
+[   18.497123] dbus-daemon[1002]: [system] Activating systemd to hand-off: service name='org.freedesktop.PolicyKit1' unit='polkit.service' requested by ':1.4' (uid=0 pid=1004 comm="/usr/libexec/power-profiles-daemon" label="unconfined")
+[   18.504210] dbus-daemon[1002]: [system] Successfully activated service 'org.freedesktop.systemd1'
+         Starting [0;1;39mNetworkManager.service[0m - Network Manager...
+[   18.506560] systemd[1]: Starting NetworkManager.service - Network Manager...
+         Starting [0;1;39mwpa_supplicant.service[0m - WPA supplicant...
+[   18.515106] systemd[1]: Starting wpa_supplicant.service - WPA supplicant...
+[[0;32m  OK  [0m] Started [0;1;39mavahi-daemon.service[0m - Avahi mDNS/DNS-SD Stack.
+[   18.519285] systemd[1]: Started avahi-daemon.service - Avahi mDNS/DNS-SD Stack.
+[   18.531132] avahi-daemon[1001]: Joining mDNS multicast group on interface lo.IPv6 with address ::1.
+[   18.533482] avahi-daemon[1001]: New relevant interface lo.IPv6 for mDNS.
+[   18.536169] avahi-daemon[1001]: Joining mDNS multicast group on interface lo.IPv4 with address 127.0.0.1.
+[   18.538864] avahi-daemon[1001]: New relevant interface lo.IPv4 for mDNS.
+[   18.541259] avahi-daemon[1001]: Network interface enumeration completed.
+[   18.543082] avahi-daemon[1001]: Registering new address record for ::1 on lo.*.
+[   18.545047] avahi-daemon[1001]: Registering new address record for 127.0.0.1 on lo.IPv4.
+         Starting [0;1;39mpolkit.service[0m - Authorization Manager...
+[   18.562441] systemd[1]: Starting polkit.service - Authorization Manager...
+[[0;32m  OK  [0m] Started [0;1;39mwpa_supplicant.service[0m - WPA supplicant.
+[   18.760777] systemd[1]: Started wpa_supplicant.service - WPA supplicant.
+[   18.763449] wpa_supplicant[1015]: [0;1;39mSuccessfully initialized wpa_supplicant[0m
+[   18.794526] polkitd[1016]: Started polkitd version 124
+[   18.818059] NetworkManager[1014]: <info>  [1793655651.9736] NetworkManager (version 1.46.0) is starting... (boot:aa2230ab-8b40-412a-84d3-12bf390200c5)
+[   18.821951] NetworkManager[1014]: <info>  [1793655651.9737] Read config: /etc/NetworkManager/NetworkManager.conf (lib: 10-default-firewall-use-iptables.conf, 10-dns-resolved.conf, no-mac-addr-change.conf) (etc: 10-globally-managed-devices.conf, default-wifi-powersave-on.conf)
+[   18.828310] NetworkManager[1014]: <info>  [1793655651.9806] manager[0x5bfd342aab80]: monitoring kernel firmware directory '/lib/firmware'.
+[   18.833241] dbus-daemon[1002]: [system] Activating via systemd: service name='org.freedesktop.hostname1' unit='dbus-org.freedesktop.hostname1.service' requested by ':1.7' (uid=0 pid=1014 comm="/usr/sbin/NetworkManager --no-daemon" label="unconfined")
+[   18.838323] NetworkManager[1014]: <info>  [1793655651.9806] monitoring ifupdown state file '/run/network/ifstate'.
+[   18.840759] polkitd[1016]: [0;1;39mLoading rules from directory /etc/polkit-1/rules.d[0m
+[   18.842698] polkitd[1016]: [0;1;39mLoading rules from directory /usr/share/polkit-1/rules.d[0m
+         Starting [0;1;39msystemd-hostnamed.service[0m - Hostname Service...
+[   18.870059] systemd[1]: Starting systemd-hostnamed.service - Hostname Service...
+[   18.877167] polkitd[1016]: [0;1;39mFinished loading, compiling and executing 6 rules[0m
+[   18.879877] dbus-daemon[1002]: [system] Successfully activated service 'org.freedesktop.PolicyKit1'
+[[0;32m  OK  [0m] Started [0;1;39mpolkit.service[0m - Authorization Manager.
+[   18.882730] polkitd[1016]: [0;1;39mAcquired the name org.freedesktop.PolicyKit1 on the system bus[0m
+[   18.886564] systemd[1]: Started polkit.service - Authorization Manager.
+[[0;32m  OK  [0m] Started [0;1;39mpower-profiles-daemon.service[0m - Power Profiles daemon.
+[   18.891624] systemd[1]: Started power-profiles-daemon.service - Power Profiles daemon.
+[   18.951452] dbus-daemon[1002]: [system] Successfully activated service 'org.freedesktop.hostname1'
+[[0;32m  OK  [0m] Started [0;1;39msystemd-hostnamed.service[0m - Hostname Service.
+[   18.955525] systemd[1]: Started systemd-hostnamed.service - Hostname Service.
+[   18.958407] NetworkManager[1014]: <info>  [1793655652.1132] hostname: hostname: using hostnamed
+[   18.960641] NetworkManager[1014]: <info>  [1793655652.1132] hostname: static hostname changed from (none) to "nimbus"
+[   18.963257] NetworkManager[1014]: <info>  [1793655652.1137] dns-mgr: init: dns=systemd-resolved rc-manager=unmanaged (auto), plugin=systemd-resolved
+[   18.966475] NetworkManager[1014]: <info>  [1793655652.1139] manager[0x5bfd342aab80]: rfkill: Wi-Fi hardware radio set enabled
+[   18.969241] NetworkManager[1014]: <info>  [1793655652.1139] manager[0x5bfd342aab80]: rfkill: WWAN hardware radio set enabled
+[   18.979787] NetworkManager[1014]: <info>  [1793655652.1360] Loaded device plugin: NMAtmManager (/usr/lib/x86_64-linux-gnu/NetworkManager/1.46.0/libnm-device-plugin-adsl.so)
+[   19.001956] NetworkManager[1014]: <info>  [1793655652.1581] Loaded device plugin: NMBluezManager (/usr/lib/x86_64-linux-gnu/NetworkManager/1.46.0/libnm-device-plugin-bluetooth.so)
+[   19.008082] NetworkManager[1014]: <info>  [1793655652.1595] Loaded device plugin: NMTeamFactory (/usr/lib/x86_64-linux-gnu/NetworkManager/1.46.0/libnm-device-plugin-team.so)
+[   19.011830] dbus-daemon[1002]: [system] Activating via systemd: service name='org.freedesktop.nm_dispatcher' unit='dbus-org.freedesktop.nm-dispatcher.service' requested by ':1.7' (uid=0 pid=1014 comm="/usr/sbin/NetworkManager --no-daemon" label="unconfined")
+[   19.017200] NetworkManager[1014]: <info>  [1793655652.1601] Loaded device plugin: NMWifiFactory (/usr/lib/x86_64-linux-gnu/NetworkManager/1.46.0/libnm-device-plugin-wifi.so)
+[   19.020966] NetworkManager[1014]: <info>  [1793655652.1608] Loaded device plugin: NMWwanFactory (/usr/lib/x86_64-linux-gnu/NetworkManager/1.46.0/libnm-device-plugin-wwan.so)
+[   19.024752] NetworkManager[1014]: <info>  [1793655652.1613] manager: rfkill: Wi-Fi enabled by radio killswitch; enabled by state file
+[   19.027901] NetworkManager[1014]: <info>  [1793655652.1615] manager: rfkill: WWAN enabled by radio killswitch; enabled by state file
+[   19.031258] NetworkManager[1014]: <info>  [1793655652.1616] manager: Networking is enabled by state file
+         Starting [0;1;39mNetworkManager-dispatcher…[0manager Script Dispatcher Service...
+[   19.033921] NetworkManager[1014]: <info>  [1793655652.1624] settings: Loaded settings plugin: ifupdown ("/usr/lib/x86_64-linux-gnu/NetworkManager/1.46.0/libnm-settings-plugin-ifupdown.so")
+[   19.040213] NetworkManager[1014]: <info>  [1793655652.1625] settings: Loaded settings plugin: keyfile (internal)
+[   19.042775] NetworkManager[1014]: <info>  [1793655652.1625] ifupdown: management mode: unmanaged
+[   19.045192] NetworkManager[1014]: <info>  [1793655652.1826] ifupdown: interfaces file /etc/network/interfaces doesn't exist
+[   19.047919] systemd[1]: Starting NetworkManager-dispatcher.service - Network Manager Script Dispatcher Service...
+[[0;32m  OK  [0m] Started [0;1;39mNetworkManager-dispatcher.…[0m Manager Script Dispatcher Service.
+[   19.069762] dbus-daemon[1002]: [system] Successfully activated service 'org.freedesktop.nm_dispatcher'
+[   19.072326] systemd[1]: Started NetworkManager-dispatcher.service - Network Manager Script Dispatcher Service.
+[   19.310125] avahi-daemon[1001]: Server startup complete. Host name is nimbus.local. Local service cookie is 2667288602.
+[   20.763170] systemd[1]: Reloading requested from client PID 1043 ('systemctl') (unit NetworkManager.service)...
+[   20.765795] systemd[1]: Reloading...
+[   20.939917] systemd[1]: Reloading finished in 176 ms.
+[   20.971745] NetworkManager[1014]: <info>  [1793655654.1278] dhcp: init: Using DHCP client 'internal'
+[   20.974464] NetworkManager[1014]: <info>  [1793655654.1280] manager: (lo): new Loopback device (/org/freedesktop/NetworkManager/Devices/1)
+[   20.977922] NetworkManager[1014]: <info>  [1793655654.1295] device (lo): state change: unmanaged -> unavailable (reason 'connection-assumed', sys-iface-state: 'external')
+[[0;32m  OK  [0m] Started [0;1;39mNetworkManager.service[0m - Network Manager.
+[[0;32m  OK  [0m] Reached target [0;1;39mnetwork.target[0m - Network.
+[   20.986086] NetworkManager[1014]: <info>  [1793655654.1301] device (lo): state change: unavailable -> disconnected (reason 'connection-assumed', sys-iface-state: 'external')
+[   20.990779] NetworkManager[1014]: <info>  [1793655654.1309] device (lo): Activation: starting connection 'lo' (6b99cd8c-3b68-4e21-b296-528726d81181)
+[   20.994377] NetworkManager[1014]: <info>  [1793655654.1317] manager: (enp0s1): new Ethernet device (/org/freedesktop/NetworkManager/Devices/2)
+[   20.997671] avahi-daemon[1001]: Joining mDNS multicast group on interface enp0s1.IPv6 with address fe80::8378:cc5:dadf:d2b3.
+[   21.000415] NetworkManager[1014]: <info>  [1793655654.1327] settings: (enp0s1): created default wired connection 'Wired connection 1'
+         Starting [0;1;39mcups.service[0m - CUPS Scheduler...
+[   21.005121] avahi-daemon[1001]: New relevant interface enp0s1.IPv6 for mDNS.
+         Starting [0;1;39msystemd-user-sessions.service[0m - Permit User Sessions...
+[   21.010086] NetworkManager[1014]: <info>  [1793655654.1327] device (enp0s1): state change: unmanaged -> unavailable (reason 'managed', sys-iface-state: 'external')
+[   21.016106] avahi-daemon[1001]: Registering new address record for fe80::8378:cc5:dadf:d2b3 on enp0s1.*.
+[   21.020305] NetworkManager[1014]: <info>  [1793655654.1358] failed to open /run/network/ifstate
+[   21.022627] NetworkManager[1014]: <info>  [1793655654.1361] bus-manager: acquired D-Bus service "org.freedesktop.NetworkManager"
+[   21.025543] NetworkManager[1014]: <info>  [1793655654.1368] device (lo): state change: disconnected -> prepare (reason 'none', sys-iface-state: 'external')
+[   21.028915] NetworkManager[1014]: <info>  [1793655654.1369] device (lo): state change: prepare -> config (reason 'none', sys-iface-state: 'external')
+[   21.032754] NetworkManager[1014]: <info>  [1793655654.1370] device (lo): state change: config -> ip-config (reason 'none', sys-iface-state: 'external')
+[   21.036998] NetworkManager[1014]: <info>  [1793655654.1371] device (enp0s1): carrier: link connected
+[   21.042285] NetworkManager[1014]: <info>  [1793655654.1373] device (lo): state change: ip-config -> ip-check (reason 'none', sys-iface-state: 'external')
+[   21.045630] systemd[1]: Started NetworkManager.service - Network Manager.
+[   21.047392] NetworkManager[1014]: <info>  [1793655654.1395] device (enp0s1): state change: unavailable -> disconnected (reason 'carrier-changed', sys-iface-state: 'managed')
+[   21.051064] systemd[1]: Reached target network.target - Network.
+[   21.052697] NetworkManager[1014]: <info>  [1793655654.1411] policy: auto-activating connection 'Wired connection 1' (046441b5-fc42-34b9-b3d1-b01e624f5bc6)
+[   21.056122] NetworkManager[1014]: <info>  [1793655654.1412] device (lo): state change: ip-check -> secondaries (reason 'none', sys-iface-state: 'external')
+[   21.059437] NetworkManager[1014]: <info>  [1793655654.1422] device (enp0s1): Activation: starting connection 'Wired connection 1' (046441b5-fc42-34b9-b3d1-b01e624f5bc6)
+[   21.062987] NetworkManager[1014]: <info>  [1793655654.1422] device (lo): state change: secondaries -> activated (reason 'none', sys-iface-state: 'external')
+[   21.066393] NetworkManager[1014]: <info>  [1793655654.1431] device (lo): Activation: successful, device activated.
+[   21.068967] NetworkManager[1014]: <info>  [1793655654.1442] device (enp0s1): state change: disconnected -> prepare (reason 'none', sys-iface-state: 'managed')
+[   21.072430] NetworkManager[1014]: <info>  [1793655654.1443] manager: NetworkManager state is now CONNECTING
+[   21.074813] NetworkManager[1014]: <info>  [1793655654.1444] device (enp0s1): state change: prepare -> config (reason 'none', sys-iface-state: 'managed')
+[   21.078160] NetworkManager[1014]: <info>  [1793655654.1457] device (enp0s1): state change: config -> ip-config (reason 'none', sys-iface-state: 'managed')
+[   21.081481] NetworkManager[1014]: <info>  [1793655654.1463] dhcp4 (enp0s1): activation: beginning transaction (timeout in 45 seconds)
+[[0;32m  OK  [0m] Finished [0;1;39msystemd-user-sessions.service[0m - Permit User Sessions.
+[   21.086313] NetworkManager[1014]: <info>  [1793655654.1495] dhcp4 (enp0s1): state changed new lease, address=10.0.2.15, acd pending
+[   21.089979] systemd[1]: Starting cups.service - CUPS Scheduler...
+[   21.091630] systemd[1]: nimbus-test-wifi.service - Simulated Wi-Fi access point for boot tests was skipped because of an unmet condition check (ConditionKernelCommandLine=nimbus.test=wifi).
+[   21.099240] systemd[1]: Starting systemd-user-sessions.service - Permit User Sessions...
+[   21.103103] systemd[1]: Finished systemd-user-sessions.service - Permit User Sessions.
+[[0;32m  OK  [0m] Started [0;1;39mnimbus-session.service[0m - Nimbus desktop.
+[   21.124120] systemd[1]: Started nimbus-session.service - Nimbus desktop.
+[[0;32m  OK  [0m] Started [0;1;39mserial-getty@ttyS0.service[0m - Serial Getty on ttyS0.
+[[0;32m  OK  [0m] Reached target [0;1;39mgetty.target[0m - Login Prompts.
+[   21.132822] systemd[1]: Started serial-getty@ttyS0.service - Serial Getty on ttyS0.
+[   21.141123] systemd[1]: Reached target getty.target - Login Prompts.
+[   21.161143] NetworkManager[1014]: <info>  [1793655654.3174] dhcp4 (enp0s1): state changed new lease, address=10.0.2.15
+[   21.171994] NetworkManager[1014]: <info>  [1793655654.3205] policy: set 'Wired connection 1' (enp0s1) as default for IPv4 routing and DNS
+[   21.177820] avahi-daemon[1001]: Joining mDNS multicast group on interface enp0s1.IPv4 with address 10.0.2.15.
+[   21.185538] systemd-resolved[673]: enp0s1: Bus client set default route setting: yes
+[   21.187610] avahi-daemon[1001]: New relevant interface enp0s1.IPv4 for mDNS.
+[   21.189428] systemd-resolved[673]: enp0s1: Bus client set DNS server list to: 10.0.2.3
+[   21.191464] avahi-daemon[1001]: Registering new address record for 10.0.2.15 on enp0s1.IPv4.
+[   21.193600] NetworkManager[1014]: <info>  [1793655654.3282] device (enp0s1): state change: ip-config -> ip-check (reason 'none', sys-iface-state: 'managed')
+[   21.196935] NetworkManager[1014]: <info>  [1793655654.3394] device (enp0s1): state change: ip-check -> secondaries (reason 'none', sys-iface-state: 'managed')
+[   21.200389] NetworkManager[1014]: <info>  [1793655654.3397] device (enp0s1): state change: secondaries -> activated (reason 'none', sys-iface-state: 'managed')
+[   21.207275] NetworkManager[1014]: <info>  [1793655654.3400] manager: NetworkManager state is now CONNECTED_SITE
+         Starting [0;1;39msetvtrgb.service[0m - Set console scheme...
+[   21.213715] NetworkManager[1014]: <info>  [1793655654.3404] device (enp0s1): Activation: successful, device activated.
+[   21.219222] NetworkManager[1014]: <info>  [1793655654.3406] manager: NetworkManager state is now CONNECTED_GLOBAL
+[   21.221808] NetworkManager[1014]: <info>  [1793655654.3408] manager: startup complete
+[   21.223957] systemd[1]: Starting setvtrgb.service - Set console scheme...
+[   21.241214] (-session)[1075]: pam_unix(nimbus-session:session): session opened for user nimbus(uid=1000) by nimbus(uid=0)
+[[0;32m  OK  [0m] Started [0;1;39mcups.service[0m - CUPS Scheduler.
+[[0;32m  OK  [0m] Finished [0;1;39msetvtrgb.service[0m - Set console scheme.
+[   21.283570] systemd[1]: Started cups.service - CUPS Scheduler.
+[   21.290146] systemd[1]: Finished setvtrgb.service - Set console scheme.
+[   21.292120] systemd-logind[1005]: New session c1 of user nimbus.
+[[0;32m  OK  [0m] Created slice [0;1;39msystem-getty.slice[0m - Slice /system/getty.
+[   21.297079] systemd[1]: Created slice system-getty.slice - Slice /system/getty.
+[[0;32m  OK  [0m] Created slice [0;1;39muser-1000.slice[0m - User Slice of UID 1000.
+[   21.302780] systemd[1]: Created slice user-1000.slice - User Slice of UID 1000.
+[[0;32m  OK  [0m] Reached target [0;1;39mmulti-user.target[0m - Multi-User System.
+[   21.306542] systemd[1]: Reached target multi-user.target - Multi-User System.
+[[0;32m  OK  [0m] Reached target [0;1;39mgraphical.target[0m - Graphical Interface.
+[   21.310183] systemd[1]: Reached target graphical.target - Graphical Interface.
+[[0;32m  OK  [0m] Reached target [0;1;39mprinter.target[0m - Printer Support.
+[   21.313842] systemd[1]: Reached target printer.target - Printer Support.
+         Starting [0;1;39msystemd-update-utmp-runle…[0m- Record Runlevel Change in UTMP...
+[   21.321959] systemd[1]: Starting systemd-update-utmp-runlevel.service - Record Runlevel Change in UTMP...
+         Starting [0;1;39muser-runtime-dir@1000.ser…[0mRuntime Directory /run/user/1000...
+[   21.328895] systemd[1]: Starting user-runtime-dir@1000.service - User Runtime Directory /run/user/1000...
+[   21.341906] systemd[1]: systemd-update-utmp-runlevel.service: Deactivated successfully.
+[[0;32m  OK  [0m] Finished [0;1;39msystemd-update-utmp-runle…e[0m - Record Runlevel Change in UTMP.
+[   21.346393] systemd[1]: Finished systemd-update-utmp-runlevel.service - Record Runlevel Change in UTMP.
+[   21.360119] systemd[1]: Finished user-runtime-dir@1000.service - User Runtime Directory /run/user/1000.
+[[0;32m  OK  [0m] Finished [0;1;39muser-runtime-dir@1000.ser…[0mr Runtime Directory /run/user/1000.
+         Starting [0;1;39muser@1000.service[0m - User Manager for UID 1000...
+[   21.372128] systemd[1]: Starting user@1000.service - User Manager for UID 1000...
+[   21.477678] (systemd)[1084]: pam_unix(systemd-user:session): session opened for user nimbus(uid=1000) by nimbus(uid=0)
+[   21.643726] systemd[1084]: Queued start job for default target default.target.
+[   21.649883] systemd[1084]: Created slice app.slice - User Application Slice.
+[   21.651683] systemd[1084]: Created slice session.slice - User Core Session Slice.
+[   21.653546] systemd[1084]: Reached target paths.target - Paths.
+[   21.655102] systemd[1084]: Reached target timers.target - Timers.
+[   21.657434] systemd[1084]: Starting dbus.socket - D-Bus User Message Bus Socket...
+[   21.659267] systemd[1084]: Listening on dirmngr.socket - GnuPG network certificate management daemon.
+[   21.662117] systemd[1084]: Listening on gpg-agent-browser.socket - GnuPG cryptographic agent and passphrase cache (access for web browsers).
+[   21.665138] systemd[1084]: Listening on gpg-agent-extra.socket - GnuPG cryptographic agent and passphrase cache (restricted).
+[   21.670169] systemd[1084]: Starting gpg-agent-ssh.socket - GnuPG cryptographic agent (ssh-agent emulation)...
+[   21.672579] systemd[1084]: Listening on gpg-agent.socket - GnuPG cryptographic agent and passphrase cache.
+[   21.675646] systemd[1084]: Listening on keyboxd.socket - GnuPG public key management service.
+[   21.678806] systemd[1084]: Listening on pipewire-pulse.socket - PipeWire PulseAudio.
+[   21.681699] systemd[1084]: Listening on pipewire.socket - PipeWire Multimedia System Sockets.
+[   21.684757] systemd[1084]: Listening on dbus.socket - D-Bus User Message Bus Socket.
+[   21.699960] systemd[1084]: Listening on gpg-agent-ssh.socket - GnuPG cryptographic agent (ssh-agent emulation).
+[   21.702401] systemd[1084]: Reached target sockets.target - Sockets.
+[   21.705879] systemd[1084]: Reached target basic.target - Basic System.
+[[0;32m  OK  [0m] Started [0;1;39muser@1000.service[0m - User Manager for UID 1000.
+[   21.709632] systemd[1]: Started user@1000.service - User Manager for UID 1000.
+[[0;32m  OK  [0m] Started [0;1;39msession-c1.scope[0m - Session c1 of User nimbus.
+[   21.715245] systemd[1084]: Started pipewire.service - PipeWire Multimedia Service.
+[   21.718697] systemd[1084]: Started filter-chain.service - PipeWire filter chain daemon.
+[   21.722361] systemd[1]: Started session-c1.scope - Session c1 of User nimbus.
+[   21.725427] systemd[1084]: Started wireplumber.service - Multimedia Service Session Manager.
+[   21.729562] systemd[1]: Startup finished in 7.502s (kernel) + 14.215s (userspace) = 21.718s.
+[   21.733202] systemd[1084]: Started pipewire-pulse.service - PipeWire PulseAudio.
+[   21.734944] systemd[1084]: Reached target default.target - Main User Target.
+[   21.736620] systemd[1084]: Startup finished in 241ms.
+[   21.877833] nimbus-session[1111]: nimbus-session: capabilities: CapInh:	0000000800000000 CapPrm:	0000000800000000 CapEff:	0000000800000000 CapAmb:	0000000800000000
+[   22.009114] systemd[1084]: Starting dbus.service - D-Bus User Message Bus...
+[   22.067479] nimbus-session[1115]: 00:00:00.000 [INFO] [libseat] [libseat/backend/seatd.c:64] Could not connect to socket /run/seatd.sock: No such file or directory
+[   22.071429] nimbus-session[1115]: 00:00:00.003 [INFO] [libseat] [libseat/libseat.c:76] Backend 'seatd' failed to open seat, skipping
+[   22.075878] systemd[1084]: Started dbus.service - D-Bus User Message Bus.
+[   22.078361] dbus-daemon[1114]: [session uid=1000 pid=1114] AppArmor D-Bus mediation is enabled
+[   22.080781] dbus-daemon[1002]: [system] Activating via systemd: service name='org.freedesktop.RealtimeKit1' unit='rtkit-daemon.service' requested by ':1.15' (uid=1000 pid=1099 comm="/usr/bin/pipewire -c filter-chain.conf" label="unconfined")
+[   22.119238] systemd[1]: Starting rtkit-daemon.service - RealtimeKit Scheduling Policy Service...
+[   22.195715] dbus-daemon[1002]: [system] Successfully activated service 'org.freedesktop.RealtimeKit1'
+[   22.198099] systemd[1]: Started rtkit-daemon.service - RealtimeKit Scheduling Policy Service.
+[   22.336844] pipewire[1098]: [0;1;38;5;185mmod.jackdbus-detect: Failed to receive jackdbus reply: org.freedesktop.DBus.Error.ServiceUnknown: The name org.jackaudio.service was not provided by any .service files[0m
+[   22.346795] nimbus-session[1115]: 00:00:00.278 [INFO] [libseat] [libseat/libseat.c:73] Seat opened with backend 'logind'
+[   22.350926] nimbus-session[1115]: 00:00:00.278 [INFO] [backend/session/session.c:109] Successfully loaded libseat session
+[   22.355094] nimbus-session[1115]: 00:00:00.283 [INFO] [backend/backend.c:213] Found 1 GPUs
+[   22.357570] nimbus-session[1115]: 00:00:00.283 [INFO] [backend/drm/backend.c:202] Initializing DRM backend for /dev/dri/card0 (bochs-drm)
+[   22.361346] nimbus-session[1115]: 00:00:00.283 [INFO] [backend/drm/drm.c:255] Found 1 DRM CRTCs
+[   22.363608] nimbus-session[1115]: 00:00:00.283 [INFO] [backend/drm/drm.c:213] Found 1 DRM planes
+[   22.366065] nimbus-session[1115]: 00:00:00.283 [INFO] [util/env.c:25] Loading WLR_RENDERER option: pixman
+[   22.369333] nimbus-session[1115]: 00:00:00.283 [INFO] [render/pixman/renderer.c:537] Creating pixman renderer
+[   22.372911] nimbus-session[1115]: 00:00:00.285 [INFO] [nimbus-wm.c:3287] X11 programs use DISPLAY=:0
+[   22.375508] rtkit-daemon[1120]: Successfully made thread 1098 of process 1098 owned by '1000' high priority at nice level -11.
+[   22.379296] rtkit-daemon[1120]: Successfully made thread 1127 of process 1098 owned by '1000' RT at priority 20.
+[   22.382831] rtkit-daemon[1120]: Successfully made thread 1121 of process 1099 owned by '1000' RT at priority 20.
+[   22.385769] rtkit-daemon[1120]: Successfully made thread 1101 of process 1101 owned by '1000' high priority at nice level -11.
+[   22.388628] rtkit-daemon[1120]: Successfully made thread 1100 of process 1100 owned by '1000' high priority at nice level -11.
+[   22.391418] rtkit-daemon[1120]: Successfully made thread 1122 of process 1100 owned by '1000' RT at priority 20.
+[   22.393969] rtkit-daemon[1120]: Successfully made thread 1126 of process 1101 owned by '1000' RT at priority 20.
+[   22.500149] wireplumber[1100]: [0;1;39mSPA handle 'api.libcamera.enum.manager' could not be loaded; is it installed?[0m
+[   22.502903] wireplumber[1100]: [0;1;39mPipeWire's libcamera SPA missing or broken. libcamera not supported.[0m
+[   22.564802] wireplumber[1100]: [0;1;38;5;185mFailed to get percentage from UPower: org.freedesktop.DBus.Error.NameHasNoOwner[0m
+[   22.666121] nimbus-session[1115]: 00:00:00.597 [INFO] [backend/drm/drm.c:1547] Scanning DRM connectors on /dev/dri/card0
+[   22.674149] nimbus-session[1115]: 00:00:00.607 [INFO] [backend/drm/drm.c:1598] Found connector 'Virtual-1'
+[   22.675664] nimbus-session[1115]: 00:00:00.607 [INFO] [backend/drm/drm.c:1623] 'Virtual-1' connected
+[   22.679894] nimbus-session[1115]: 00:00:00.607 [INFO] [backend/drm/drm.c:1432] Detected modes:
+[   22.680903] nimbus-session[1115]: 00:00:00.607 [INFO] [backend/drm/drm.c:1459]   1440x900 @ 74.995 Hz (preferred)
+[   22.681797] nimbus-session[1115]: 00:00:00.610 [INFO] [backend/drm/drm.c:1459]   1920x1440 @ 60.000 Hz
+[   22.682718] nimbus-session[1115]: 00:00:00.610 [INFO] [backend/drm/drm.c:1459]   2560x1080 @ 50.000 Hz
+[   22.683059] nimbus-session[1115]: 00:00:00.610 [INFO] [backend/drm/drm.c:1459]   1856x1392 @ 59.995 Hz
+[   22.683355] nimbus-session[1115]: 00:00:00.610 [INFO] [backend/drm/drm.c:1459]   1792x1344 @ 60.000 Hz
+[   22.683649] nimbus-session[1115]: 00:00:00.610 [INFO] [backend/drm/drm.c:1459]   2048x1152 @ 60.000 Hz
+[   22.683936] nimbus-session[1115]: 00:00:00.610 [INFO] [backend/drm/drm.c:1459]   1920x1200 @ 59.885 Hz
+[   22.684569] nimbus-session[1115]: 00:00:00.610 [INFO] [backend/drm/drm.c:1459]   1920x1080 @ 60.000 Hz
+[   22.684857] nimbus-session[1115]: 00:00:00.610 [INFO] [backend/drm/drm.c:1459]   1920x1080 @ 50.000 Hz
+[   22.685490] nimbus-session[1115]: 00:00:00.610 [INFO] [backend/drm/drm.c:1459]   1600x1200 @ 60.000 Hz
+[   22.685777] nimbus-session[1115]: 00:00:00.610 [INFO] [backend/drm/drm.c:1459]   1680x1050 @ 59.954 Hz
+[   22.686405] nimbus-session[1115]: 00:00:00.610 [INFO] [backend/drm/drm.c:1459]   1400x1050 @ 59.978 Hz
+[   22.686703] nimbus-session[1115]: 00:00:00.610 [INFO] [backend/drm/drm.c:1459]   1280x1024 @ 60.020 Hz
+[   22.686990] nimbus-session[1115]: 00:00:00.610 [INFO] [backend/drm/drm.c:1459]   1440x900 @ 59.887 Hz
+[   22.687624] nimbus-session[1115]: 00:00:00.610 [INFO] [backend/drm/drm.c:1459]   1280x960 @ 60.000 Hz
+[   22.687913] nimbus-session[1115]: 00:00:00.610 [INFO] [backend/drm/drm.c:1459]   1360x768 @ 60.015 Hz
+[   22.688527] nimbus-session[1115]: 00:00:00.610 [INFO] [backend/drm/drm.c:1459]   1280x768 @ 59.870 Hz
+[   22.688823] nimbus-session[1115]: 00:00:00.610 [INFO] [backend/drm/drm.c:1459]   1024x768 @ 60.004 Hz
+[   22.689432] nimbus-session[1115]: 00:00:00.610 [INFO] [backend/drm/drm.c:1459]   800x600 @ 60.317 Hz
+[   22.689723] nimbus-session[1115]: 00:00:00.610 [INFO] [backend/drm/drm.c:1459]   640x480 @ 60.000 Hz
+[   22.690366] nimbus-session[1115]: 00:00:00.610 [INFO] [backend/drm/drm.c:1459]   640x480 @ 59.940 Hz
+[   22.690643] nimbus-session[1115]: 00:00:00.610 [INFO] [util/env.c:9] Loading WLR_NO_HARDWARE_CURSORS option: 1
+[   22.690937] nimbus-session[1115]: 00:00:00.610 [INFO] [backend/drm/drm.c:1479] Physical size: 360x220
+[   22.691576] nimbus-session[1115]: 00:00:00.610 [INFO] [backend/drm/drm.c:1659] connector Virtual-1: Requesting modeset
+[   22.738069] nimbus-session[1115]: 00:00:00.670 [INFO] [backend/drm/drm.c:782] connector Virtual-1: Modesetting with 1440x900 @ 74.995 Hz
+[   22.742075] NetworkManager[1014]: <info>  [1793655655.8979] policy: set 'Wired connection 1' (enp0s1) as default for IPv6 routing and DNS
+[   22.745698] avahi-daemon[1001]: Leaving mDNS multicast group on interface enp0s1.IPv6 with address fe80::8378:cc5:dadf:d2b3.
+[   22.748629] avahi-daemon[1001]: Joining mDNS multicast group on interface enp0s1.IPv6 with address fec0::7e7e:82ab:cbc9:312b.
+[   22.751922] nimbus-session[1115]: 00:00:00.681 [INFO] [nimbus-wm.c:2086] screen 1440x900 at 0,0
+[   22.754195] nimbus-session[1115]: 00:00:00.681 [INFO] [nimbus-wm.c:3311] nimbus-wm on WAYLAND_DISPLAY=wayland-0
+[   22.757362] avahi-daemon[1001]: Registering new address record for fec0::7e7e:82ab:cbc9:312b on enp0s1.*.
+[   22.765885] avahi-daemon[1001]: Withdrawing address record for fe80::8378:cc5:dadf:d2b3 on enp0s1.
+[   22.769140] wireplumber[1100]: [0;1;39mBlueZ system service is not available[0m
+[   22.773121] wireplumber[1100]: [0;1;39m<WpNode:0x62112bd771f0> ignoring set_param on already destroyed objects[0m
+[   22.776110] wireplumber[1100]: [0;1;39m<WpNode:0x62112bd771f0> ignoring set_param on already destroyed objects[0m
+[   22.779160] wireplumber[1100]: [0;1;39m<WpNode:0x62112bcdde90> ignoring set_param on already destroyed objects[0m
+[   22.781736] wireplumber[1100]: [0;1;39m<WpNode:0x62112bcdde90> ignoring set_param on already destroyed objects[0m
+[   22.788243] wireplumber[1100]: [0;1;39m<WpSiAudioAdapter:0x62112bccb580> Object activation aborted: proxy destroyed[0m
+[   22.790937] wireplumber[1100]: [0;1;39m<WpSiAudioAdapter:0x62112bccb580> failed to activate item: Object activation aborted: proxy destroyed[0m
+
+Nimbus OS 0.1 nimbus ttyS0
+
+nimbus login: [   22.872053] nimbus-session[1115]: 00:00:00.804 [INFO] [nimbus-wm.c:3107] started the desktop (pid 1144)
+[   24.079194] nimbus-session[1145]: [   5014.082] wl_registry@2.global(18, "wl_seat", 8)
+[   24.088723] nimbus-session[1145]: [   5024.068]  -> wl_registry@2.bind(18, "wl_seat", 5, new id [unknown]@15)
+[   24.091542] nimbus-session[1145]: [   5026.887]  -> zwp_primary_selection_device_manager_v1@8.get_device(new id zwp_primary_selection_device_v1@17, wl_seat@15)
+[   24.095079] nimbus-session[1145]: [   5026.920]  -> wl_data_device_manager@7.get_data_device(new id wl_data_device@18, wl_seat@15)
+[   24.098058] nimbus-session[1145]: [   5027.398] wl_seat@15.name("seat0")
+[   24.099864] nimbus-session[1145]: [   5027.410] wl_seat@15.capabilities(3)
+[   24.101769] nimbus-session[1145]: [   5027.475]  -> wl_seat@15.get_pointer(new id wl_pointer@14)
+[   24.104103] nimbus-session[1145]: [   5027.496]  -> wl_seat@15.get_keyboard(new id wl_keyboard@10)
+[   24.589926] avahi-daemon[1001]: Registering new address record for fec0::b31c:5c36:da62:7c8c on enp0s1.*.
+[   26.538516] nimbus-session[1145]: [   7473.331]  -> xdg_toplevel@23.set_app_id("nimbus-shell")
+[   29.079806] systemd[1]: NetworkManager-dispatcher.service: Deactivated successfully.
+[   29.372323] nimbus-session[1145]: [  10307.241] wl_registry@25.global(18, "wl_seat", 8)
+[   29.738528] nimbus-session[1145]: [  10669.584] wl_keyboard@10.keymap(1, fd 10, 64756)
+[   29.740688] nimbus-session[1145]: [  10676.045] wl_keyboard@10.repeat_info(25, 600)
+[   29.741478] nimbus-session[1145]: [  10676.835] xdg_toplevel@23.configure(1440, 900, array[24])
+[   29.750730] rtkit-daemon[1120]: Successfully made thread 1186 of process 1144 owned by '1000' RT at priority 5.
+[   29.758898] rtkit-daemon[1120]: Successfully made thread 1187 of process 1144 owned by '1000' RT at priority 5.
+[   29.775053] rtkit-daemon[1120]: Successfully made thread 1192 of process 1156 owned by '1000' RT at priority 5.
+[   29.781384] nimbus-session[1115]: 00:00:07.714 [INFO] [nimbus-wm.c:1020] the desktop is on screen
+[   29.784631] nimbus-session[1145]: [  10719.589] wl_keyboard@10.enter(2, wl_surface@21, array[0])
+[   29.785613] nimbus-session[1145]: [  10719.610] wl_keyboard@10.modifiers(3, 0, 0, 0, 0)
+[   29.785860] nimbus-session[1145]: [  10719.696] xdg_toplevel@23.configure(1440, 900, array[28])
+[   29.786412] nimbus-session[1145]: nimbus-shell: focus in: window
+[   29.786671] nimbus-session[1145]: nimbus-shell: focus in: page
+[   30.194372] sudo[1202]: [0;1;39m  nimbus : TTY=tty1 ; PWD=/ ; USER=root ; COMMAND=/usr/lib/nimbus/nimbus-sys firewall apply public[0m
+[   30.196665] sudo[1202]: pam_unix(sudo:session): session opened for user root(uid=0) by nimbus(uid=1000)
+[   30.288361] sudo[1236]: [0;1;39m  nimbus : TTY=tty1 ; PWD=/ ; USER=root ; COMMAND=/usr/lib/nimbus/nimbus-sys firewall apply public[0m
+[   30.291879] sudo[1236]: pam_unix(sudo:session): session opened for user root(uid=0) by nimbus(uid=1000)
+[   30.603809] rtkit-daemon[1120]: Successfully made thread 1164 of process 1162 owned by '1000' RT at priority 5.
+[   30.798961] nimbus-session[1145]: page: page loaded, hasFocus=true
+[   30.817085] sudo[1236]: pam_unix(sudo:session): session closed for user root
+[   31.132086] sudo[1202]: pam_unix(sudo:session): session closed for user root
+[   31.450474] dbus-daemon[1002]: [system] Activating via systemd: service name='org.freedesktop.timedate1' unit='dbus-org.freedesktop.timedate1.service' requested by ':1.35' (uid=1000 pid=1285 comm="timedatectl show" label="unconfined")
+[   31.542853] systemd[1]: Starting systemd-timedated.service - Time & Date Service...
+[   31.697103] dbus-daemon[1002]: [system] Successfully activated service 'org.freedesktop.timedate1'
+[   31.701463] systemd[1]: Started systemd-timedated.service - Time & Date Service.
+[   31.771119] nimbus-session[1145]: [  12704.531] wl_keyboard@10.keymap(1, fd 22, 64756)
+[   31.775306] nimbus-session[1145]: [  12706.414] wl_keyboard@10.repeat_info(30, 500)
+[   31.857363] nimbus-session[1145]: page: test chrome: installing
+[   31.941937] sudo[1327]: [0;1;39m  nimbus : TTY=tty1 ; PWD=/ ; USER=root ; COMMAND=/usr/lib/nimbus/nimbus-apps install chrome[0m
+[   31.949780] sudo[1327]: pam_unix(sudo:session): session opened for user root(uid=0) by nimbus(uid=1000)
+[   42.179762] systemd-timesyncd[648]: Contacted time server 185.125.190.57:123 (ntp.ubuntu.com).
+[   42.183329] systemd-timesyncd[648]: Initial clock synchronization to Mon 2026-11-02 21:41:15.629569 UTC.
+[   48.990282] systemd[1]: systemd-hostnamed.service: Deactivated successfully.
+[   57.278108] sudo[1327]: pam_unix(sudo:session): session closed for user root
+[   57.850742] nimbus-session[1145]: page: test chrome: installed in 26 s (156.0.8078.79)
+[   59.422363] dbus-daemon[1002]: [system] Activating via systemd: service name='org.bluez' unit='dbus-org.bluez.service' requested by ':1.40' (uid=1000 pid=2138 comm="/opt/google/chrome/chrome --ozone-platform=wayland" label="unconfined")
+[   59.448055] systemd[1]: bluetooth.service - Bluetooth service was skipped because of an unmet condition check (ConditionPathIsDirectory=/sys/class/bluetooth).
+[   59.603470] systemd[1084]: Started app-com.google.Chrome-2138.scope.
+[   59.672071] dbus-daemon[1114]: [session uid=1000 pid=1114] Activating via systemd: service name='org.freedesktop.portal.Desktop' unit='xdg-desktop-portal.service' requested by ':1.23' (uid=1000 pid=2138 comm="/opt/google/chrome/chrome --ozone-platform=wayland" label="unconfined")
+[   59.723441] systemd[1084]: Starting xdg-desktop-portal.service - Portal service...
+[   59.829792] dbus-daemon[1114]: [session uid=1000 pid=1114] Activating via systemd: service name='org.freedesktop.portal.Documents' unit='xdg-document-portal.service' requested by ':1.24' (uid=1000 pid=2267 comm="/usr/libexec/xdg-desktop-portal" label="unconfined")
+[   59.839080] nimbus-session[1115]: 00:00:37.771 [INFO] [nimbus-wm.c:1040] window 1 (google-chrome) opened
+[   59.841480] systemd[1084]: Starting xdg-document-portal.service - flatpak document portal service...
+[   59.857733] nimbus-session[1145]: [  40792.561] wl_keyboard@10.leave(7, wl_surface@21)
+[   59.858598] nimbus-session[1145]: [  40792.571] xdg_toplevel@23.configure(1440, 900, array[24])
+[   59.858834] nimbus-session[1145]: nimbus-shell: focus out: window
+[   59.860792] nimbus-session[1145]: nimbus-shell: focus out: page
+[   59.950206] dbus-daemon[1114]: [session uid=1000 pid=1114] Activating via systemd: service name='org.freedesktop.impl.portal.PermissionStore' unit='xdg-permission-store.service' requested by ':1.25' (uid=1000 pid=2287 comm="/usr/libexec/xdg-document-portal" label="unconfined")
+[   59.966154] nimbus-session[1145]: page: test chrome: window opened: Nimbus test page - Google Chrome
+[   59.972696] nimbus-session[1145]: page: test chrome: page loaded: Nimbus test page - Google Chrome
+[   59.974063] nimbus-session[1145]: page: window blur
+[   59.996260] systemd[1084]: Starting xdg-permission-store.service - sandboxed app permission store...
+[   60.013324] dbus-daemon[1114]: [session uid=1000 pid=1114] Successfully activated service 'org.freedesktop.impl.portal.PermissionStore'
+[   60.016533] systemd[1084]: Started xdg-permission-store.service - sandboxed app permission store.
+[   60.021777] dbus-daemon[1114]: [session uid=1000 pid=1114] Successfully activated service 'org.freedesktop.portal.Documents'
+[   60.029447] systemd[1084]: Started xdg-document-portal.service - flatpak document portal service.
+[   60.098347] xdg-document-portal[2287]: Ignoring invalid max threads value 4294967295 > max (100000).
+[   60.112328] dbus-daemon[1114]: [session uid=1000 pid=1114] Activating via systemd: service name='org.freedesktop.impl.portal.desktop.gtk' unit='xdg-desktop-portal-gtk.service' requested by ':1.24' (uid=1000 pid=2267 comm="/usr/libexec/xdg-desktop-portal" label="unconfined")
+[   60.127234] systemd[1084]: Starting xdg-desktop-portal-gtk.service - Portal service (GTK/GNOME implementation)...
+[   60.198556] xdg-desktop-por[2317]: [0;1;38;5;185mAT-SPI: Error retrieving accessibility bus address: org.freedesktop.DBus.Error.ServiceUnknown: The name org.a11y.Bus was not provided by any .service files[0m
+[   60.239615] dbus-daemon[1114]: [session uid=1000 pid=1114] Successfully activated service 'org.freedesktop.impl.portal.desktop.gtk'
+[   60.240945] systemd[1084]: Started xdg-desktop-portal-gtk.service - Portal service (GTK/GNOME implementation).
+[   60.345075] dbus-daemon[1114]: [session uid=1000 pid=1114] Successfully activated service 'org.freedesktop.portal.Desktop'
+[   60.346196] systemd[1084]: Started xdg-desktop-portal.service - Portal service.
+[   61.755167] systemd[1]: systemd-timedated.service: Deactivated successfully.
+[   66.397125] nimbus-session[1145]: page: test chrome: maximized: max 1440x852
+[   66.398301] nimbus-session[1145]: page: test chrome: ready
+[   70.030780] nimbus-session[1115]: 00:00:47.963 [INFO] [nimbus-wm.c:533] key super for the desktop
+[   70.036270] nimbus-session[1145]: [  50966.139] wl_keyboard@10.enter(15, wl_surface@21, array[0])
+[   70.037783] nimbus-session[1145]: [  50966.155] wl_keyboard@10.modifiers(16, 64, 0, 0, 0)
+[   70.040875] nimbus-session[1145]: [  50966.189] wl_keyboard@10.modifiers(18, 0, 0, 0, 0)
+[   70.043740] nimbus-session[1145]: [  50966.195] xdg_toplevel@23.configure(1440, 900, array[28])
+[   70.044383] nimbus-session[1145]: nimbus-shell: focus in: window
+[   70.044687] nimbus-session[1145]: nimbus-shell: focus in: page
+[   70.063486] nimbus-session[1145]: page: window focus
+[   70.064610] nimbus-session[1145]: page: window focus
+[   70.092803] nimbus-session[1145]: [  51028.088] xdg_toplevel@23.configure(1440, 900, array[28])
+[   71.694394] nimbus-session[1145]: [  52626.993] wl_keyboard@10.key(20, 71688, 31, 1)
+[   71.695458] nimbus-session[1145]: nimbus-shell: down s (focus: WebView, active: True)
+[   71.704892] nimbus-session[1145]: page: keydown key=s code=KeyS repeat=false focus=input hasFocus=true
+[   71.758350] nimbus-session[1145]: [  52693.670] wl_keyboard@10.key(21, 71757, 31, 0)
+[   71.768764] nimbus-session[1145]: nimbus-shell: up s (focus: WebView, active: True)
+[   71.832966] nimbus-session[1145]: [  52768.277] wl_keyboard@10.key(22, 71827, 18, 1)
+[   71.838896] nimbus-session[1145]: nimbus-shell: down e (focus: WebView, active: True)
+[   71.845112] nimbus-session[1145]: page: keyup key=s code=KeyS repeat=false focus=input hasFocus=true
+[   71.849928] nimbus-session[1145]: page: keydown key=e code=KeyE repeat=false focus=input hasFocus=true
+[   71.899102] nimbus-session[1145]: [  52833.900] wl_keyboard@10.key(23, 71897, 18, 0)
+[   71.901803] nimbus-session[1145]: nimbus-shell: up e (focus: WebView, active: True)
+[   71.909248] nimbus-session[1145]: page: keyup key=e code=KeyE repeat=false focus=input hasFocus=true
+[   71.968251] nimbus-session[1145]: [  52903.561] wl_keyboard@10.key(24, 71967, 20, 1)
+[   71.970243] nimbus-session[1145]: nimbus-shell: down t (focus: WebView, active: True)
+[   71.972377] nimbus-session[1145]: page: keydown key=t code=KeyT repeat=false focus=input hasFocus=true
+[   72.040265] nimbus-session[1145]: [  52975.131] wl_keyboard@10.key(25, 72038, 20, 0)
+[   72.050340] nimbus-session[1145]: nimbus-shell: up t (focus: WebView, active: True)
+[   72.056300] nimbus-session[1145]: page: keyup key=t code=KeyT repeat=false focus=input hasFocus=true
+[   72.108542] nimbus-session[1145]: [  53043.489] wl_keyboard@10.key(26, 72107, 20, 1)
+[   72.116160] nimbus-session[1145]: nimbus-shell: down t (focus: WebView, active: True)
+[   72.123804] nimbus-session[1145]: page: keydown key=t code=KeyT repeat=false focus=input hasFocus=true
+[   72.192822] nimbus-session[1145]: [  53128.138] wl_keyboard@10.key(27, 72177, 20, 0)
+[   72.199379] nimbus-session[1145]: nimbus-shell: up t (focus: WebView, active: True)
+[   72.224052] nimbus-session[1145]: page: keyup key=t code=KeyT repeat=false focus=input hasFocus=true
+[   72.248727] nimbus-session[1145]: [  53183.690] wl_keyboard@10.key(28, 72248, 23, 1)
+[   72.257096] nimbus-session[1145]: nimbus-shell: down i (focus: WebView, active: True)
+[   72.263077] nimbus-session[1145]: page: keydown key=i code=KeyI repeat=false focus=input hasFocus=true
+[   72.319243] nimbus-session[1145]: [  53254.353] wl_keyboard@10.key(29, 72318, 23, 0)
+[   72.324650] nimbus-session[1145]: nimbus-shell: up i (focus: WebView, active: True)
+[   72.366684] nimbus-session[1145]: page: keyup key=i code=KeyI repeat=false focus=input hasFocus=true
+[   72.388414] nimbus-session[1145]: [  53323.706] wl_keyboard@10.key(30, 72388, 49, 1)
+[   72.392131] nimbus-session[1145]: nimbus-shell: down n (focus: WebView, active: True)
+[   72.401696] nimbus-session[1145]: page: keydown key=n code=KeyN repeat=false focus=input hasFocus=true
+[   72.458422] nimbus-session[1145]: [  53393.729] wl_keyboard@10.key(31, 72458, 49, 0)
+[   72.460965] nimbus-session[1145]: nimbus-shell: up n (focus: WebView, active: True)
+[   72.467319] nimbus-session[1145]: page: keyup key=n code=KeyN repeat=false focus=input hasFocus=true
+[   72.529425] nimbus-session[1145]: [  53464.413] wl_keyboard@10.key(32, 72528, 34, 1)
+[   72.533829] nimbus-session[1145]: nimbus-shell: down g (focus: WebView, active: True)
+[   72.540522] nimbus-session[1145]: page: keydown key=g code=KeyG repeat=false focus=input hasFocus=true
+[   72.598558] nimbus-session[1145]: [  53533.870] wl_keyboard@10.key(33, 72598, 34, 0)
+[   72.604917] nimbus-session[1145]: nimbus-shell: up g (focus: WebView, active: True)
+[   72.609690] nimbus-session[1145]: page: keyup key=g code=KeyG repeat=false focus=input hasFocus=true
+[   72.673379] nimbus-session[1145]: [  53608.109] wl_keyboard@10.key(34, 72668, 31, 1)
+[   72.682454] nimbus-session[1145]: nimbus-shell: down s (focus: WebView, active: True)
+[   72.688841] nimbus-session[1145]: page: keydown key=s code=KeyS repeat=false focus=input hasFocus=true
+[   72.739175] nimbus-session[1145]: [  53673.965] wl_keyboard@10.key(35, 72738, 31, 0)
+[   72.743806] nimbus-session[1145]: nimbus-shell: up s (focus: WebView, active: True)
+[   72.749166] nimbus-session[1145]: page: keyup key=s code=KeyS repeat=false focus=input hasFocus=true
+[   73.859673] nimbus-session[1145]: [  54794.669] wl_keyboard@10.key(36, 73859, 28, 1)
+[   73.860971] nimbus-session[1145]: nimbus-shell: down Return (focus: WebView, active: True)
+[   73.861532] nimbus-session[1145]: page: keydown key=Enter code=Enter repeat=false focus=input hasFocus=true
+[   73.928538] nimbus-session[1145]: [  54863.859] wl_keyboard@10.key(37, 73928, 28, 0)
+[   73.932273] nimbus-session[1145]: nimbus-shell: up Return (focus: WebView, active: True)
+[   73.985897] nimbus-session[1145]: page: keyup key=Enter code=Enter repeat=false focus=div.win-body hasFocus=true
+[   77.088554] nimbus-session[1145]: [  58023.534] wl_keyboard@10.key(38, 77086, 56, 1)
+[   77.090576] nimbus-session[1145]: [  58025.023] wl_keyboard@10.modifiers(39, 8, 0, 0, 0)
+[   77.090866] nimbus-session[1145]: nimbus-shell: down Alt_L (focus: WebView, active: True)
+[   77.098520] nimbus-session[1145]: page: keydown key=Alt code=AltLeft repeat=false focus=div.win-body hasFocus=true
+[   77.106058] nimbus-session[1145]: nimbus-shell: down Alt_L (focus: WebView, active: True)
+[   77.168187] nimbus-session[1145]: [  58103.507] wl_keyboard@10.key(40, 77167, 15, 1)
+[   77.170393] nimbus-session[1145]: nimbus-shell: down Tab (focus: WebView, active: True)
+[   77.181793] nimbus-session[1145]: page: keydown key=Tab code=Tab repeat=false focus=div.win-body hasFocus=true
+[   77.239705] nimbus-session[1145]: [  58174.776] wl_keyboard@10.key(41, 77237, 15, 0)
+[   77.240466] nimbus-session[1145]: nimbus-shell: up Tab (focus: WebView, active: True)
+[   77.244390] nimbus-session[1145]: page: keyup key=Tab code=Tab repeat=false focus=div.win-body hasFocus=true
+[   78.171760] nimbus-session[1145]: [  59106.730] wl_keyboard@10.key(42, 78169, 56, 0)
+[   78.173882] nimbus-session[1145]: [  59106.746] wl_keyboard@10.modifiers(43, 0, 0, 0, 0)
+[   78.176494] nimbus-session[1145]: nimbus-shell: up Alt_L (focus: WebView, active: True)
+[   78.179307] nimbus-session[1145]: page: keyup key=Alt code=AltLeft repeat=false focus=div.win-body hasFocus=true
+[   78.183255] nimbus-session[1145]: [  59113.989] wl_keyboard@10.leave(45, wl_surface@21)
+[   78.185874] nimbus-session[1145]: [  59113.994] xdg_toplevel@23.configure(1440, 900, array[24])
+[   78.189262] nimbus-session[1145]: nimbus-shell: focus out: window
+[   78.194071] nimbus-session[1145]: nimbus-shell: focus out: page
+[   78.246110] nimbus-session[1145]: page: window blur
+[   84.426642] dbus-daemon[1002]: [0;1;39m[system] Failed to activate service 'org.bluez': timed out (service_start_timeout=25000ms)[0m
+[   84.686121] nimbus-session[1115]: 00:01:02.618 [INFO] [nimbus-wm.c:533] key alt+f4 for the desktop
+[   84.706638] nimbus-session[1145]: [  65639.776] wl_keyboard@10.enter(87, wl_surface@21, array[8])
+[   84.711236] nimbus-session[1145]: [  65639.785] wl_keyboard@10.modifiers(88, 8, 0, 0, 0)
+[   84.715103] nimbus-session[1145]: [  65639.814] xdg_toplevel@23.configure(1440, 900, array[28])
+[   84.717051] nimbus-session[1145]: nimbus-shell: focus in: window
+[   84.720088] nimbus-session[1145]: nimbus-shell: focus in: page
+[   84.741080] nimbus-session[1145]: page: test chrome: window closed
+[   84.742626] nimbus-session[1145]: [  65676.505] xdg_toplevel@23.configure(1440, 900, array[28])
+[   84.815226] nimbus-session[1145]: page: window focus
+[   84.817185] nimbus-session[1145]: page: window focus
+[   84.827471] nimbus-session[1145]: [  65762.626] wl_keyboard@10.key(91, 84825, 56, 0)
+[   84.828457] nimbus-session[1145]: [  65762.644] wl_keyboard@10.modifiers(92, 0, 0, 0, 0)
+[   84.828703] nimbus-session[1145]: nimbus-shell: up Alt_L (focus: WebView, active: True)
+[   84.853278] systemd[1084]: app-com.google.Chrome-2138.scope: Consumed 1.962s CPU time.
+[   84.897787] nimbus-session[1145]: page: keyup key=Alt code=AltLeft repeat=false focus=div.win-body hasFocus=true
+[   88.378615] nimbus-session[1145]: [  69313.260] wl_keyboard@10.key(93, 88377, 56, 1)
+[   88.379407] nimbus-session[1145]: [  69313.279] wl_keyboard@10.modifiers(94, 8, 0, 0, 0)
+[   88.379724] nimbus-session[1145]: nimbus-shell: down Alt_L (focus: WebView, active: True)
+[   88.384337] nimbus-session[1145]: page: keydown key=Alt code=AltLeft repeat=false focus=div.win-body hasFocus=true
+[   88.386920] nimbus-session[1145]: nimbus-shell: down Alt_L (focus: WebView, active: True)
+[   88.447480] nimbus-session[1145]: [  69382.780] wl_keyboard@10.key(95, 88447, 62, 1)
+[   88.448769] nimbus-session[1145]: nimbus-shell: down F4 (focus: WebView, active: True)
+[   88.451964] nimbus-session[1145]: page: keydown key=F4 code=F4 repeat=false focus=div.win-body hasFocus=true
+[   88.517649] nimbus-session[1145]: [  69452.750] wl_keyboard@10.key(96, 88517, 62, 0)
+[   88.519837] nimbus-session[1145]: nimbus-shell: up F4 (focus: WebView, active: True)
+[   88.539704] nimbus-session[1145]: page: keyup key=F4 code=F4 repeat=false focus=div.win-body hasFocus=true
+[   88.590232] nimbus-session[1145]: [  69524.957] wl_keyboard@10.key(97, 88587, 56, 0)
+[   88.593449] nimbus-session[1145]: [  69524.975] wl_keyboard@10.modifiers(98, 0, 0, 0, 0)
+[   88.595503] nimbus-session[1145]: nimbus-shell: up Alt_L (focus: WebView, active: True)
+[   88.609828] nimbus-session[1145]: page: keyup key=Alt code=AltLeft repeat=false focus=div.win-body hasFocus=true
+[   89.500059] nimbus-session[1145]: [  70435.005] wl_keyboard@10.key(99, 89499, 56, 1)
+[   89.500529] nimbus-session[1145]: [  70435.023] wl_keyboard@10.modifiers(100, 8, 0, 0, 0)
+[   89.500835] nimbus-session[1145]: nimbus-shell: down Alt_L (focus: WebView, active: True)
+[   89.504262] nimbus-session[1145]: page: keydown key=Alt code=AltLeft repeat=false focus=div.win-body hasFocus=true
+[   89.505942] nimbus-session[1145]: nimbus-shell: down Alt_L (focus: WebView, active: True)
+[   89.568951] nimbus-session[1145]: [  70504.267] wl_keyboard@10.key(101, 89568, 62, 1)
+[   89.569961] nimbus-session[1145]: nimbus-shell: down F4 (focus: WebView, active: True)
+[   89.573510] nimbus-session[1145]: page: keydown key=F4 code=F4 repeat=false focus=div.win-body hasFocus=true
+[   89.639073] nimbus-session[1145]: [  70574.177] wl_keyboard@10.key(102, 89638, 62, 0)
+[   89.641156] nimbus-session[1145]: nimbus-shell: up F4 (focus: WebView, active: True)
+[   89.654676] nimbus-session[1145]: page: keyup key=F4 code=F4 repeat=false focus=div.win-body hasFocus=true
+[   89.712930] nimbus-session[1145]: [  70647.704] wl_keyboard@10.key(103, 89708, 56, 0)
+[   89.715089] nimbus-session[1145]: [  70647.721] wl_keyboard@10.modifiers(104, 0, 0, 0, 0)
+[   89.718102] nimbus-session[1145]: nimbus-shell: up Alt_L (focus: WebView, active: True)
+[   89.721572] nimbus-session[1145]: page: keyup key=Alt code=AltLeft repeat=false focus=body hasFocus=true
+[   90.621781] nimbus-session[1145]: [  71556.746] wl_keyboard@10.key(105, 90621, 56, 1)
+[   90.622862] nimbus-session[1145]: [  71556.764] wl_keyboard@10.modifiers(106, 8, 0, 0, 0)
+[   90.624806] nimbus-session[1145]: nimbus-shell: down Alt_L (focus: WebView, active: True)
+[   90.625556] nimbus-session[1145]: page: keydown key=Alt code=AltLeft repeat=false focus=body hasFocus=true
+[   90.625716] nimbus-session[1145]: nimbus-shell: down Alt_L (focus: WebView, active: True)
+[   90.691326] nimbus-session[1145]: [  71626.652] wl_keyboard@10.key(107, 90691, 62, 1)
+[   90.693103] nimbus-session[1145]: nimbus-shell: down F4 (focus: WebView, active: True)
+[   90.696326] nimbus-session[1145]: page: keydown key=F4 code=F4 repeat=false focus=body hasFocus=true
+[   90.761861] nimbus-session[1145]: [  71697.205] wl_keyboard@10.key(108, 90761, 62, 0)
+[   90.767122] nimbus-session[1145]: nimbus-shell: up F4 (focus: WebView, active: True)
+[   90.776965] nimbus-session[1145]: page: keyup key=F4 code=F4 repeat=false focus=button.btn hasFocus=true
+[   90.832199] nimbus-session[1145]: [  71767.542] wl_keyboard@10.key(109, 90831, 56, 0)
+[   90.835130] nimbus-session[1145]: [  71769.595] wl_keyboard@10.modifiers(110, 0, 0, 0, 0)
+[   90.837935] nimbus-session[1145]: nimbus-shell: up Alt_L (focus: WebView, active: True)
+[   90.846406] nimbus-session[1145]: page: keyup key=Alt code=AltLeft repeat=false focus=button.btn hasFocus=true
+[   91.743372] nimbus-session[1145]: [  72678.314] wl_keyboard@10.key(111, 91742, 56, 1)
+[   91.744190] nimbus-session[1145]: [  72678.331] wl_keyboard@10.modifiers(112, 8, 0, 0, 0)
+[   91.744442] nimbus-session[1145]: nimbus-shell: down Alt_L (focus: WebView, active: True)
+[   91.749193] nimbus-session[1145]: page: keydown key=Alt code=AltLeft repeat=false focus=button.btn hasFocus=true
+[   91.751741] nimbus-session[1145]: nimbus-shell: down Alt_L (focus: WebView, active: True)
+[   91.812632] nimbus-session[1145]: [  72747.973] wl_keyboard@10.key(113, 91812, 62, 1)
+[   91.814623] nimbus-session[1145]: nimbus-shell: down F4 (focus: WebView, active: True)
+[   91.816832] nimbus-session[1145]: page: keydown key=F4 code=F4 repeat=false focus=button.btn hasFocus=true
+[   91.882734] nimbus-session[1145]: [  72818.075] wl_keyboard@10.key(114, 91882, 62, 0)
+[   91.883598] nimbus-session[1145]: nimbus-shell: up F4 (focus: WebView, active: True)
+[   91.886866] nimbus-session[1145]: page: keyup key=F4 code=F4 repeat=false focus=button.btn hasFocus=true
+[   91.952784] nimbus-session[1145]: [  72888.099] wl_keyboard@10.key(115, 91952, 56, 0)
+[   91.953673] nimbus-session[1145]: [  72888.139] wl_keyboard@10.modifiers(116, 0, 0, 0, 0)
+[   91.953991] nimbus-session[1145]: nimbus-shell: up Alt_L (focus: WebView, active: True)
+[   91.958914] nimbus-session[1145]: page: keyup key=Alt code=AltLeft repeat=false focus=button.btn hasFocus=true
+[   93.140751] nimbus-session[1145]: [  74075.639] wl_keyboard@10.key(117, 93140, 28, 1)
+[   93.141811] nimbus-session[1145]: nimbus-shell: down Return (focus: WebView, active: True)
+[   93.144889] nimbus-session[1145]: page: keydown key=Enter code=Enter repeat=false focus=button.btn hasFocus=true
+[   93.211412] nimbus-session[1145]: [  74145.621] wl_keyboard@10.key(118, 93209, 28, 0)
+[   93.213237] nimbus-session[1145]: nimbus-shell: up Return (focus: WebView, active: True)
+[   93.231810] nimbus-session[1145]: page: keyup key=Enter code=Enter repeat=false focus=body hasFocus=true
+[   94.554889] polkitd[1016]: [0;1;39mRegistered Authentication Agent for unix-process:2712:9451 (system bus name :1.43 [/usr/bin/pkttyagent --notify-fd 5 --fallback], object path /org/freedesktop/PolicyKit1/AuthenticationAgent, locale en_US.UTF-8)[0m
+[   94.564826] systemd-logind[1005]: [0;1;39mThe system will power off now![0m
+[   94.590202] systemd-logind[1005]: [0;1;39mSystem is powering down.[0m
+[   94.596635] polkitd[1016]: [0;1;39mUnregistered Authentication Agent for unix-process:2712:9451 (system bus name :1.43, object path /org/freedesktop/PolicyKit1/AuthenticationAgent, locale en_US.UTF-8) (disconnected from bus)[0m
+         Stopping [0;1;39msession-c1.scope[0m - Session c1 of User nimbus...
+[[0;32m  OK  [0m] Removed slice [0;1;39msystem-getty.slice[0m - Slice /system/getty.
+[[0;32m  OK  [0m] Removed slice [0;1;39msystem-modprobe.slice[0m - Slice /system/modprobe.
+[[0;32m  OK  [0m] Stopped target [0;1;39mgraphical.target[0m - Graphical Interface.
+[[0;32m  OK  [0m] Stopped target [0;1;39mmulti-user.target[0m - Multi-User System.
+[[0;32m  OK  [0m] Stopped target [0;1;39mgetty.target[0m - Login Prompts.
+[[0;32m  OK  [0m] Stopped target [0;1;39mnss-lookup.target[0m - Host and Network Name Lookups.
+[[0;32m  OK  [0m] Stopped target [0;1;39mprinter.target[0m - Printer Support.
+[[0;32m  OK  [0m] Stopped target [0;1;39msound.target[0m - Sound Card.
+[[0;32m  OK  [0m] Stopped target [0;1;39mtimers.target[0m - Timer Units.
+[[0;32m  OK  [0m] Stopped [0;1;39mapt-daily-upgrade.timer[0m - …y apt upgrade and clean activities.
+[[0;32m  OK  [0m] Stopped [0;1;39mapt-daily.timer[0m - Daily apt download activities.
+[[0;32m  OK  [0m] Stopped [0;1;39mdpkg-db-backup.timer[0m - Daily dpkg database backup timer.
+[[0;32m  OK  [0m] Stopped [0;1;39me2scrub_all.timer[0m - Period…Metadata Check for All Filesystems.
+[[0;32m  OK  [0m] Stopped [0;1;39mfstrim.timer[0m - Discard unused filesystem blocks once a week.
+[[0;32m  OK  [0m] Stopped [0;1;39mlogrotate.timer[0m - Daily rotation of log files.
+[[0;32m  OK  [0m] Stopped [0;1;39mmotd-news.timer[0m - Message of the Day.
+[[0;32m  OK  [0m] Stopped [0;1;39msystemd-tmpfiles-clean.tim…[0my Cleanup of Temporary Directories.
+[[0;32m  OK  [0m] Stopped target [0;1;39mtime-set.target[0m - System Time Set.
+[[0;32m  OK  [0m] Closed [0;1;39msystemd-rfkill.socket[0m - Loa…ll Switch Status /dev/rfkill Watch.
+         Stopping [0;1;39mavahi-daemon.service[0m - Avahi mDNS/DNS-SD Stack...
+         Stopping [0;1;39mcups.service[0m - CUPS Scheduler...
+[   94.665650] systemd[1]: Stopping session-c1.scope - Session c1 of User nimbus...
+         Stopping [0;1;39mfinalrd.service[0m - Create …time dir for shutdown pivot root...
+         Stopping [0;1;39mnimbus-session.service[0m - Nimbus desktop...
+         Stopping [0;1;39mpolkit.service[0m - Authorization Manager...
+         Stopping [0;1;39mpower-profiles-daemon.service[0m - Power Profiles daemon...
+         Stopping [0;1;39mrtkit-daemon.service[0m - Re…imeKit Scheduling Policy Service...
+         Stopping [0;1;39mserial-getty@ttyS0.service[0m - Serial Getty on ttyS0...
+         Stopping [0;1;39msystemd-random-seed.service[0m - Load/Save OS Random Seed...
+[[0;32m  OK  [0m] Stopped [0;1;39mnimbus-session.service[0m - Nimbus desktop.
+[[0;32m  OK  [0m] Stopped [0;1;39mavahi-daemon.service[0m - Avahi mDNS/DNS-SD Stack.
+[[0;32m  OK  [0m] Stopped [0;1;39mpolkit.service[0m - Authorization Manager.
+[   94.705994] avahi-daemon[1001]: Got SIGTERM, quitting.
+[   94.708597] [2317]: [0;1;39mError reading events from display: Broken pipe[0m
+[[0;32m  OK  [0m] Stopped [0;1;39mpower-profiles-daemon.service[0m - Power Profiles daemon.
+[   94.713035] avahi-daemon[1001]: Leaving mDNS multicast group on interface enp0s1.IPv6 with address fec0::7e7e:82ab:cbc9:312b.
+[   94.716907] systemd[1084]: [0;1;39mxdg-desktop-portal-gtk.service: Main process exited, code=exited, status=1/FAILURE[0m
+[   94.719837] avahi-daemon[1001]: Leaving mDNS multicast group on interface enp0s1.IPv4 with address 10.0.2.15.
+[[0;32m  OK  [0m] Stopped [0;1;39mcups.service[0m - CUPS Scheduler.
+[[0;32m  OK  [0m] Stopped [0;1;39mserial-getty@ttyS0.service[0m - Serial Getty on ttyS0.
+[   94.722428] systemd[1084]: [0;1;38;5;185mxdg-desktop-portal-gtk.service: Failed with result 'exit-code'.[0m
+[   94.730284] avahi-daemon[1001]: Leaving mDNS multicast group on interface lo.IPv6 with address ::1.
+[   94.732782] systemd[1]: Removed slice system-getty.slice - Slice /system/getty.
+[   94.734799] avahi-daemon[1001]: Leaving mDNS multicast group on interface lo.IPv4 with address 127.0.0.1.
+[[0;32m  OK  [0m] Stopped [0;1;39mrtkit-daemon.service[0m - RealtimeKit Scheduling Policy Service.
+[   94.737355] systemd[1]: Removed slice system-modprobe.slice - Slice /system/modprobe.
+[[0;32m  OK  [0m] Stopped [0;1;39msystemd-random-seed.service[0m - Load/Save OS Random Seed.
+[[0;32m  OK  [0m] Stopped [0;1;39msession-c1.scope[0m - Session c1 of User nimbus.
+[   94.749766] avahi-daemon[1001]: avahi-daemon 0.8 exiting.
+[   94.753754] systemd[1]: Stopped target graphical.target - Graphical Interface.
+[   94.760357] systemd[1]: Stopped target multi-user.target - Multi-User System.
+[[0;32m  OK  [0m] Removed slice [0;1;39msystem-serial\x2dget…slice[0m - Slice /system/serial-getty.
+         Stopping [0;1;39msystemd-logind.service[0m - User Login Management...
+         Stopping [0;1;39muser@1000.service[0m - User Manager for UID 1000...
+[   94.807053] systemd[1]: Stopped target getty.target - Login Prompts.
+[   94.808886] systemd[1]: Stopped target nss-lookup.target - Host and Network Name Lookups.
+[   94.812746] systemd[1]: Stopped target printer.target - Printer Support.
+[   94.814604] systemd[1]: Stopped target sound.target - Sound Card.
+[   94.816336] systemd[1]: Stopped target timers.target - Timer Units.
+[   94.818063] systemd[1]: apt-daily-upgrade.timer: Deactivated successfully.
+[   94.820178] systemd[1]: Stopped apt-daily-upgrade.timer - Daily apt upgrade and clean activities.
+[   94.823285] systemd[1]: apt-daily.timer: Deactivated successfully.
+[   94.825556] systemd[1]: Stopped apt-daily.timer - Daily apt download activities.
+[   94.827530] systemd[1]: dpkg-db-backup.timer: Deactivated successfully.
+[   94.829456] systemd[1]: Stopped dpkg-db-backup.timer - Daily dpkg database backup timer.
+[   94.831597] systemd[1]: e2scrub_all.timer: Deactivated successfully.
+[[0;32m  OK  [0m] Stopped [0;1;39msystemd-logind.service[0m - User Login Management.
+[   94.833255] systemd[1]: Stopped e2scrub_all.timer - Periodic ext4 Online Metadata Check for All Filesystems.
+[   94.842897] systemd[1]: fstrim.timer: Deactivated successfully.
+[   94.850320] systemd[1]: Stopped fstrim.timer - Discard unused filesystem blocks once a week.
+[[0;32m  OK  [0m] Unmounted [0;1;39mrun-user-1000-doc.mount[0m - /run/user/1000/doc.
+[   94.855313] systemd[1]: logrotate.timer: Deactivated successfully.
+[   94.862587] systemd[1]: Stopped logrotate.timer - Daily rotation of log files.
+[   94.865488] systemd[1]: motd-news.timer: Deactivated successfully.
+[   94.867079] systemd[1]: Stopped motd-news.timer - Message of the Day.
+[   94.868683] systemd[1]: systemd-tmpfiles-clean.timer: Deactivated successfully.
+[   94.871078] systemd[1]: Stopped systemd-tmpfiles-clean.timer - Daily Cleanup of Temporary Directories.
+[   94.874554] systemd[1]: Stopped target time-set.target - System Time Set.
+[   94.876356] systemd[1]: systemd-rfkill.socket: Deactivated successfully.
+[   94.882137] systemd[1]: Closed systemd-rfkill.socket - Load/Save RF Kill Switch Status /dev/rfkill Watch.
+[   94.884876] systemd[1]: Stopping avahi-daemon.service - Avahi mDNS/DNS-SD Stack...
+[   94.890351] systemd[1]: Stopping cups.service - CUPS Scheduler...
+[   94.891994] systemd[1]: Stopping finalrd.service - Create final runtime dir for shutdown pivot root...
+[   94.899434] systemd[1]: Stopping nimbus-session.service - Nimbus desktop...
+[   94.901720] systemd[1]: Stopping polkit.service - Authorization Manager...
+[   94.903655] systemd[1]: Stopping power-profiles-daemon.service - Power Profiles daemon...
+[   94.905884] systemd[1]: Stopping rtkit-daemon.service - RealtimeKit Scheduling Policy Service...
+[   94.909585] systemd[1]: Stopping serial-getty@ttyS0.service - Serial Getty on ttyS0...
+[   94.912172] systemd[1]: Stopping systemd-random-seed.service - Load/Save OS Random Seed...
+[   94.914559] systemd[1]: nimbus-session.service: Deactivated successfully.
+[   94.916342] systemd[1]: Stopped nimbus-session.service - Nimbus desktop.
+[   94.918235] systemd[1]: avahi-daemon.service: Deactivated successfully.
+[[0;32m  OK  [0m] Stopped [0;1;39muser@1000.service[0m - User Manager for UID 1000.
+[   94.921839] systemd[1]: Stopped avahi-daemon.service - Avahi mDNS/DNS-SD Stack.
+[   94.923988] (sd-pam)[1086]: pam_unix(systemd-user:session): session closed for user nimbus
+[   94.926191] systemd[1]: polkit.service: Deactivated successfully.
+[   94.927810] systemd[1]: Stopped polkit.service - Authorization Manager.
+[   94.929611] systemd[1]: power-profiles-daemon.service: Deactivated successfully.
+[   94.931613] systemd[1]: Stopped power-profiles-daemon.service - Power Profiles daemon.
+[   94.933634] systemd[1]: cups.service: Deactivated successfully.
+[   94.935298] systemd[1]: Stopped cups.service - CUPS Scheduler.
+[   94.936864] systemd[1]: serial-getty@ttyS0.service: Deactivated successfully.
+[   94.938758] systemd[1]: Stopped serial-getty@ttyS0.service - Serial Getty on ttyS0.
+[   94.940776] systemd[1]: rtkit-daemon.service: Deactivated successfully.
+[   94.942620] systemd[1]: Stopped rtkit-daemon.service - RealtimeKit Scheduling Policy Service.
+[   94.944760] systemd[1]: systemd-random-seed.service: Deactivated successfully.
+[   94.946719] systemd[1]: Stopped systemd-random-seed.service - Load/Save OS Random Seed.
+[   94.948792] systemd[1]: session-c1.scope: Deactivated successfully.
+[   94.950543] systemd[1]: Stopped session-c1.scope - Session c1 of User nimbus.
+[   94.952401] systemd[1]: session-c1.scope: Consumed 44.673s CPU time.
+[   94.954482] systemd-logind[1005]: Session c1 logged out. Waiting for processes to exit.
+[   94.956589] systemd[1]: Removed slice system-serial\x2dgetty.slice - Slice /system/serial-getty.
+[   94.958840] systemd[1]: Stopping systemd-logind.service - User Login Management...
+[   94.960833] systemd[1]: Stopping user@1000.service - User Manager for UID 1000...
+[   94.964265] systemd[1]: systemd-logind.service: Deactivated successfully.
+         Stopping [0;1;39msystemd-user-sessions.service[0m - Permit User Sessions...
+[   94.967834] systemd[1]: Stopped systemd-logind.service - User Login Management.
+[   94.971831] systemd[1084]: Activating special unit exit.target...
+         Stopping [0;1;39muser-runtime-dir@1000.ser…[0mRuntime Directory /run/user/1000...
+[[0;32m  OK  [0m] Stopped [0;1;39msystemd-user-sessions.service[0m - Permit User Sessions.
+[   94.973643] systemd[1084]: Stopped target default.target - Main User Target.
+[   94.980964] systemd[1084]: Stopping dbus.service - D-Bus User Message Bus...
+[   94.983111] systemd[1084]: Stopping filter-chain.service - PipeWire filter chain daemon...
+[[0;32m  OK  [0m] Unmounted [0;1;39mrun-user-1000.mount[0m - /run/user/1000.
+[   94.987090] systemd[1084]: Stopping pipewire-pulse.service - PipeWire PulseAudio...
+[[0;32m  OK  [0m] Stopped [0;1;39muser-runtime-dir@1000.serv…[0mr Runtime Directory /run/user/1000.
+[   94.989099] systemd[1084]: Stopping xdg-desktop-portal.service - Portal service...
+[[0;32m  OK  [0m] Removed slice [0;1;39muser-1000.slice[0m - User Slice of UID 1000.
+[[0;32m  OK  [0m] Stopped target [0;1;39mnetwork.target[0m - Network.
+[[0;32m  OK  [0m] Stopped target [0;1;39mremote-fs.target[0m - Remote File Systems.
+[   95.000037] systemd[1084]: Stopping xdg-document-portal.service - flatpak document portal service...
+[   95.002450] systemd[1084]: Stopping xdg-permission-store.service - sandboxed app permission store...
+         Stopping [0;1;39mNetworkManager.service[0m - Network Manager...
+         Stopping [0;1;39mwpa_supplicant.service[0m - WPA supplicant...
+[   95.005908] systemd[1084]: Stopped pipewire-pulse.service - PipeWire PulseAudio.
+[   95.011285] dbus-daemon[1002]: [system] Activating via systemd: service name='org.freedesktop.nm_dispatcher' unit='dbus-org.freedesktop.nm-dispatcher.service' requested by ':1.7' (uid=0 pid=1014 comm="/usr/sbin/NetworkManager --no-daemon" label="unconfined")
+[   95.016690] systemd[1084]: Stopping wireplumber.service - Multimedia Service Session Manager...
+[[0;32m  OK  [0m] Stopped [0;1;39mwpa_supplicant.service[0m - WPA supplicant.
+[   95.018950] dbus-daemon[1002]: [system] Activation via systemd failed for unit 'dbus-org.freedesktop.nm-dispatcher.service': Transaction for NetworkManager-dispatcher.service/start is destructive (systemd-binfmt.service has 'stop' job queued, but 'start' is included in transaction).
+[[0;32m  OK  [0m] Stopped [0;1;39mNetworkManager.service[0m - Network Manager.
+[   95.029803] [1100]: [0;1;39mstopped by signal: Terminated[0m
+[[0;32m  OK  [0m] Stopped target [0;1;39mbasic.target[0m - Basic System.
+[[0;32m  OK  [0m] Stopped target [0;1;39mnetwork-pre.target[0m - Preparation for Network.
+[[0;32m  OK  [0m] Stopped target [0;1;39mpaths.target[0m - Path Units.
+[[0;32m  OK  [0m] Stopped [0;1;39mcups.path[0m - CUPS Scheduler.
+[[0;32m  OK  [0m] Stopped target [0;1;39mslices.target[0m - Slice Units.
+[[0;32m  OK  [0m] Removed slice [0;1;39muser.slice[0m - User and Session Slice.
+[[0;32m  OK  [0m] Stopped target [0;1;39msockets.target[0m - Socket Units.
+[[0;32m  OK  [0m] Closed [0;1;39mavahi-daemon.socket[0m - Avahi…DNS/DNS-SD Stack Activation Socket.
+[[0;32m  OK  [0m] Closed [0;1;39mcups.socket[0m - CUPS Scheduler.
+[[0;32m  OK  [0m] Closed [0;1;39muuidd.socket[0m - UUID daemon activation socket.
+[[0;32m  OK  [0m] Stopped target [0;1;39msysinit.target[0m - System Initialization.
+[[0;32m  OK  [0m] Stopped target [0;1;39mcryptsetup.target[0m - Local Encrypted Volumes.
+[[0;32m  OK  [0m] Stopped [0;1;39msystemd-ask-password-conso…[0mequests to Console Directory Watch.
+[   95.056417] [1100]: [0;1;39mdisconnected from pipewire[0m
+[[0;32m  OK  [0m] Stopped [0;1;39msystemd-ask-password-wall.…[0md Requests to Wall Directory Watch.
+[[0;32m  OK  [0m] Stopped target [0;1;39mintegritysetup.targ…[0m Local Integrity Protected Volumes.
+[   95.058500] systemd[1084]: Stopped xdg-permission-store.service - sandboxed app permission store.
+[   95.064442] systemd[1]: run-user-1000-doc.mount: Deactivated successfully.
+[[0;32m  OK  [0m] Stopped target [0;1;39mveritysetup.target[0m - Local Verity Protected Volumes.
+[   95.066792] systemd[1]: Unmounted run-user-1000-doc.mount - /run/user/1000/doc.
+[   95.070153] systemd[1084]: Stopped filter-chain.service - PipeWire filter chain daemon.
+[   95.072146] systemd[1084]: Stopped dbus.service - D-Bus User Message Bus.
+[   95.073803] systemd[1084]: Stopped xdg-desktop-portal.service - Portal service.
+[   95.075704] systemd[1084]: Stopped xdg-document-portal.service - flatpak document portal service.
+[   95.077883] systemd[1084]: Stopped wireplumber.service - Multimedia Service Session Manager.
+[   95.079928] systemd[1084]: Stopping pipewire.service - PipeWire Multimedia Service...
+[   95.081824] systemd[1084]: Stopped pipewire.service - PipeWire Multimedia Service.
+         Stopping [0;1;39msystemd-binfmt.service[0m - Set Up Additional Binary Formats...
+         Stopping [0;1;39msystemd-resolved.service[0m - Network Name Resolution...
+[   95.084775] systemd[1084]: Removed slice session.slice - User Core Session Slice.
+[   95.093736] systemd[1084]: session.slice: Consumed 1.271s CPU time.
+[   95.095514] systemd[1084]: Stopped target basic.target - Basic System.
+         Stopping [0;1;39msystemd-timesyncd.service[0m - Network Time Synchronization...
+[   95.099816] systemd[1084]: Stopped target paths.target - Paths.
+[[0;32m  OK  [0m] Stopped [0;1;39msystemd-update-done.service[0m - Update is Completed.
+[   95.104554] systemd[1084]: Stopped target sockets.target - Sockets.
+[[0;32m  OK  [0m] Stopped [0;1;39mldconfig.service[0m - Rebuild Dynamic Linker Cache.
+[   95.108480] systemd[1084]: Stopped target timers.target - Timers.
+[[0;32m  OK  [0m] Stopped [0;1;39msystemd-journal-catalog-up….service[0m - Rebuild Journal Catalog.
+[   95.112575] systemd[1084]: Closed dbus.socket - D-Bus User Message Bus Socket.
+[   95.114603] systemd[1084]: Closed dirmngr.socket - GnuPG network certificate management daemon.
+[   95.117473] systemd[1084]: Closed gpg-agent-browser.socket - GnuPG cryptographic agent and passphrase cache (access for web browsers).
+[   95.120489] systemd[1084]: Closed gpg-agent-extra.socket - GnuPG cryptographic agent and passphrase cache (restricted).
+[   95.123198] systemd[1084]: Stopping gpg-agent-ssh.socket - GnuPG cryptographic agent (ssh-agent emulation)...
+         Stopping [0;1;39msystemd-update-utmp.servi…[0mord System Boot/Shutdown in UTMP...
+[[0;32m  OK  [0m] Stopped [0;1;39msystemd-timesyncd.service[0m - Network Time Synchronization.
+[   95.130697] systemd[1084]: Closed gpg-agent.socket - GnuPG cryptographic agent and passphrase cache.
+[   95.134268] systemd[1084]: Closed keyboxd.socket - GnuPG public key management service.
+[[0;32m  OK  [0m] Stopped [0;1;39msystemd-resolved.service[0m - Network Name Resolution.
+[   95.139210] systemd[1084]: Closed pipewire-pulse.socket - PipeWire PulseAudio.
+[   95.140930] systemd[1084]: Closed pipewire.socket - PipeWire Multimedia System Sockets.
+[   95.144092] systemd[1084]: Closed gpg-agent-ssh.socket - GnuPG cryptographic agent (ssh-agent emulation).
+[[0;32m  OK  [0m] Stopped [0;1;39msystemd-binfmt.service[0m - Set Up Additional Binary Formats.
+[   95.148801] systemd[1084]: Removed slice app.slice - User Application Slice.
+[   95.150613] systemd[1084]: app.slice: Consumed 2.091s CPU time.
+[   95.152948] systemd[1084]: Reached target shutdown.target - Shutdown.
+[   95.154545] systemd[1084]: Finished systemd-exit.service - Exit the Session.
+[   95.156242] systemd[1084]: Reached target exit.target - Exit the Session.
+[   95.157854] systemd[1]: user@1000.service: Deactivated successfully.
+[   95.159427] systemd[1]: Stopped user@1000.service - User Manager for UID 1000.
+[   95.161168] systemd[1]: user@1000.service: Consumed 3.790s CPU time.
+[   95.162680] systemd[1]: Stopping systemd-user-sessions.service - Permit User Sessions...
+[   95.166113] systemd[1]: Stopping user-runtime-dir@1000.service - User Runtime Directory /run/user/1000...
+[   95.166810] systemd[1]: systemd-user-sessions.service: Deactivated successfully.
+[[0;32m  OK  [0m] Stopped [0;1;39msystemd-update-utmp.servic…[0mecord System Boot/Shutdown in UTMP.
+[[0;32m  OK  [0m] Unset automount [0;1;39mproc-sys-fs-binfmt…[0mormats File System Automount Point.
+[   95.172471] systemd[1]: Stopped systemd-user-sessions.service - Permit User Sessions.
+[   95.172707] systemd[1]: run-user-1000.mount: Deactivated successfully.
+[   95.172956] systemd[1]: Unmounted run-user-1000.mount - /run/user/1000.
+[   95.173499] systemd[1]: user-runtime-dir@1000.service: Deactivated successfully.
+[   95.173764] systemd[1]: Stopped user-runtime-dir@1000.service - User Runtime Directory /run/user/1000.
+[   95.174297] systemd[1]: Removed slice user-1000.slice - User Slice of UID 1000.
+[   95.183161] systemd[1]: user-1000.slice: Consumed 48.497s CPU time.
+[   95.185257] systemd[1]: Stopped target network.target - Network.
+[[0;32m  OK  [0m] Stopped [0;1;39msystemd-sysctl.service[0m - Apply Kernel Variables.
+[[0;32m  OK  [0m] Stopped [0;1;39msystemd-modules-load.service[0m - Load Kernel Modules.
+[   95.186825] systemd[1]: Stopped target remote-fs.target - Remote File Systems.
+[   95.192742] systemd[1]: Stopping NetworkManager.service - Network Manager...
+[[0;32m  OK  [0m] Stopped [0;1;39msystemd-tmpfiles-setup.ser…[0mate Volatile Files and Directories.
+[   95.196464] NetworkManager[1014]: <info>  [1793655728.1588] caught SIGTERM, shutting down normally.
+[   95.199794] NetworkManager[1014]: <info>  [1793655728.1593] dhcp4 (enp0s1): canceled DHCP transaction
+[   95.201899] NetworkManager[1014]: <info>  [1793655728.1593] dhcp4 (enp0s1): activation: beginning transaction (timeout in 45 seconds)
+[   95.204556] NetworkManager[1014]: <info>  [1793655728.1594] dhcp4 (enp0s1): state changed no lease
+[   95.206650] NetworkManager[1014]: <info>  [1793655728.1597] manager: NetworkManager state is now CONNECTED_SITE
+[   95.208894] NetworkManager[1014]: <info>  [1793655728.1601] exiting (success)
+[   95.210596] systemd[1]: Stopping wpa_supplicant.service - WPA supplicant...
+[   95.212234] systemd[1]: [0;1;39mRequested transaction contradicts existing jobs: Transaction for NetworkManager-dispatcher.service/start is destructive (systemd-binfmt.service has 'stop' job queued, but 'start' is included in transaction).[0m
+[   95.216702] systemd[1]: wpa_supplicant.service: Deactivated successfully.
+[   95.218307] systemd[1]: Stopped wpa_supplicant.service - WPA supplicant.
+[   95.219853] systemd[1]: NetworkManager.service: Deactivated successfully.
+[   95.221513] systemd[1]: Stopped NetworkManager.service - Network Manager.
+[   95.223157] systemd[1]: NetworkManager.service: Consumed 1.940s CPU time, 39.3M memory peak, 0B memory swap peak.
+[[0;32m  OK  [0m] Stopped [0;1;39mfinalrd.service[0m - Create f…untime dir for shutdown pivot root.
+[   95.227492] systemd[1]: Stopped target basic.target - Basic System.
+[[0;32m  OK  [0m] Stopped target [0;1;39mlocal-fs.target[0m - Local File Systems.
+[   95.230672] systemd[1]: Stopped target network-pre.target - Preparation for Network.
+[   95.232459] systemd[1]: Stopped target paths.target - Path Units.
+[   95.233905] systemd[1]: cups.path: Deactivated successfully.
+         Unmounting [0;1;39mcdrom.mount[0m - /cdrom...
+[   95.236484] systemd[1]: Stopped cups.path - CUPS Scheduler.
+[   95.237835] systemd[1]: Stopped target slices.target - Slice Units.
+[   95.239417] systemd[1]: Removed slice user.slice - User and Session Slice.
+[   95.241150] systemd[1]: user.slice: Consumed 48.497s CPU time, 0B memory peak, 0B memory swap peak.
+[   95.243184] systemd[1]: Stopped target sockets.target - Socket Units.
+[   95.244689] systemd[1]: avahi-daemon.socket: Deactivated successfully.
+         Unmounting [0;1;39mrofs.mount[0m - /rofs...
+[   95.247528] systemd[1]: Closed avahi-daemon.socket - Avahi mDNS/DNS-SD Stack Activation Socket.
+[   95.249999] systemd[1]: cups.socket: Deactivated successfully.
+[   95.251460] systemd[1]: Closed cups.socket - CUPS Scheduler.
+[   95.252843] systemd[1]: uuidd.socket: Deactivated successfully.
+[   95.254837] systemd[1]: Closed uuidd.socket - UUID daemon activation socket.
+         Unmounting [0;1;39mtmp.mount[0m - /tmp...
+[   95.258083] systemd[1]: Stopped target sysinit.target - System Initialization.
+[   95.259844] systemd[1]: Stopped target cryptsetup.target - Local Encrypted Volumes.
+[   95.261722] systemd[1]: systemd-ask-password-console.path: Deactivated successfully.
+[   95.263816] systemd[1]: Stopped systemd-ask-password-console.path - Dispatch Password Requests to Console Directory Watch.
+[   95.266321] systemd[1]: systemd-ask-password-wall.path: Deactivated successfully.
+[   95.268909] systemd[1]: Stopped systemd-ask-password-wall.path - Forward Password Requests to Wall Directory Watch.
+[[0;32m  OK  [0m] Unmounted [0;1;39mtmp.mount[0m - /tmp.
+[   95.273159] systemd[1]: Stopped target integritysetup.target - Local Integrity Protected Volumes.
+[[0;1;31mFAILED[0m] Failed unmounting [0;1;39mcdrom.mount[0m - /cdrom.
+[   95.276740] umount[2889]: umount: /cdrom: target is busy.
+[[0;32m  OK  [0m] Unmounted [0;1;39mrofs.mount[0m - /rofs.
+[   95.279331] systemd[1]: Stopped target veritysetup.target - Local Verity Protected Volumes.
+[   95.281313] systemd[1]: Stopping systemd-binfmt.service - Set Up Additional Binary Formats...
+[[0;32m  OK  [0m] Stopped target [0;1;39mlocal-fs-pre.target[0m…Preparation for Local File Systems.
+[[0;32m  OK  [0m] Stopped target [0;1;39mswap.target[0m - Swaps.
+[[0;32m  OK  [0m] Reached target [0;1;39mumount.target[0m - Unmount All Filesystems.
+[[0;32m  OK  [0m] Stopped [0;1;39msystemd-tmpfiles-setup-dev…[0mCreate Static Device Nodes in /dev.
+[[0;32m  OK  [0m] Stopped [0;1;39msystemd-sysusers.service[0m - Create System Users.
+[[0;32m  OK  [0m] Stopped [0;1;39msystem[   95.291995] systemd[1]: Stopping systemd-resolved.service - Network Name Resolution...
+[   95.293844] systemd[1]: Stopping systemd-timesyncd.service - Network Time Synchronization...
+[   95.295800] systemd[1]: systemd-update-done.service: Deactivated successfully.
+[   95.297568] systemd[1]: Stopped systemd-update-done.service - Update is Completed.
+         Starting [0;1;39mcasper.service[0m - Shuts do…ive" preinstalled system cleanly...
+[   95.301108] systemd[1]: ldconfig.service: Deactivated successfully.
+[   95.302596] systemd[1]: Stopped ldconfig.service - Rebuild Dynamic Linker Cache.
+[   95.304283] systemd[1]: ldconfig.service: Consumed 4.767s CPU time.
+[   95.305722] systemd[1]: systemd-journal-catalog-update.service: Deactivated successfully.
+[   95.307583] systemd[1]: Stopped systemd-journal-catalog-update.service - Rebuild Journal Catalog.
+[   95.309530] systemd[1]: Stopping systemd-update-utmp.service - Record System Boot/Shutdown in UTMP...
+[   95.311554] systemd[1]: systemd-timesyncd.service: Deactivated successfully.
+[   95.313167] systemd[1]: Stopped systemd-timesyncd.service - Network Time Synchronization.
+[   95.314993] systemd[1]: systemd-resolved.service: Deactivated successfully.
+[   95.316597] systemd[1]: Stopped systemd-resolved.service - Network Name Resolution.
+[   95.318343] systemd[1]: systemd-binfmt.service: Deactivated successfully.
+[   95.319871] systemd[1]: Stopped systemd-binfmt.service - Set Up Additional Binary Formats.
+[   95.321818] systemd-tmpfiles[2876]: [0;1;39m/run/finalrd-libs.conf:47: Duplicate line for path "/run/initramfs/lib64", ignoring.[0m
+[   95.324448] systemd[1]: systemd-update-utmp.service: Deactivated successfully.
+[   95.326186] casper[2897]: [0;1;39mresyncing snapshots and caching reboot files...[0m
+[   95.327934] systemd[1]: Stopped systemd-update-utmp.service - Record System Boot/Shutdown in UTMP.
+[   95.329963] systemd[1]: proc-sys-fs-binfmt_misc.automount: Deactivated successfully.
+[   95.331766] systemd[1]: Unset automount proc-sys-fs-binfmt_misc.automount - Arbitrary Executable File Formats File System Automount Point.
+[   95.334433] systemd[1]: systemd-sysctl.service: Deactivated successfully.
+[   95.335945] systemd[1]: Stopped systemd-sysctl.service - Apply Kernel Variables.
+[   95.337669] systemd[1]: systemd-modules-load.service: Deactivated successfully.
+[   95.339342] systemd[1]: Stopped systemd-modules-load.service - Load Kernel Modules.
+[   95.341064] systemd[1]: systemd-tmpfiles-setup.service: Deactivated successfully.
+[   95.342833] systemd[1]: Stopped systemd-tmpfiles-setup.service - Create Volatile Files and Directories.
+[   95.344954] systemd[1]: proc-sys-fs-binfmt_misc.mount: Deactivated successfully.
+[   95.346679] systemd[1]: finalrd.service: Deactivated successfully.
+[   95.348126] systemd[1]: Stopped finalrd.service - Create final runtime dir for shutdown pivot root.
+[   95.350122] systemd[1]: Stopped target local-fs.target - Local File Systems.
+[   95.352997] systemd[1]: Unmounting cdrom.mount - /cdrom...
+[   95.354370] systemd[1]: Unmounting rofs.mount - /rofs...
+[   95.355610] systemd[1]: Unmounting tmp.mount - /tmp...
+[   95.356825] systemd[1]: tmp.mount: Deactivated successfully.
+[   95.358224] systemd[1]: Unmounted tmp.mount - /tmp.
+[   95.359393] systemd[1]: [0;1;39mcdrom.mount: Mount process exited, code=exited, status=32/n/a[0m
+[   95.361370] systemd[1]: [0;1;31mFailed unmounting cdrom.mount - /cdrom.[0m
+[   95.362939] systemd[1]: rofs.mount: Deactivated successfully.
+[   95.364323] systemd[1]: Unmounted rofs.mount - /rofs.
+[   95.365513] systemd[1]: Stopped target local-fs-pre.target - Preparation for Local File Systems.
+[   95.367458] systemd[1]: Stopped target swap.target - Swaps.
+[   95.368784] systemd[1]: Reached target umount.target - Unmount All Filesystems.
+[   95.370509] systemd[1]: systemd-tmpfiles-setup-dev.service: Deactivated successfully.
+[   95.372243] systemd[1]: Stopped systemd-tmpfiles-setup-dev.service - Create Static Device Nodes in /dev.
+[   95.374296] systemd[1]: systemd-sysusers.service: Deactivated successfully.
+[   95.375836] systemd[1]: Stopped systemd-sysusers.service - Create System Users.
+[   95.377540] systemd[1]: systemd-remount-fs.service: Deactivated successfully.
+[   95.379220] systemd[1]: Stopped systemd-remount-fs.service - Remount Root and Kernel File Systems.
+[   95.381221] systemd[1]: systemd-tmpfiles-setup-dev-early.service: Deactivated successfully.
+[   95.383069] systemd[1]: Stopped systemd-tmpfiles-setup-dev-early.service - Create Static Device Nodes in /dev gracefully.
+[   95.385432] systemd[1]: Reached target shutdown.target - System Shutdown.
+[   95.386954] systemd[1]: Starting casper.service - Shuts down the "live" preinstalled system cleanly...
+[   97.517330] systemd[1]: casper.service: Deactivated successfully.
+[   97.518413] systemd[1]: Finished casper.service - Shuts down the "live" preinstalled system cleanly.
+[[0;32m  OK  [0m] Finished [0;1;39mcasper.service[0m - Shuts do…"live" preinstalled system cleanly.
+[   97.523279] systemd[1]: casper.service: Consumed 2.629s CPU time.
+[[0;32m  OK  [0m] Reached target [0;1;39mfinal.target[0m - Late Shutdown Services.
+[   97.525047] systemd[1]: Reached target final.target - Late Shutdown Services.
+[   97.528881] systemd[1]: systemd-poweroff.service: Deactivated successfully.
+[   97.529582] systemd[1]: Finished systemd-poweroff.service - System Power Off.
+[[0;32m  OK  [0m] Finished [0;1;39msystemd-poweroff.service[0m - System Power Off.
+[[0;32m  OK  [0m] Reached target [0;1;39mpoweroff.target[0m - System Power Off.
+[   97.534330] systemd[1]: Reached target poweroff.target - System Power Off.
+[   97.537889] systemd[1]: [0;1;39mShutting down.[0m
+[   97.855105] reboot: Power down

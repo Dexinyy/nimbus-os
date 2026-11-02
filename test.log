@@ -1,0 +1,298 @@
+== uefi (full)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/uefi-01-boot-menu.png
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/uefi-02-desktop.png
+PASS Starts to the Nimbus desktop (36 s)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/uefi-03-start-menu.png
+PASS The first Windows key press opens Start (11% of the screen changed)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/uefi-04-terminal.png
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/uefi-05-settings-about.png
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/uefi-06-alt-tab.png
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/uefi-07-shut-down-dialog.png
+PASS Shut down turns the computer off
+== bios (short)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/bios-01-boot-menu.png
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/bios-02-desktop.png
+PASS Starts to the Nimbus desktop (39 s)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/bios-07-shut-down-dialog.png
+PASS Shut down turns the computer off
+== usb-bios (short)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/usb-bios-01-boot-menu.png
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/usb-bios-02-desktop.png
+PASS Starts to the Nimbus desktop (39 s)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/usb-bios-07-shut-down-dialog.png
+PASS Shut down turns the computer off
+== usb-uefi (short)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/usb-uefi-01-boot-menu.png
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/usb-uefi-02-desktop.png
+PASS Starts to the Nimbus desktop (45 s)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/usb-uefi-07-shut-down-dialog.png
+PASS Shut down turns the computer off
+== logs (full)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/logs-01-boot-menu.png
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/logs-02-desktop.png
+PASS Starts to the Nimbus desktop (36 s)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/logs-03-start-menu.png
+PASS The first Windows key press opens Start (11% of the screen changed)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/logs-04-terminal.png
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/logs-05-settings-about.png
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/logs-06-alt-tab.png
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/logs-07-shut-down-dialog.png
+PASS Shut down turns the computer off
+== wifi (wifi)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/wifi-01-boot-menu.png
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/wifi-02-desktop.png
+PASS Starts to the Nimbus desktop (36 s)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/wifi-08-wifi.png
+PASS Joins a Wi-Fi network with its password
+PASS Settings shows the network it joined (NimbusTestAP)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/wifi-07-shut-down-dialog.png
+PASS Shut down turns the computer off
+== usb (storage)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/usb-01-boot-menu.png
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/usb-02-desktop.png
+PASS Starts to the Nimbus desktop (36 s)
+PASS Saves by itself from the first start
+PASS A setting survives a restart
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/usb-09-saving.png
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/usb-07-shut-down-dialog.png
+PASS Shut down turns the computer off
+== disk (storage)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/disk-01-boot-menu.png
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/disk-02-desktop.png
+PASS Starts to the Nimbus desktop (36 s)
+PASS Sets up saving on the empty disk
+PASS Starts with saving on after a restart
+PASS A setting survives a restart
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/disk-09-saving.png
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/disk-07-shut-down-dialog.png
+PASS Shut down turns the computer off
+== settings (settings)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/settings-01-boot-menu.png
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/settings-02-desktop.png
+PASS Starts to the Nimbus desktop (37 s)
+PASS Sound plays through PipeWire (1 output(s), default Line Out)
+PASS Settings changes the real volume (37)
+PASS Settings lists the display's resolutions (Virtual-1 1440x900, 21 modes)
+PASS Settings changes the resolution (1920x1440)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/settings-03-resolution-changed.png
+PASS ...and puts it back (1440x900)
+PASS Settings sees the keyboard and pointer (1 keyboard(s), 3 pointer(s))
+PASS Power modes answer (power-saver,balanced active=balanced)
+PASS The printing service runs (ready)
+PASS Storage is measured (1.9 GB total)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/settings-04-settings-system.png
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/settings-05-settings-sound.png
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/settings-06-settings-display.png
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/settings-07-settings-devices.png
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/settings-08-settings-network.png
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/settings-09-settings-personalization.png
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/settings-10-settings-time.png
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/settings-11-settings-update.png
+PASS Every Settings page opens (all pages: 84 opened, 0 failed)
+PASS The Settings test finished
+== chrome (chrome)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/chrome-01-boot-menu.png
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/chrome-02-desktop.png
+PASS Starts to the Nimbus desktop (36 s)
+PASS Installs Google Chrome from Google (26 s, version 156.0.8078.79)
+PASS Chrome opens as a window on the desktop (Nimbus test page - Google Chrome)
+PASS Chrome shows a web page (Nimbus test page - Google Chrome)
+PASS Chrome maximizes through the desktop (1440x852)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/chrome-10-chrome.png
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/chrome-11-start-over-chrome.png
+PASS The Windows key opens Start over Chrome (34% of the screen changed)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/chrome-12-settings-over-chrome.png
+PASS A Nimbus window opens over Chrome (51% of the screen changed)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/chrome-13-alt-tab.png
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/chrome-14-back-to-chrome.png
+PASS Alt+Tab brings Chrome back to the front (0% differs from Chrome before)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/chrome-15-typed-in-chrome.png
+PASS Typing goes to Chrome (87% of the screen changed)
+PASS Alt+F4 closes Chrome
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/chrome-16-chrome-closed.png
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/chrome-07-shut-down-dialog.png
+PASS Shut down turns the computer off
+== security (security)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/security-01-boot-menu.png
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/security-02-desktop.png
+PASS Starts to the Nimbus desktop (36 s)
+PASS ClamAV and the test signature are ready (engine 1.5.4 definitions test (1 signatures) realtime true)
+PASS The firewall is on (firewall active network public)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/security-03-security-home.png
+PASS Real-time protection quarantines a threat in a new download (realtime found 1 Nimbus.Test.EICAR.UNOFFICIAL and quarantined it)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/security-04-security-alert.png
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/security-05-security-scanning.png
+PASS A quick scan finds a threat (quick scan done: 3 files, 1 threats)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/security-06-security-threats.png
+PASS Start actions quarantines it (start actions: 1 quarantined, 0 still active, 2 in quarantine)
+PASS Protection history: remove and restore (history 3 items, allowed 1, quarantine 0)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/security-07-security-history.png
+PASS Blocking all incoming connections works (firewall block public true active true)
+PASS ...and unblocking (firewall unblock public true)
+PASS A Private network allows Steam Remote Play (firewall network Wired connection 1 now private, steam remote play allowed true)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/security-08-security-firewall.png
+PASS Device security is read (device secure boot n/a, tpm none, lockdown none, mitigations 2/5)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/security-09-security-device.png
+PASS A PlayStation controller is detected (controller Nimbus Test DualSense: DualSense (playstation) over USB)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/security-10-security-controllers.png
+PASS Its button presses reach Settings (controller input: Cross pressed, left stick x 1)
+PASS The Security test finished (done)
+== store (store)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/store-01-boot-menu.png
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/store-02-desktop.png
+PASS Starts to the Nimbus desktop (36 s)
+PASS Flatpak and Flathub are ready (flatpak true flathub false libflatpak true)
+PASS The Store downloads Flathub's catalog (catalog 3392 apps in 8 s)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/store-03-store-home.png
+PASS Search finds Discord (search discord: com.discordapp.Discord)
+PASS Search finds Steam (search steam: com.valvesoftware.Steam)
+PASS Discord's page has its details (details Discord by Discord Inc.: 252 MB to download, 4 permissions, 2 screenshots)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/store-04-store-app.png
+PASS The Store installs Discord (installed in 21 s; Start has fp:com.discordapp.Discord)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/store-05-store-installed.png
+PASS Discord opens as a window with its taskbar button (window Discord Updater (Wayland) on the taskbar as fp:com.discordapp.Discord)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/store-06-store-discord.png
+PASS Updates can be checked (updates waiting: 0)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/store-07-store-library.png
+PASS The Store test finished (done)
+Test update: nimbus-os-update-7e57d24.tar.xz (766512 bytes) from 4ae2d24
+== update (update)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/update-01-boot-menu.png
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/update-02-desktop.png
+PASS Starts to the Nimbus desktop (36 s)
+PASS The ISO's files match the list it keeps of them (build 4ae2d24, 59 of 59 files)
+PASS Finds a newer build on the update server (build 7e57d24, 0.8 MB to download, 1 package to add)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/update-03-update-available.png
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/update-04-update-installing.png
+PASS Downloads and installs it from Settings (16 s, 3 files changed, added hello, 0 warnings)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/update-05-update-restart.png
+PASS Starts the new build after a restart (build 7e57d24)
+PASS Every file is the new build's (59 of 59)
+PASS The package it needs is installed (hello)
+PASS Its one-off setup step ran
+PASS A file it adds is there and one it drops is gone
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/update-06-update-uptodate.png
+PASS Settings says it's up to date (You’re up to date)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/update-07-update-history.png
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/update-08-update-recovery.png
+PASS Recovery offers going back (build 4ae2d24)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/update-09-update-back.png
+PASS Goes back from Recovery (went back, Nimbus OS 0.1 (build 4ae2d24) waits for a restart)
+PASS Starts the earlier build after a restart (build 4ae2d24, 59 of 59 files as before)
+screenshot /home/runner/work/nimbus-os/nimbus-os/out/ci/update-10-update-offered.png
+PASS The Update test finished (done)
+## Boot test
+
+Image: nimbus-os-0.1-amd64.iso (900 MB)
+
+### uefi
+- ✅ Starts to the Nimbus desktop (36 s)
+- ✅ The first Windows key press opens Start (11% of the screen changed)
+- ✅ Shut down turns the computer off
+
+### bios
+- ✅ Starts to the Nimbus desktop (39 s)
+- ✅ Shut down turns the computer off
+
+### usb-bios
+- ✅ Starts to the Nimbus desktop (39 s)
+- ✅ Shut down turns the computer off
+
+### usb-uefi
+- ✅ Starts to the Nimbus desktop (45 s)
+- ✅ Shut down turns the computer off
+
+### logs
+- ✅ Starts to the Nimbus desktop (36 s)
+- ✅ The first Windows key press opens Start (11% of the screen changed)
+- ✅ Shut down turns the computer off
+
+### wifi
+- ✅ Starts to the Nimbus desktop (36 s)
+- ✅ Joins a Wi-Fi network with its password
+- ✅ Settings shows the network it joined (NimbusTestAP)
+- ✅ Shut down turns the computer off
+
+### usb
+- ✅ Starts to the Nimbus desktop (36 s)
+- ✅ Saves by itself from the first start
+- ✅ A setting survives a restart
+- ✅ Shut down turns the computer off
+
+### disk
+- ✅ Starts to the Nimbus desktop (36 s)
+- ✅ Sets up saving on the empty disk
+- ✅ Starts with saving on after a restart
+- ✅ A setting survives a restart
+- ✅ Shut down turns the computer off
+
+### settings
+- ✅ Starts to the Nimbus desktop (37 s)
+- ✅ Sound plays through PipeWire (1 output(s), default Line Out)
+- ✅ Settings changes the real volume (37)
+- ✅ Settings lists the display's resolutions (Virtual-1 1440x900, 21 modes)
+- ✅ Settings changes the resolution (1920x1440)
+- ✅ ...and puts it back (1440x900)
+- ✅ Settings sees the keyboard and pointer (1 keyboard(s), 3 pointer(s))
+- ✅ Power modes answer (power-saver,balanced active=balanced)
+- ✅ The printing service runs (ready)
+- ✅ Storage is measured (1.9 GB total)
+- ✅ Every Settings page opens (all pages: 84 opened, 0 failed)
+- ✅ The Settings test finished
+
+### chrome
+- ✅ Starts to the Nimbus desktop (36 s)
+- ✅ Installs Google Chrome from Google (26 s, version 156.0.8078.79)
+- ✅ Chrome opens as a window on the desktop (Nimbus test page - Google Chrome)
+- ✅ Chrome shows a web page (Nimbus test page - Google Chrome)
+- ✅ Chrome maximizes through the desktop (1440x852)
+- ✅ The Windows key opens Start over Chrome (34% of the screen changed)
+- ✅ A Nimbus window opens over Chrome (51% of the screen changed)
+- ✅ Alt+Tab brings Chrome back to the front (0% differs from Chrome before)
+- ✅ Typing goes to Chrome (87% of the screen changed)
+- ✅ Alt+F4 closes Chrome
+- ✅ Shut down turns the computer off
+
+### security
+- ✅ Starts to the Nimbus desktop (36 s)
+- ✅ ClamAV and the test signature are ready (engine 1.5.4 definitions test (1 signatures) realtime true)
+- ✅ The firewall is on (firewall active network public)
+- ✅ Real-time protection quarantines a threat in a new download (realtime found 1 Nimbus.Test.EICAR.UNOFFICIAL and quarantined it)
+- ✅ A quick scan finds a threat (quick scan done: 3 files, 1 threats)
+- ✅ Start actions quarantines it (start actions: 1 quarantined, 0 still active, 2 in quarantine)
+- ✅ Protection history: remove and restore (history 3 items, allowed 1, quarantine 0)
+- ✅ Blocking all incoming connections works (firewall block public true active true)
+- ✅ ...and unblocking (firewall unblock public true)
+- ✅ A Private network allows Steam Remote Play (firewall network Wired connection 1 now private, steam remote play allowed true)
+- ✅ Device security is read (device secure boot n/a, tpm none, lockdown none, mitigations 2/5)
+- ✅ A PlayStation controller is detected (controller Nimbus Test DualSense: DualSense (playstation) over USB)
+- ✅ Its button presses reach Settings (controller input: Cross pressed, left stick x 1)
+- ✅ The Security test finished (done)
+
+### store
+- ✅ Starts to the Nimbus desktop (36 s)
+- ✅ Flatpak and Flathub are ready (flatpak true flathub false libflatpak true)
+- ✅ The Store downloads Flathub's catalog (catalog 3392 apps in 8 s)
+- ✅ Search finds Discord (search discord: com.discordapp.Discord)
+- ✅ Search finds Steam (search steam: com.valvesoftware.Steam)
+- ✅ Discord's page has its details (details Discord by Discord Inc.: 252 MB to download, 4 permissions, 2 screenshots)
+- ✅ The Store installs Discord (installed in 21 s; Start has fp:com.discordapp.Discord)
+- ✅ Discord opens as a window with its taskbar button (window Discord Updater (Wayland) on the taskbar as fp:com.discordapp.Discord)
+- ✅ Updates can be checked (updates waiting: 0)
+- ✅ The Store test finished (done)
+
+### update
+- ✅ Starts to the Nimbus desktop (36 s)
+- ✅ The ISO's files match the list it keeps of them (build 4ae2d24, 59 of 59 files)
+- ✅ Finds a newer build on the update server (build 7e57d24, 0.8 MB to download, 1 package to add)
+- ✅ Downloads and installs it from Settings (16 s, 3 files changed, added hello, 0 warnings)
+- ✅ Starts the new build after a restart (build 7e57d24)
+- ✅ Every file is the new build's (59 of 59)
+- ✅ The package it needs is installed (hello)
+- ✅ Its one-off setup step ran
+- ✅ A file it adds is there and one it drops is gone
+- ✅ Settings says it's up to date (You’re up to date)
+- ✅ Recovery offers going back (build 4ae2d24)
+- ✅ Goes back from Recovery (went back, Nimbus OS 0.1 (build 4ae2d24) waits for a restart)
+- ✅ Starts the earlier build after a restart (build 4ae2d24, 59 of 59 files as before)
+- ✅ The Update test finished (done)
