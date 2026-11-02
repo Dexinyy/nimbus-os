@@ -161,6 +161,7 @@ const UI_ICONS = {
   pin: '<path d="M9 3.8h6l-1.2 5.4 3.4 3.3v1.9H6.8v-1.9l3.4-3.3z"/><path d="M12 14.4v5.8"/>',
   unpin: '<path d="M9 3.8h6l-1.2 5.4 3.4 3.3v1.9H6.8v-1.9l3.4-3.3z"/><path d="M12 14.4v5.8M3.5 3.5l17 17"/>',
   info: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.2M12 7.8h.01"/>',
+  warning: '<path d="M10.3 4.6 3.2 17a2 2 0 0 0 1.7 3h14.2a2 2 0 0 0 1.7-3L13.7 4.6a2 2 0 0 0-3.4 0z"/><path d="M12 10v4M12 17.2h.01"/>',
   check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
   play: '<path d="M8 5.5v13l10.5-6.5z"/>',
   pause: '<path d="M8.5 5.5v13M15.5 5.5v13"/>',
@@ -241,6 +242,7 @@ const SVG_DEFS = `<svg width="0" height="0" style="position:absolute;width:0;hei
 <linearGradient id="g-screen" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5ab6ff"/><stop offset="1" stop-color="#3a50d6"/></linearGradient>
 <linearGradient id="g-logo" x1=".2" y1=".08" x2=".8" y2=".95"><stop offset="0" style="stop-color:var(--accent-hi)"/><stop offset=".55" style="stop-color:var(--accent)"/><stop offset="1" style="stop-color:var(--accent-lo)"/></linearGradient>
 <linearGradient id="g-ring" x1="0" y1="0" x2="1" y2="0"><stop offset="0" style="stop-color:var(--accent-hi)"/><stop offset="1" style="stop-color:var(--accent)"/></linearGradient>
+<linearGradient id="g-web" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5aa9ff"/><stop offset="1" stop-color="#2347c9"/></linearGradient>
 <clipPath id="c-photo"><rect x="5" y="8" width="38" height="32" rx="7"/></clipPath>
 </defs></svg>`;
 
@@ -273,8 +275,15 @@ const APP_ICONS = {
   fileImage: `<path d="${PAGE}" fill="url(#g-paper)" stroke="#c3cbda"/><path d="M28 4v8a2 2 0 0 0 2 2h8" fill="#dde3ed" stroke="#c3cbda"/><rect x="13" y="20" width="22" height="17" rx="2.5" fill="#7cc2ff"/><path d="M13 37l7.5-9 5.5 6 3-3 6 6z" fill="#2e9e6a"/><circle cx="29.5" cy="25" r="2.3" fill="#fff6c4"/>`,
   welcome: '',
 };
+// A web browser before Chrome is installed (then Chrome's own icon is used), and other programs
+APP_ICONS.browser = '<circle cx="24" cy="24" r="19" fill="url(#g-web)"/><g fill="none" stroke="#fff" stroke-width="2.2" stroke-opacity=".92"><ellipse cx="24" cy="24" rx="8.2" ry="19"/><path d="M5.5 24h37M8.6 14.5h30.8M8.6 33.5h30.8"/></g>';
+APP_ICONS.app = '<rect x="5" y="8" width="38" height="32" rx="6" fill="url(#g-slate)"/><path d="M5 14a6 6 0 0 1 6-6h26a6 6 0 0 1 6 6v2H5z" fill="#fff" fill-opacity=".2"/><circle cx="11" cy="12" r="1.5" fill="#fff"/><circle cx="15.5" cy="12" r="1.5" fill="#fff"/><rect x="11" y="21" width="26" height="3" rx="1.5" fill="#fff" fill-opacity=".7"/><rect x="11" y="28" width="17" height="3" rx="1.5" fill="#fff" fill-opacity=".45"/>';
 APP_ICONS.welcome = '<rect x="5" y="5" width="38" height="38" rx="10" fill="url(#g-logo)"/><path d="M24 12.5l3.3 6.9 7.5 1-5.5 5.2 1.4 7.5L24 29.5l-6.7 3.6 1.4-7.5-5.5-5.2 7.5-1z" fill="#fff"/>';
-function appIcon(name) { return `<svg viewBox="0 0 48 48" aria-hidden="true">${APP_ICONS[name] || APP_ICONS.files}</svg>`; }
+// name: an icon below, or a picture (a program's own icon, as a data: URL)
+function appIcon(name) {
+  if (typeof name === 'string' && /^data:image\//.test(name)) return `<svg viewBox="0 0 48 48" aria-hidden="true"><image href="${esc(name)}" x="3" y="3" width="42" height="42"/></svg>`;
+  return `<svg viewBox="0 0 48 48" aria-hidden="true">${APP_ICONS[name] || APP_ICONS.files}</svg>`;
+}
 
 /* ========== Settings ========== */
 const DEFAULTS = {
@@ -282,11 +291,11 @@ const DEFAULTS = {
   theme: 'auto', accent: '#4a74f5', wallpaper: 'ridgeline',
   transparency: true, energySaver: false, reduceMotion: false, textSize: 14,
   tbAlign: 'center', tbPos: 'bottom', tbFloat: true, tbSearch: true, tbTaskView: true,
-  pinned: ['files', 'notes', 'terminal', 'paint', 'settings'],
-  startPins: ['files', 'notes', 'calculator', 'settings', 'terminal', 'paint', 'photos', 'clock', 'mines', 'taskmgr', 'assistant', 'welcome'],
+  pinned: ['chrome', 'files', 'notes', 'terminal', 'paint', 'settings'],
+  startPins: ['chrome', 'files', 'notes', 'calculator', 'settings', 'terminal', 'paint', 'photos', 'clock', 'mines', 'taskmgr', 'assistant', 'welcome'],
   brightness: 100, nightLight: false, nightStrength: 45,
   volume: 60, sounds: true, dnd: false,
-  clockSeconds: false, clock24: null, lockOnStart: false, showDesktopIcons: true,
+  clockSeconds: false, clock24: null, lockOnStart: false, showDesktopIcons: true, chromePinned: false,
   iconPos: {}, recent: [], filesView: 'grid', minesBest: {},
   worldClocks: ['America/Los_Angeles', 'Europe/London', 'Asia/Tokyo'],
   focusDnd: true, assistantMode: 'quick', setupDone: false, updatedAt: 0,

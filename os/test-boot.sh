@@ -6,6 +6,7 @@
 #   4. Wi-Fi: joins a simulated access point through the desktop's Wi-Fi code
 #   5. Saving from a USB image: casper saves in its free space; a setting survives a restart
 #   6. Saving from a DVD with an empty disk: Nimbus sets the disk up; a setting survives a restart
+#   7. Chrome: installed from Google, opened as a window; Start, Settings and Alt+Tab over it, typing, closing
 # usage: os/test-boot.sh ISO [OUTDIR]     results: OUTDIR/*.png, *-serial.log, summary.md
 set -uo pipefail
 
@@ -86,6 +87,10 @@ truncate -s 2G /tmp/nimbus-empty.img
 run_vm disk storage -cdrom "$ISO" -drive file=/tmp/nimbus-empty.img,format=raw,if=virtio \
   -kernel /tmp/nimbus-vmlinuz -initrd /tmp/nimbus-initrd \
   -append "boot=casper noprompt persistent nimbus.debug nimbus.test=storage nimbus.open=settings:system $SERIAL"
+
+# Google Chrome: Nimbus installs it from Google (the machine reaches the internet through QEMU) and shows it as a window
+run_vm chrome chrome -cdrom "$ISO" -kernel /tmp/nimbus-vmlinuz -initrd /tmp/nimbus-initrd \
+  -append "boot=casper noprompt nimbus.debug nimbus.test=chrome $SERIAL"
 
 cat "$OUTDIR/summary.md"
 exit "$FAILED"

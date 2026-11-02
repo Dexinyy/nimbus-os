@@ -1,0 +1,2 @@
+# The desktop may install, update and remove Google Chrome (from Google's signed repository) as root.
+nimbus ALL=(root) NOPASSWD: /usr/lib/nimbus/nimbus-apps

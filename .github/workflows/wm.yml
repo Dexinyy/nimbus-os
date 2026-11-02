@@ -2,7 +2,7 @@ name: Window manager
 
 on:
   push:
-    paths: ["wm/**", ".github/workflows/wm.yml"]
+    paths: ["wm/**", ".github/workflows/wm.yml", "shell/**", "os/overlay/usr/bin/nimbus-shell", "os/overlay/usr/lib/nimbus/**"]
   workflow_dispatch:
 
 permissions:
@@ -54,3 +54,28 @@ jobs:
 
       - name: Build
         run: make -C wm
+
+      - name: Install what the headless check needs
+        run: |
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+            grim wtype wlrctl dbus-daemon python3-gi python3-pil gir1.2-gtk-3.0 gir1.2-webkit2-4.1 \
+            adwaita-icon-theme fonts-dejavu-core
+          google-chrome-stable --version
+
+      - name: Check the window manager with the desktop and Chrome (headless)
+        run: wm/test-headless.sh out/wm
+
+      - name: Save the screenshots to the wm-results branch
+        if: always()
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p out/wm && cd out/wm
+          echo "$GITHUB_SHA" > commit.txt
+          [ -f summary.md ] && cat summary.md >> "$GITHUB_STEP_SUMMARY" || true
+          git init -q -b wm-results
+          git config user.name "nimbus-ci"
+          git config user.email "nimbus-ci@users.noreply.github.com"
+          git add -A
+          git commit -qm "Window manager check for ${GITHUB_SHA::7}"
+          git push -qf "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" wm-results

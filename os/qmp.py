@@ -6,6 +6,8 @@ usage: qmp.py SOCKET OUTDIR NAME SLOWNESS SCENARIO
             short - boot to the desktop, then shut down
             wifi  - boot with nimbus.test=wifi, check the desktop joined NimbusTestAP, then shut down
             storage - boot with nimbus.test=storage from a USB image: set up saving, restart twice, check
+            chrome - boot with nimbus.test=chrome: install Chrome from Google, open it as a window, then
+                     Start, Settings and Alt+Tab over it, typing into it and closing it
             logs  - boot, take one screenshot, leave the serial log for reading
 
 Screenshots go to OUTDIR/NAME-*.png and results are appended to OUTDIR/summary.md.
@@ -269,6 +271,72 @@ def main():
             if result == "kept":
                 time.sleep(4 * slow)
                 snap("09-saving")
+
+    if scenario == "chrome":
+        serial = os.path.join(outdir, f"{name}-serial.log")
+
+        def log_text():
+            return open(serial, errors="replace").read() if os.path.exists(serial) else ""
+
+        def wait_for(pattern, seconds):
+            end = time.time() + seconds * slow
+            while time.time() < end:
+                text = log_text()
+                m = re.search(pattern, text)
+                if m or "test chrome: failed" in text:
+                    return m
+                time.sleep(2)
+            return None
+
+        def shot_diff(a, b):
+            return changed(os.path.join(outdir, f"{name}-{a}.png"), os.path.join(outdir, f"{name}-{b}.png"))
+
+        m = wait_for(r"test chrome: installed in (\d+) s \(([^)]*)\)", 600)
+        failed = re.search(r"test chrome: failed: ([^\r\n]*)", log_text())
+        note("Installs Google Chrome from Google", bool(m), f"{m.group(1)} s, version {m.group(2)}" if m else failed.group(1) if failed else "no result in the system log")
+        m = wait_for(r"test chrome: window opened: ([^\r\n]*)", 120)
+        note("Chrome opens as a window on the desktop", bool(m), m.group(1).strip() if m else "")
+        m = wait_for(r"test chrome: page loaded: ([^\r\n]*)", 60)
+        note("Chrome shows a web page", bool(m), m.group(1).strip() if m else "")
+        ready = wait_for(r"test chrome: ready", 60)
+        m = re.search(r"test chrome: maximized: (\S+) (\d+)x(\d+)", log_text())
+        note("Chrome maximizes through the desktop", bool(m) and m.group(1) == "max", f"{m.group(2)}x{m.group(3)}" if m else "")
+        if ready:
+            time.sleep(2 * slow)
+            snap("10-chrome")
+            vm.key("meta_l")
+            time.sleep(1.5 * slow)
+            snap("11-start-over-chrome")
+            share = shot_diff("10-chrome", "11-start-over-chrome")
+            note("The Windows key opens Start over Chrome", share > 0.05, f"{share:.0%} of the screen changed")
+            vm.type("settings")
+            time.sleep(1.2 * slow)
+            vm.key("ret")
+            time.sleep(3 * slow)
+            snap("12-settings-over-chrome")
+            share = shot_diff("10-chrome", "12-settings-over-chrome")
+            note("A Nimbus window opens over Chrome", share > 0.15, f"{share:.0%} of the screen changed")
+            vm.press("alt", True)
+            vm.key("tab")
+            time.sleep(0.8 * slow)
+            snap("13-alt-tab")
+            vm.press("alt", False)
+            time.sleep(1.5 * slow)
+            snap("14-back-to-chrome")
+            back = shot_diff("10-chrome", "14-back-to-chrome")
+            note("Alt+Tab brings Chrome back to the front", back < 0.08, f"{back:.0%} differs from Chrome before")
+            vm.key("ctrl", "l")
+            time.sleep(0.6 * slow)
+            vm.type("about:blank\n")
+            time.sleep(2.5 * slow)
+            snap("15-typed-in-chrome")
+            share = shot_diff("14-back-to-chrome", "15-typed-in-chrome")
+            note("Typing goes to Chrome", share > 0.15, f"{share:.0%} of the screen changed")
+            vm.key("alt", "f4")
+            m = wait_for(r"test chrome: window closed", 30)
+            note("Alt+F4 closes Chrome", bool(m))
+            time.sleep(1.5 * slow)
+            snap("16-chrome-closed")
 
     # Alt+F4 closes each window, then on the empty desktop it asks what to do; Enter picks "Shut down".
     for _ in range(4):

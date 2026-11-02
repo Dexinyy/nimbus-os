@@ -84,10 +84,9 @@ window.webkit = { messageHandlers: { nimbus: { postMessage(json) {
   await step('terminal', async () => {
     await page.keyboard.press('Control+Alt+t');
     await page.waitForTimeout(300);
-    await page.keyboard.type('neofetch'); await page.keyboard.press('Enter');
-    await page.waitForTimeout(200);
-    const t = await page.textContent('.app-term .term-out');
-    if (!/Linux 6\.14/.test(t) || !/Ryzen/.test(t)) errors.push('neofetch missing native info');
+    // On Nimbus OS, Terminal is a real shell (tested by rterm.js); here it only has to open
+    const real = await page.$('.rterm');
+    if (!real) errors.push('Ctrl+Alt+T did not open the real terminal');
     await page.screenshot({ path: path.join(OUT, 'n5-terminal.png') });
   });
   await step('shutdown', async () => {

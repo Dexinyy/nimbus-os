@@ -16,7 +16,7 @@ const SETTINGS_INDEX = [
   ['showDesktopIcons', 'Desktop icons', 'personalization', 'show hide', 'desktop'],
   ['tbAlign', 'Taskbar alignment', 'taskbar', 'center left start button', 'layout'], ['tbPos', 'Taskbar position', 'taskbar', 'top bottom move', 'layout'],
   ['tbFloat', 'Floating taskbar', 'taskbar', 'rounded margin', 'layout'], ['pinned', 'Pinned apps', 'taskbar', 'pin unpin shortcuts', 'pin'],
-  ['installed', 'Installed apps', 'apps', 'programs software', 'apps'], ['userName', 'Your name', 'accounts', 'user profile account', 'person'],
+  ['installed', 'Installed apps', 'apps', 'programs software', 'apps'], ['browser', 'Default web browser', 'apps', 'chrome google internet web browser default', 'globe'], ['userName', 'Your name', 'accounts', 'user profile account', 'person'],
   ['sync', 'Sync and backup', 'accounts', 'cloud save backup restore export import', 'cloud'], ['privacy', 'Privacy dashboard', 'privacy', 'ads tracking data telemetry', 'shield'],
   ['reset', 'Reset this PC', 'privacy', 'erase wipe factory', 'restart'], ['textSize', 'Text size', 'accessibility', 'font bigger larger zoom', 'textSize'],
   ['reduceMotion', 'Reduce motion', 'accessibility', 'animations', 'activity'], ['shortcuts', 'Keyboard shortcuts', 'accessibility', 'keys hotkeys', 'keyboard'],
@@ -185,7 +185,7 @@ function mountSettings(root, api, args) {
     },
     taskbar: () => {
       const pins = h('div', { class: 'pin-list' });
-      for (const id of Object.keys(APPS).filter(appAvailable)) {
+      for (const id of Object.keys(APPS).filter(appListed)) {
         const a = APPS[id];
         const b = h('button', { class: 'switch', role: 'switch', 'aria-label': 'Pin ' + a.name, 'aria-checked': String(S.data.pinned.includes(id)) });
         b.onclick = () => S.set('pinned', S.data.pinned.includes(id) ? S.data.pinned.filter((x) => x !== id) : [...S.data.pinned, id]);
@@ -204,11 +204,14 @@ function mountSettings(root, api, args) {
       ];
     },
     apps: () => [
-      section('Installed apps', h('div', { class: 'srow sub', 'data-sid': 'installed' }, h('div', { class: 'app-list' }, ...Object.keys(APPS).filter(appAvailable).map((id) => {
+      section('Installed apps', h('div', { class: 'srow sub', 'data-sid': 'installed' }, h('div', { class: 'app-list' }, ...Object.keys(APPS).filter(appListed).map((id) => {
         const a = APPS[id];
         return h('div', { class: 'app-row' }, h('span', { class: 'ic', html: appIcon(a.icon) }), h('div', { class: 'grow' }, h('div', { class: 'srow-t', text: a.name }), h('div', { class: 'srow-d', text: a.desc })), h('button', { class: 'btn sm', text: 'Open', onclick: () => WM.open(id) }));
       })))),
       section('Default apps',
+        caps.programs ? row({ id: 'browser', icon: 'globe', title: 'Web browser: Google Chrome',
+          desc: Apps.installed('chrome') ? ('Opens web links.' + (Apps.status.chrome.version ? ' Version ' + Apps.status.chrome.version + '.' : '')) : 'Nimbus downloads it from Google the first time you open it.',
+          ctl: h('button', { class: 'btn sm', text: Apps.installed('chrome') ? 'Open' : 'Install', onclick: () => WM.open('chrome') }) }) : null,
         row({ icon: 'doc', title: 'Text files', desc: '.txt, .md, .csv, .json and other text open in Notes.' }),
         row({ icon: 'image', title: 'Pictures', desc: '.png, .jpg, .webp and .gif open in Photos.' })),
     ],

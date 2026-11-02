@@ -475,3 +475,21 @@
 .stg-ic svg { width: 22px; height: 22px; color: var(--accent-text); }
 .stg-txt { display: flex; flex-direction: column; gap: 2px; }
 .stg-txt .muted { font-size: var(--fs-sm); line-height: 1.4; }
+
+/* ---------- Get Google Chrome ---------- */
+.app-installer { display: flex; flex-direction: column; height: 100%; padding: 24px 28px 20px; gap: 18px; }
+.app-installer .in-head { display: flex; gap: 16px; align-items: center; }
+.app-installer .in-icon svg { width: 56px; height: 56px; display: block; }
+.app-installer h2 { margin: 0; font-size: 1.45rem; font-weight: 600; }
+.app-installer .in-head p { margin: 2px 0 0; }
+.app-installer .in-body { flex: 1; display: flex; flex-direction: column; gap: 12px; min-height: 0; overflow: auto; }
+.app-installer .in-body p { margin: 0; line-height: 1.5; }
+.app-installer .small { font-size: var(--fs-sm); }
+.app-installer .in-note, .app-installer .in-error { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 8px; background: var(--card); line-height: 1.45; }
+.app-installer .in-note svg, .app-installer .in-error svg { width: 18px; height: 18px; flex: none; margin-top: 2px; }
+.app-installer .in-error { background: color-mix(in srgb, #c42b1c 16%, var(--card)); }
+.app-installer .in-note a { color: var(--accent-text); }
+.app-installer .in-status { font-size: 1.02rem; }
+.app-installer .in-bar { height: 6px; border-radius: 3px; background: var(--hover); overflow: hidden; }
+.app-installer .in-bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+.app-installer .in-foot { display: flex; justify-content: flex-end; gap: 8px; }

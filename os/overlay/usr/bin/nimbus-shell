@@ -5,7 +5,14 @@ Shows the Nimbus desktop full screen and gives it a small, fixed set of
 abilities on the real machine (power, system information, time zone).
 The page talks to this process through a WebKit script message handler
 named "nimbus"; replies come back through window.__nimbusNative.
+
+Under nimbus-wm (the window manager, which starts this program) it also
+relays between the page and the window manager over NIMBUS_WM_FD, so real
+programs' windows (Google Chrome, or anything started from Terminal) show
+on the desktop, and it starts and installs those programs.
 """
+import base64
+import configparser
 import glob
 import json
 import os
@@ -31,13 +38,19 @@ from gi.repository import Gdk, GLib, Gtk, WebKit2  # noqa: E402
 VERSION = "0.1"
 STORAGE_LABEL = "writable"  # keep in step with /usr/lib/nimbus/nimbus-storage
 # Calls that are quick and touch state shared with the main loop run on the main thread.
-MAIN_THREAD = {"termOpen", "termInput", "termResize", "termClose", "log"}
+MAIN_THREAD = {"termOpen", "termInput", "termResize", "termClose", "log", "wm", "wmReady"}
 SHELL_DIR = os.environ.get("NIMBUS_SHELL_DIR", "/usr/share/nimbus/shell")
 DATA_DIR = os.path.join(GLib.get_user_data_dir(), "nimbus")
 CACHE_DIR = os.path.join(GLib.get_user_cache_dir(), "nimbus")
 SOFTWARE = os.environ.get("NIMBUS_SOFTWARE") == "1" or not glob.glob("/dev/dri/renderD*")
 # Start with "nimbus.debug" on the kernel command line to log keyboard and focus events.
 DEBUG = bool(os.environ.get("NIMBUS_DEBUG")) or "nimbus.debug" in open("/proc/cmdline").read().split()
+CHROME = "/usr/bin/google-chrome-stable"
+CHROME_ICONS = ("/usr/share/icons/hicolor/256x256/apps/google-chrome.png", "/opt/google/chrome/product_logo_256.png",
+                "/usr/share/icons/hicolor/128x128/apps/google-chrome.png")
+# The window manager's desktop socket is passed in by nimbus-wm; programs must not inherit it.
+PRIVATE_ENV = ("NIMBUS_WM_FD", "WAYLAND_SOCKET")
+STATES = {"normal": 0, "max": 1, "snap": 2, "full": 3}
 VENDORS = {"0x8086": "Intel", "0x1002": "AMD", "0x10de": "NVIDIA", "0x1234": "QEMU", "0x1af4": "Virtio",
            "0x15ad": "VMware", "0x80ee": "VirtualBox", "0x1414": "Microsoft Hyper-V", "0x5143": "Qualcomm"}
 
@@ -179,8 +192,144 @@ def info():
         "software": SOFTWARE,
         "debug": DEBUG,
         "open": cmdline_value("nimbus.open"),  # app[:page] to open at startup
-        "test": cmdline_value("nimbus.test"),  # boot tests (os/test-boot.sh)
+        "test": os.environ.get("NIMBUS_TEST") or cmdline_value("nimbus.test"),  # boot tests (os/test-boot.sh)
+        "wm": bool(os.environ.get("NIMBUS_WM_FD")),  # programs' windows show on the desktop
     }
+
+
+def program_env():
+    """The environment programs started from the desktop get."""
+    env = {k: v for k, v in os.environ.items() if k not in PRIVATE_ENV}
+    env.setdefault("XDG_SESSION_TYPE", "wayland")
+    return env
+
+
+def spawn(argv):
+    """Start a program on its own (it outlives this process); its output goes to a log file."""
+    log = open(os.path.join(CACHE_DIR, "programs.log"), "ab")
+    proc = subprocess.Popen(argv, env=program_env(), stdin=subprocess.DEVNULL, stdout=log, stderr=log,
+                            start_new_session=True, close_fds=True, cwd=os.path.expanduser("~"))
+    log.close()
+    GLib.child_watch_add(GLib.PRIORITY_DEFAULT, proc.pid, lambda *_: None)  # collect it when it exits
+    return proc.pid
+
+
+def image_data_url(path, limit=600 * 1024):
+    try:
+        if not path or os.path.getsize(path) > limit:
+            return None
+        with open(path, "rb") as f:
+            data = f.read()
+    except OSError:
+        return None
+    kind = "image/svg+xml" if path.endswith(".svg") else "image/png" if path.endswith(".png") else None
+    return "data:%s;base64,%s" % (kind, base64.b64encode(data).decode()) if kind else None
+
+
+def chrome_status():
+    if not os.access(CHROME, os.X_OK):
+        return {"installed": False, "version": None, "icon": None}
+    version = ""
+    try:
+        r = subprocess.run(["dpkg-query", "-W", "-f=${Version}", "google-chrome-stable"], capture_output=True, text=True, timeout=10)
+        version = r.stdout.strip().split("-")[0]
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    icon = next((image_data_url(p) for p in CHROME_ICONS if os.path.exists(p)), None)
+    return {"installed": True, "version": version, "icon": icon}
+
+
+def desktop_entry(app_id):
+    """Name and icon of a program, from its .desktop file (matched by file name or StartupWMClass)."""
+    dirs = [os.path.join(d, "applications") for d in [GLib.get_user_data_dir()] + list(GLib.get_system_data_dirs())]
+    files = [os.path.join(d, app_id + ".desktop") for d in dirs] + [f for d in dirs for f in sorted(glob.glob(os.path.join(d, "*.desktop")))]
+    for path in files:
+        if not os.path.isfile(path):
+            continue
+        cp = configparser.RawConfigParser(strict=False, interpolation=None)
+        try:
+            cp.read(path, encoding="utf-8")
+            entry = cp["Desktop Entry"]
+        except (configparser.Error, KeyError, UnicodeDecodeError):
+            continue
+        base = os.path.basename(path)[:-len(".desktop")]
+        if base != app_id and entry.get("StartupWMClass", "").lower() != app_id.lower():
+            continue
+        return {"name": entry.get("Name", ""), "icon": icon_url(entry.get("Icon", ""))}
+    return None
+
+
+def icon_url(name):
+    if not name:
+        return None
+    if name.startswith("/"):
+        return image_data_url(name)
+    for size in ("256x256", "128x128", "96x96", "64x64", "48x48", "scalable"):
+        for ext in ("png", "svg"):
+            for theme in ("hicolor", "Adwaita"):
+                path = "/usr/share/icons/%s/%s/apps/%s.%s" % (theme, size, name, ext)
+                if os.path.exists(path):
+                    return image_data_url(path)
+    for ext in ("png", "svg"):
+        if os.path.exists("/usr/share/pixmaps/%s.%s" % (name, ext)):
+            return image_data_url("/usr/share/pixmaps/%s.%s" % (name, ext))
+    return None
+
+
+class WMLink:
+    """The connection to nimbus-wm: JSON events in, one-line commands out (see wm/nimbus-wm.c)."""
+
+    def __init__(self, fd, on_event):
+        self.sock = socket.socket(fileno=fd)
+        self.sock.setblocking(False)
+        self.inbuf = b""
+        self.outbuf = b""
+        self.out_watch = None
+        self.on_event = on_event
+        GLib.io_add_watch(fd, GLib.PRIORITY_HIGH, GLib.IO_IN | GLib.IO_HUP | GLib.IO_ERR, self.on_readable)
+
+    def on_readable(self, _fd, _cond):
+        try:
+            data = self.sock.recv(65536)
+        except BlockingIOError:
+            return True
+        except OSError:
+            data = b""
+        if not data:
+            print("nimbus-shell: the window manager went away", file=sys.stderr)
+            Gtk.main_quit()
+            return False
+        self.inbuf += data
+        while b"\n" in self.inbuf:
+            line, self.inbuf = self.inbuf.split(b"\n", 1)
+            try:
+                event = json.loads(line.decode("utf-8", "replace"))
+            except ValueError:
+                continue
+            self.on_event(event)
+        return True
+
+    def send(self, line):
+        self.outbuf += line.encode() + b"\n"
+        self.flush()
+
+    def flush(self, *_):
+        while self.outbuf:
+            try:
+                n = self.sock.send(self.outbuf)
+            except BlockingIOError:
+                break
+            except OSError:
+                self.outbuf = b""
+                break
+            self.outbuf = self.outbuf[n:]
+        if self.outbuf and not self.out_watch:
+            def writable(*_):
+                self.out_watch = None
+                self.flush()
+                return False
+            self.out_watch = GLib.io_add_watch(self.sock.fileno(), GLib.PRIORITY_HIGH, GLib.IO_OUT, writable)
+        return False
 
 
 class Shell:
@@ -243,6 +392,14 @@ class Shell:
         self.view.load_uri(uri + ("?debug=1" if DEBUG else ""))
         self.net_due = False
         self.watch_network()
+        # Programs' windows: what the window manager has told us, so a page that (re)loads can catch up
+        self.windows = {}
+        self.page_ready = False
+        self.focused = None
+        self.wm = WMLink(int(os.environ["NIMBUS_WM_FD"]), self.on_wm_event) if os.environ.get("NIMBUS_WM_FD") else None
+        self.listen_for_links()
+        if self.wm and os.access(CHROME, os.X_OK):
+            GLib.timeout_add_seconds(90, self.update_chrome)
 
     def debug_key(self, window, event):
         focus = window.get_focus()
@@ -305,6 +462,150 @@ class Shell:
     def emit(self, name, data):
         """Send an event to the page (it arrives on the page's bus as 'native:<name>')."""
         self.run_js("window.__nimbusNative && window.__nimbusNative.event(%s, %s);" % (json.dumps(name), json.dumps(data)))
+
+    # ---- programs' windows (nimbus-wm) ----
+    def on_wm_event(self, event):
+        kind, wid = event.get("ev"), event.get("id")
+        if kind == "new":
+            self.windows[wid] = dict(event)
+        elif kind == "gone":
+            self.windows.pop(wid, None)
+        elif wid in self.windows and kind in ("title", "app", "geom", "parent"):
+            self.windows[wid].update({k: v for k, v in event.items() if k not in ("ev", "id")})
+        if kind == "focus":
+            self.focused = wid
+        if self.page_ready:
+            self.emit("wm", event)
+
+    def m_wmReady(self, _args):
+        """The page is listening: tell it about the windows that are already open."""
+        self.page_ready = True
+        for event in list(self.windows.values()):
+            self.emit("wm", dict(event, ev="new"))
+        if self.focused:
+            self.emit("wm", {"ev": "focus", "id": self.focused})
+        return len(self.windows)
+
+    def m_wm(self, args):
+        if not self.wm:
+            raise RuntimeError("No window manager")
+        cmd = args.get("cmd")
+        num = lambda v: str(int(round(float(v or 0))))  # noqa: E731
+        rects = lambda rs: [str(len(rs))] + [num(x) for r in rs for x in (list(r) + [0] * 5)[:5]]  # noqa: E731
+        if cmd == "layout":
+            words = ["layout"] + rects(args.get("top") or [])
+            stack = args.get("stack") or []
+            words.append(str(len(stack)))
+            for wid, above in stack:
+                words += [num(wid)] + rects(above)
+            self.wm.send(" ".join(words))
+        elif cmd in ("focus", "close"):
+            self.wm.send("%s %s" % (cmd, num(args.get("id"))))
+        elif cmd == "show":
+            self.wm.send("show %s %s" % (num(args.get("id")), num(args.get("on"))))
+        elif cmd == "geom":
+            self.wm.send("geom " + " ".join(num(args.get(k)) for k in ("id", "x", "y", "w", "h", "state", "rw", "rh")))
+        elif cmd == "area":
+            self.wm.send("area " + " ".join(num(args.get(k)) for k in ("x", "y", "w", "h")))
+        elif cmd == "overlay":
+            self.wm.send("overlay %s %s" % (num(args.get("dim")), num(args.get("night"))))
+        else:
+            raise ValueError("Unknown window manager command")
+        return True
+
+    # ---- programs: Google Chrome, installed from Google (see /usr/lib/nimbus/nimbus-apps) ----
+    def m_appStatus(self, _args):
+        return {"chrome": chrome_status()}
+
+    def m_appInfo(self, args):
+        app_id = str(args.get("appId", ""))
+        if not re.match(r"^[A-Za-z0-9._-]{1,200}$", app_id):
+            return None
+        return desktop_entry(app_id)
+
+    def m_appLaunch(self, args):
+        if args.get("app") != "chrome":
+            raise ValueError("Unknown program")
+        if not os.access(CHROME, os.X_OK):
+            raise RuntimeError("Google Chrome isn't installed")
+        argv = [CHROME, "--ozone-platform=wayland", "--no-default-browser-check", "--password-store=basic"]
+        if args.get("test"):
+            argv.append("--no-first-run")
+        url = str(args.get("url") or "")
+        if url and re.match(r"^(https?|file|data):", url, re.I):
+            argv.append(url)
+        return spawn(argv)
+
+    def m_appInstall(self, args):
+        if args.get("app") != "chrome":
+            raise ValueError("Unknown program")
+        result = self.run_apps_helper("install", "chrome")
+        # Chrome is the browser for web links, and knows it
+        subprocess.run(["xdg-settings", "set", "default-web-browser", "google-chrome.desktop"],
+                       env=program_env(), capture_output=True, timeout=30)
+        return result
+
+    def run_apps_helper(self, *args, quiet=False):
+        """Run the installer helper as root (allowed by /etc/sudoers.d/nimbus-apps), passing its progress to the page."""
+        proc = subprocess.Popen(["sudo", "-n", "/usr/lib/nimbus/nimbus-apps", *args], stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE, text=True)
+        last = {}
+        for line in proc.stdout:
+            try:
+                msg = json.loads(line)
+            except ValueError:
+                continue
+            last = msg
+            if "progress" in msg and not quiet:
+                GLib.idle_add(lambda m=msg: self.emit("app-progress", m) and False)
+        err = proc.stderr.read()
+        proc.wait()
+        if not last.get("ok"):
+            raise RuntimeError(last.get("error") or (err.strip().splitlines() or ["Installing failed"])[-1])
+        return last
+
+    def update_chrome(self):
+        """Once a while after startup, bring Chrome up to date (Chrome on Linux leaves that to the system)."""
+        def run():
+            try:
+                if nimbus_net.available() and nimbus_net.status().get("connectivity") == "none":
+                    return
+                result = self.run_apps_helper("update", "chrome", quiet=True)
+                print("nimbus-shell: Chrome update:", result.get("text", "done"))
+            except Exception as exc:
+                print("nimbus-shell: Chrome update:", exc, file=sys.stderr)
+        threading.Thread(target=run, daemon=True).start()
+        return False
+
+    def m_openUrl(self, args):
+        """Open a web link: in Chrome, or the page offers to install it first."""
+        self.emit("open-url", {"urls": [str(args.get("url", ""))]})
+        return True
+
+    def listen_for_links(self):
+        """Web links opened by programs go to /usr/lib/nimbus/nimbus-open, which runs Chrome when it's installed
+        and otherwise asks the desktop (through this socket) to offer installing it."""
+        path = os.path.join(GLib.get_user_runtime_dir(), "nimbus-shell.sock")
+        try:
+            if os.path.exists(path):
+                os.unlink(path)
+            self.links = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+            self.links.bind(path)
+            os.chmod(path, 0o600)
+        except OSError as exc:
+            print("nimbus-shell: no link socket:", exc, file=sys.stderr)
+            return
+
+        def readable(*_):
+            try:
+                data = json.loads(self.links.recv(65536).decode("utf-8", "replace"))
+                urls = [str(u) for u in data.get("open", []) if re.match(r"^(https?|file):", str(u), re.I)][:10]
+                if urls:
+                    self.emit("open-url", {"urls": urls})
+            except (OSError, ValueError, AttributeError):
+                pass
+            return True
+        GLib.io_add_watch(self.links.fileno(), GLib.PRIORITY_DEFAULT, GLib.IO_IN, readable)
 
     def on_destroy(self, *_):
         self.terminals.close_all()
@@ -427,6 +728,8 @@ class Shell:
 
     def restart(self):
         self.terminals.close_all()
+        if self.wm:
+            os._exit(75)  # the window manager starts the desktop again; programs keep running
         os.execv(sys.executable, [sys.executable] + sys.argv)
 
     # ---- guard rails ----
@@ -438,9 +741,14 @@ class Shell:
             uri = decision.get_navigation_action().get_request().get_uri()
             if not uri.startswith("file://" + SHELL_DIR) and not uri.startswith("about:"):
                 decision.ignore()
+                if re.match(r"^https?:", uri, re.I):
+                    self.emit("open-url", {"urls": [uri]})  # web links open in the browser
                 return True
         if kind == WebKit2.PolicyDecisionType.NEW_WINDOW_ACTION:
+            uri = decision.get_navigation_action().get_request().get_uri()
             decision.ignore()
+            if re.match(r"^https?:", uri or "", re.I):
+                self.emit("open-url", {"urls": [uri]})
             return True
         return False
 

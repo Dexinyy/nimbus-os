@@ -12,8 +12,13 @@ const APPS = {
   taskmgr: { name: 'Task Manager', icon: 'taskmgr', mount: mountTaskmgr, size: [820, 560], minSize: [480, 360], single: true, desc: 'See open apps and live performance.', keywords: 'processes performance memory fps end task' },
   assistant: { name: 'Assistant', icon: 'assistant', mount: mountAssistant, size: [460, 640], minSize: [340, 400], single: true, requires: 'sample', desc: 'Ask questions or have it operate the OS for you.', keywords: 'ai help chat ask claude copilot' },
   welcome: { name: 'Welcome', icon: 'welcome', mount: mountWelcome, size: [880, 660], minSize: [420, 400], single: true, desc: 'Set up your OS and learn what it can do.', keywords: 'tips getting started setup tour' },
+  // Real programs, shown by the window manager (nwin.js); Chrome is installed from Google the first time it opens
+  chrome: { name: 'Google Chrome', icon: 'browser', launch: (args) => Apps.launch('chrome', args), requires: 'programs', desc: 'Browse the web. Your default browser.', keywords: 'browser web internet google chrome www search sites' },
+  installer: { name: 'Get Google Chrome', icon: 'browser', mount: mountInstaller, size: [520, 420], minSize: [400, 320], single: true, noResize: true, hidden: true, taskbarAs: 'chrome', requires: 'programs', desc: '', keywords: '' },
 };
 function appAvailable(id) { const a = APPS[id]; return !!a && (!a.requires || !!caps[a.requires]); }
+// Apps shown in Start, search, Settings and the taskbar (the installer only opens when needed)
+function appListed(id) { return appAvailable(id) && !APPS[id].hidden; }
 
 /* ========== Shell-wide helpers and appearance ========== */
 const Shell = {
@@ -54,10 +59,11 @@ function applyEffects() {
   if (S.data.reduceMotion || S.data.energySaver) root.setAttribute('data-reduce-motion', ''); else root.removeAttribute('data-reduce-motion');
 }
 function applyTextSize() { document.documentElement.style.fontSize = clamp(S.data.textSize || 14, 12, 18) + 'px'; }
-function applyBrightness() { document.getElementById('dim').style.opacity = String(((100 - clamp(S.data.brightness, 30, 100)) / 100) * 0.8); }
+function applyBrightness() { document.getElementById('dim').style.opacity = String(((100 - clamp(S.data.brightness, 30, 100)) / 100) * 0.8); NativeWin.overlay(); }
 function applyNight() {
   const a = S.data.nightLight ? 0.1 + (clamp(S.data.nightStrength, 0, 100) / 100) * 0.45 : 0;
   document.getElementById('nightlight').style.background = `rgba(255, 138, 40, ${a.toFixed(3)})`;
+  NativeWin.overlay();
 }
 function applyTaskbar() {
   const os = document.getElementById('os');
@@ -441,7 +447,7 @@ const Start = {
     const all = h('button', { class: 'sec-btn', html: `All apps ${ui('chevR')}` }); all.onclick = () => { this.view = 'all'; this.render(); };
     head.append(all);
     const pins = h('div', { class: 'pins' });
-    for (const id of S.data.startPins.filter(appAvailable)) pins.append(this.appButton(id, 'pin'));
+    for (const id of S.data.startPins.filter(appListed)) pins.append(this.appButton(id, 'pin'));
     body.append(head, pins);
     body.append(h('div', { class: 'sec-head' }, h('h3', { text: 'Recent' })));
     const rec = (S.data.recent || []).map((id) => FS.get(id)).filter((n) => n && !FS.inTrash(n.id)).slice(0, 6);
@@ -464,7 +470,7 @@ const Start = {
     head.append(back);
     const list = h('div', { class: 'alist' });
     let letter = '';
-    for (const id of Object.keys(APPS).filter(appAvailable).sort((a, b) => APPS[a].name.localeCompare(APPS[b].name))) {
+    for (const id of Object.keys(APPS).filter(appListed).sort((a, b) => APPS[a].name.localeCompare(APPS[b].name))) {
       const L = APPS[id].name[0].toUpperCase();
       if (L !== letter) { letter = L; list.append(h('div', { class: 'letter', text: L })); }
       list.append(this.appButton(id, 'aitem'));
@@ -540,7 +546,7 @@ const Search = {
       try { const v = evalMath(q); out.push({ group: 'Calculator', score: 130, title: fmtNum(v), sub: q.replace(/^=/, '') + ' =  ·  Enter copies the result', icon: 'calculator', run: async () => { const ok = await copyText(String(parseFloat(v.toPrecision(14)))); Notif.push({ app: 'calculator', title: ok ? 'Result copied' : 'Result', body: fmtNum(v), silent: true }); } }); } catch {}
     }
     for (const id in APPS) {
-      if (!appAvailable(id)) continue; const a = APPS[id];
+      if (!appListed(id)) continue; const a = APPS[id];
       const s = this.score(a.name, a.keywords, ql);
       if (s) out.push({ group: 'Apps', score: s + 6, title: a.name, sub: 'App', icon: a.icon, run: () => WM.open(id) });
     }
@@ -712,6 +718,8 @@ bus.on('notif', () => { if (Flyouts.cur === 'nc') { NC.render(); Notif.unread = 
 bus.on('settings', (keys) => { if (Flyouts.cur === 'nc' && keys.includes('dnd')) NC.render(); });
 
 /* ========== Taskbar ========== */
+// The taskbar button a window belongs to (the Chrome installer sits under Chrome's)
+const tbId = (w) => (APPS[w.appId] && APPS[w.appId].taskbarAs) || w.appId;
 const Taskbar = {
   bat: null,
   init() {
@@ -753,14 +761,14 @@ const Taskbar = {
   },
   render() {
     const box = $('#tb-apps'); const running = WM.list(); const active = WM.activeId();
-    const ids = S.data.pinned.filter(appAvailable);
-    for (const w of running) if (!ids.includes(w.appId)) ids.push(w.appId);
+    const ids = S.data.pinned.filter(appListed);
+    for (const w of running) if (!ids.includes(tbId(w))) ids.push(tbId(w));
     const existing = new Map([...box.children].map((b) => [b.dataset.app, b]));
     ids.forEach((id, i) => {
       let b = existing.get(id);
       if (!b) b = h('button', { class: 'tbtn app', 'data-app': id, html: `<span class="ic">${appIcon(APPS[id].icon)}</span><span class="ind"></span>` });
       existing.delete(id);
-      const ws = running.filter((w) => w.appId === id);
+      const ws = running.filter((w) => tbId(w) === id);
       b.classList.toggle('running', ws.length > 0);
       b.classList.toggle('focused', ws.some((w) => w.id === active && !w.min));
       const tip = ws.length === 1 ? ws[0].title : ws.length > 1 ? `${APPS[id].name} (${ws.length} windows)` : APPS[id].name;
@@ -771,7 +779,7 @@ const Taskbar = {
     for (const b of existing.values()) b.remove();
   },
   clickApp(id, e, btn) {
-    const ws = WM.list().filter((w) => w.appId === id);
+    const ws = WM.list().filter((w) => tbId(w) === id);
     if (e.shiftKey || !ws.length) { WM.open(id); return; }
     if (ws.length === 1) { const w = ws[0]; if (w.id === WM.activeId() && !w.min) WM.minimize(w); else WM.focus(w); return; }
     Menu.show(ws.map((w) => ({ label: w.title, icon: APPS[id].icon, appIcon: true, action: () => WM.focus(w) })).concat(['sep', { label: 'New window', icon: 'plus', action: () => WM.open(id) }]), 0, 0, { anchorEl: btn, above: S.data.tbPos !== 'top', center: true });

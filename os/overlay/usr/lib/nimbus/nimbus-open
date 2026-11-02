@@ -1,0 +1,14 @@
+#!/bin/sh
+# Opens web links on Nimbus OS (the default handler for http and https, see /etc/xdg/mimeapps.list):
+# in Google Chrome when it's installed; otherwise the desktop offers to install it, then opens the link.
+if [ -x /usr/bin/google-chrome-stable ]; then
+  exec /usr/bin/google-chrome-stable --no-default-browser-check --password-store=basic "$@"
+fi
+exec python3 - "$@" <<'PY'
+import json, os, socket, sys
+path = os.path.join(os.environ.get("XDG_RUNTIME_DIR") or "/run/user/%d" % os.getuid(), "nimbus-shell.sock")
+try:
+    socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM).sendto(json.dumps({"open": sys.argv[1:]}).encode(), path)
+except OSError as exc:
+    sys.exit("nimbus-open: the desktop isn't running (%s)" % exc)
+PY

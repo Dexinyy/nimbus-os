@@ -15,7 +15,7 @@ FONTS = ROOT.parent / "os" / "fonts"
 
 CSS_ORDER = ["base.css", "shell.css", "apps.css"]
 JS_ORDER = [
-    "core.js", "native.js", "net.js", "storage.js", "store.js", "walls.js", "ui.js", "wm.js", "shell.js",
+    "core.js", "native.js", "net.js", "storage.js", "store.js", "walls.js", "ui.js", "wm.js", "shell.js", "nwin.js",
     "app-files.js", "app-notes.js", "app-photos.js", "app-paint.js",
     "app-settings.js", "app-calc.js", "app-terminal.js", "app-taskmgr.js",
     "app-clock.js", "app-mines.js", "app-assistant.js", "app-welcome.js",
@@ -32,7 +32,7 @@ def bundle(test_hook=False):
     css = "\n".join((SRC / "css" / f).read_text() for f in CSS_ORDER)
     js = "\n".join(f"/* ---- {f} ---- */\n" + (SRC / "js" / f).read_text() for f in JS_ORDER)
     if test_hook:
-        js += "\nwindow.__n = { WM, S, FS, Store, Flyouts, Power, Notif, Clock, Desktop, Menu, caps, bus, Native, Net, QS, Storage };\n"
+        js += "\nwindow.__n = { WM, S, FS, Store, Flyouts, Power, Notif, Clock, Desktop, Menu, caps, bus, Native, Net, QS, Storage, NativeWin, Apps, APPS };\n"
     return css, "(() => {\n" + js + "\n})();\n"
 
 

@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Web browser
+Comment=Opens web links in Google Chrome, or offers to install it
+Exec=/usr/lib/nimbus/nimbus-open %U
+NoDisplay=true
+MimeType=x-scheme-handler/http;x-scheme-handler/https;text/html;

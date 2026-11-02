@@ -20,11 +20,15 @@ const WM = (() => {
     return { x: 0, y: top ? r : 0, w: W, h: H - r };
   }
   const snapRect = (f) => { const A = area(); return { x: Math.round(A.x + f[0] * A.w), y: Math.round(A.y + f[1] * A.h), w: Math.round(f[2] * A.w), h: Math.round(f[3] * A.h) }; };
-  function rectFor(w) { if (w.state === 'max') return area(); if (w.snap) return snapRect(w.snap); return { x: w.x, y: w.y, w: w.w, h: w.h }; }
+  function rectFor(w) {
+    if (w.native) return { x: w.x, y: w.y, w: w.w, h: w.h }; // where the window manager says it is
+    if (w.state === 'max') return area(); if (w.snap) return snapRect(w.snap); return { x: w.x, y: w.y, w: w.w, h: w.h };
+  }
   function place(w) {
     const r = rectFor(w); const s = w.el.style;
     s.left = r.x + 'px'; s.top = r.y + 'px'; s.width = r.w + 'px'; s.height = r.h + 'px';
     w.el.classList.toggle('max', w.state === 'max');
+    if (w.native) { w.el.classList.toggle('full', !!w.full); NativeWin.schedule(); return; }
     w.el.classList.toggle('snapped', !!w.snap && w.state !== 'max');
     const restore = w.state === 'max' || !!w.snap;
     w.bMax.innerHTML = ui(restore ? 'restore' : 'max');
@@ -40,6 +44,7 @@ const WM = (() => {
 
   function open(appId, args = {}) {
     const app = APPS[appId]; if (!app || !appAvailable(appId)) return null;
+    if (app.launch) { app.launch(args || {}); return null; } // a real program: its window arrives from the window manager
     if (app.single) {
       const ex = [...wins.values()].find((w) => w.appId === appId);
       if (ex) { focus(ex); try { ex.api.onArgs?.(args || {}); } catch (e) { console.error(e); } return ex; }
@@ -111,15 +116,17 @@ const WM = (() => {
       },
     };
   }
-  function focus(w) {
+  function focus(w, fromWm) {
     if (!w || !wins.has(w.id)) return;
     if (w.min) unminimize(w);
     const changed = activeId !== w.id;
     w.z = ++zTop; setZ(w);
     activeId = w.id;
     for (const x of wins.values()) x.el.classList.toggle('active', x === w);
-    if (!w.el.contains(document.activeElement)) w.body.focus({ preventScroll: true });
+    if (w.native) { if (!fromWm) NativeWin.focus(w.nid); }
+    else { if (!w.el.contains(document.activeElement)) w.body.focus({ preventScroll: true }); NativeWin.focus(0); }
     if (changed) bus.emit('wm');
+    NativeWin.schedule();
   }
   function focusTop() {
     let best = null;
@@ -131,33 +138,46 @@ const WM = (() => {
   function minimize(w) {
     if (w.min) return;
     w.min = true; const el = w.el;
-    const t = tbRect(w.appId);
+    if (w.native) { NativeWin.call('show', { id: w.nid, on: 0 }); el.classList.add('ghost'); }
+    const t = tbRect(tbId(w));
     if (!motionOff() && t && el.animate) {
       const r = el.getBoundingClientRect();
       const dx = t.left + t.width / 2 - (r.left + r.width / 2), dy = t.top + t.height / 2 - (r.top + r.height / 2);
       const a = el.animate([{ transform: 'none', opacity: 1 }, { transform: `translate(${dx}px, ${dy}px) scale(.1)`, opacity: 0 }], { duration: 230, easing: 'cubic-bezier(.4,0,.7,.2)' });
-      a.onfinish = () => { if (w.min) el.style.display = 'none'; };
-    } else el.style.display = 'none';
+      a.onfinish = () => { el.classList.remove('ghost'); if (w.min) el.style.display = 'none'; NativeWin.schedule(); };
+    } else { el.classList.remove('ghost'); el.style.display = 'none'; }
     el.classList.remove('active');
     if (activeId === w.id) { activeId = null; focusTop(); } else bus.emit('wm');
   }
   function unminimize(w) {
     if (!w.min) return;
     w.min = false; const el = w.el; el.style.display = '';
-    const t = tbRect(w.appId);
+    const t = tbRect(tbId(w));
+    // A program's window shows again when its stand-in has flown up from the taskbar.
+    const shown = () => { if (!w.native || w.min || !wins.has(w.id)) return; el.classList.remove('ghost'); NativeWin.call('show', { id: w.nid, on: 1 }); if (activeId === w.id) NativeWin.focus(w.nid); NativeWin.schedule(); };
+    if (w.native) el.classList.add('ghost');
     if (!motionOff() && t && el.animate) {
       const r = el.getBoundingClientRect();
       const dx = t.left + t.width / 2 - (r.left + r.width / 2), dy = t.top + t.height / 2 - (r.top + r.height / 2);
-      el.animate([{ transform: `translate(${dx}px, ${dy}px) scale(.1)`, opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 240, easing: 'cubic-bezier(.2,.8,.3,1)' });
-    }
+      const a = el.animate([{ transform: `translate(${dx}px, ${dy}px) scale(.1)`, opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 240, easing: 'cubic-bezier(.2,.8,.3,1)' });
+      a.onfinish = shown;
+    } else shown();
   }
   function toggleMax(w) {
     if (w.app.noResize) return;
-    animGeom(w);
+    if (!w.native) animGeom(w);
     if (w.state === 'max') { w.state = 'normal'; w.snap = w.preMaxSnap || null; }
     else if (w.snap) { w.snap = null; }
     else { w.preMaxSnap = null; w.state = 'max'; }
+    if (w.native) { nativeApply(w); return; }
     place(w); bus.emit('wm-resize', w);
+  }
+  /* Ask the window manager to put a program's window where this window manager wants it. */
+  function nativeApply(w) {
+    const st = w.full ? 3 : w.state === 'max' ? 1 : w.snap ? 2 : 0;
+    const back = w.normal || { x: w.x, y: w.y, w: w.w, h: w.h };
+    const r = st === 1 ? area() : st === 2 ? snapRect(w.snap) : back;
+    NativeWin.call('geom', { id: w.nid, x: r.x, y: r.y, w: r.w, h: r.h, state: st, rw: back.w, rh: back.h });
   }
   function snapTo(w, zone) {
     if (w.app.noResize && zone !== 'restore') return;
@@ -166,10 +186,12 @@ const WM = (() => {
     if (zone === 'max' || zone === 'top') { w.preMaxSnap = w.snap; w.state = 'max'; }
     else if (zone === 'restore') { w.state = 'normal'; w.snap = null; }
     else { w.state = 'normal'; w.snap = Array.isArray(zone) ? zone : ZONES[zone]; }
+    if (w.native) { w.full = false; nativeApply(w); focus(w); return; }
     place(w); focus(w); bus.emit('wm-resize', w);
   }
   async function close(w, force = false) {
     if (!w || w.closing || !wins.has(w.id)) return false;
+    if (w.native) { NativeWin.call('close', { id: w.nid }); return true; } // the program decides; its window goes when it closes
     if (!force && w.beforeClose) {
       focus(w);
       let ok = false;
@@ -297,7 +319,7 @@ const WM = (() => {
       'sep',
       { label: 'Snap left', icon: 'layout', disabled: w.app.noResize, action: () => snapTo(w, 'left') },
       { label: 'Snap right', icon: 'layout', disabled: w.app.noResize, action: () => snapTo(w, 'right') },
-      { label: 'Keep on top', icon: 'pin', checked: w.onTop, action: () => { w.onTop = !w.onTop; setZ(w); focus(w); } },
+      { label: 'Keep on top', icon: 'pin', checked: w.onTop, action: () => { w.onTop = !w.onTop; setZ(w); focus(w); NativeWin.schedule(); } },
       'sep',
       { label: 'Close', icon: 'x', action: () => close(w) },
     ], x, y);
@@ -370,7 +392,9 @@ const WM = (() => {
   }
   function relayout() {
     const A = area();
+    NativeWin.area(A);
     for (const w of wins.values()) {
+      if (w.native) { if (w.state === 'max' || w.snap) nativeApply(w); continue; }
       if (w.state === 'normal' && !w.snap) {
         w.w = Math.min(w.w, A.w); w.h = Math.min(w.h, A.h);
         w.x = clamp(w.x, A.x - w.w + 100, A.x + A.w - 100); w.y = clamp(w.y, A.y, Math.max(A.y, A.y + A.h - 40));
@@ -381,14 +405,75 @@ const WM = (() => {
   }
   window.addEventListener('resize', debounce(relayout, 60));
 
+  /* ---- programs' windows (drawn by nimbus-wm; see nwin.js) ---- */
+  const byNid = (nid) => wins.get('n' + nid);
+  function openNative(ev, appId) {
+    if (byNid(ev.id)) return byNid(ev.id);
+    const app = APPS[appId];
+    const w = { id: 'n' + ev.id, nid: ev.id, native: true, appId, app, x: ev.x, y: ev.y, w: ev.w, h: ev.h,
+      state: ev.state === 'max' ? 'max' : 'normal', snap: null, full: ev.state === 'full', min: !!ev.min, z: 0, onTop: false,
+      title: ev.title || app.name, parent: ev.parent || 0, pid: ev.pid || 0, cleanup: [], beforeClose: null, dirty: false, created: Date.now() };
+    if (ev.state === 'normal') w.normal = { x: ev.x, y: ev.y, w: ev.w, h: ev.h };
+    const card = h('div', { class: 'nwin-card' }, h('span', { class: 'nwin-icon', html: appIcon(app.icon) }), h('span', { class: 'nwin-title', text: w.title }));
+    const el = h('div', { class: 'win native', 'data-app': appId, 'aria-label': w.title }, card);
+    Object.assign(w, { el, titleEl: card.querySelector('.nwin-title'), body: el });
+    w.api = { id: w.id, win: w, el, body: el, close: () => close(w), onClose(fn) { w.cleanup.push(fn); }, focus: () => focus(w), isActive: () => activeId === w.id, setTitle() {}, on: () => () => {}, every: () => 0 };
+    wins.set(w.id, w);
+    layer().append(el);
+    place(w);
+    if (w.min) el.style.display = 'none';
+    else focus(w, true); // new windows get the keyboard from the window manager itself
+    bus.emit('wm-opened', w); bus.emit('wm');
+    return w;
+  }
+  function nativeGone(nid) {
+    const w = byNid(nid); if (!w) return;
+    for (const f of w.cleanup) { try { f(); } catch (e) { console.error(e); } }
+    wins.delete(w.id); w.el.remove();
+    if (activeId === w.id) { activeId = null; focusTop(); } else bus.emit('wm');
+    NativeWin.schedule();
+  }
+  function nativeTitle(nid, title) {
+    const w = byNid(nid); if (!w) return;
+    w.title = title || w.app.name; w.titleEl.textContent = w.title; w.el.setAttribute('aria-label', w.title);
+    bus.emit('wm-title', w);
+  }
+  function nativeGeom(ev) {
+    const w = byNid(ev.id); if (!w) return;
+    Object.assign(w, { x: ev.x, y: ev.y, w: ev.w, h: ev.h });
+    w.full = ev.state === 'full';
+    if (ev.state === 'normal') { w.state = 'normal'; w.snap = null; w.normal = { x: ev.x, y: ev.y, w: ev.w, h: ev.h }; }
+    else if (ev.state === 'max') { w.state = 'max'; w.snap = null; }
+    place(w); bus.emit('wm-resize', w);
+  }
+  // The window manager moves a program's window while its title bar is dragged; snapping works as for ours.
+  function nativeMoving(ev, done) {
+    const w = byNid(ev.id); if (!w) return;
+    w.x = ev.x; w.y = ev.y; place(w);
+    const A = area(); const px = ev.px, py = ev.py; const E = 8, C = 56;
+    let z = null;
+    if (px <= A.x + E) z = py < A.y + C ? 'tl' : py > A.y + A.h - C ? 'bl' : 'left';
+    else if (px >= A.x + A.w - E) z = py < A.y + C ? 'tr' : py > A.y + A.h - C ? 'br' : 'right';
+    else if (py <= A.y + E) z = 'top';
+    if (!done) { if (z !== w.dragZone) { w.dragZone = z; showPreview(w, z); } return; }
+    showPreview(w, null); w.dragZone = null;
+    if (z) snapTo(w, z === 'top' ? 'max' : z); else bus.emit('wm-move', w);
+  }
+
   return {
     open, focus, close, minimize, snapTo, toggleMax, taskView, showDesktop, keySnap, relayout, area, hideSnapFly,
+    openNative, nativeGone, nativeTitle, nativeGeom, nativeMoving, byNid, titleMenu,
+    zOf: (w) => w.z + (w.onTop ? 100000 : 0),
     list: () => [...wins.values()].sort((a, b) => a.created - b.created),
     get: (id) => wins.get(id),
     activeId: () => activeId,
     active: () => wins.get(activeId) || null,
     inTaskView: () => osEl().classList.contains('tv'),
-    async closeAll(force) { for (const w of [...wins.values()]) await close(w, force); },
+    async closeAll(force) {
+      for (const w of [...wins.values()]) await close(w, force);
+      // programs get a few seconds to close by themselves (Chrome saves its tabs)
+      for (let i = 0; i < 40 && [...wins.values()].some((w) => w.native); i++) await sleep(100);
+    },
     anyDirty: () => [...wins.values()].some((w) => w.dirty),
   };
 })();

@@ -47,6 +47,16 @@
 .win.anim { transition: left .2s cubic-bezier(.2, .8, .2, 1), top .2s cubic-bezier(.2, .8, .2, 1), width .2s cubic-bezier(.2, .8, .2, 1), height .2s cubic-bezier(.2, .8, .2, 1), border-radius .2s; }
 .win.opening { animation: winIn .18s cubic-bezier(.2, .8, .2, 1); }
 @keyframes winIn { from { opacity: 0; transform: scale(.95) translateY(8px); } }
+/* Programs' windows are drawn by the window manager above the page; their stand-ins here only show
+   in task view and while flying to or from the taskbar. */
+#windows > .win.native { background: transparent; box-shadow: none; pointer-events: none; min-width: 0; min-height: 0; overflow: visible; }
+#os.tv #windows > .win.native, #windows > .win.native.ghost { pointer-events: auto; }
+.nwin-card { display: none; position: absolute; inset: 0; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+  border-radius: var(--r-win); background: color-mix(in srgb, var(--surface) 93%, var(--wall-tint)); box-shadow: var(--shadow-win); }
+#os.tv .win.native .nwin-card, .win.native.ghost .nwin-card { display: flex; }
+.win.native.max .nwin-card { border-radius: 0; }
+.nwin-icon svg { width: 96px; height: 96px; }
+.nwin-title { max-width: 80%; font-size: 1.15rem; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .win-titlebar { height: 40px; flex: none; display: flex; align-items: center; gap: 10px; padding-left: 12px; touch-action: none; }
 .win-icon { width: 16px; height: 16px; flex: none; }
 .win-icon svg { width: 16px; height: 16px; }
@@ -413,6 +423,8 @@
 
 #nightlight { position: absolute; inset: 0; z-index: 95; pointer-events: none; mix-blend-mode: multiply; background: rgba(255, 140, 40, 0); transition: background .6s; }
 #dim { position: absolute; inset: 0; z-index: 96; pointer-events: none; background: #000; opacity: 0; transition: opacity .2s; }
+/* the window manager tints the whole screen, programs included */
+html.wm #dim, html.wm #nightlight { display: none; }
 
 /* ---------- Narrow screens ---------- */
 #tb-search.open-fly { background: none; }

@@ -26,7 +26,7 @@ function osSnapshot() {
     `Theme: ${S.data.theme} (showing ${effectiveTheme()}), accent ${S.data.accent}, wallpaper ${wallName(S.data.wallpaper)}.`,
     `Night light ${S.data.nightLight ? 'on' : 'off'}, Focus (do not disturb) ${S.data.dnd ? 'on' : 'off'}, energy saver ${S.data.energySaver ? 'on' : 'off'}, brightness ${S.data.brightness}%, volume ${S.data.volume}%, text size ${S.data.textSize}px.`,
     `Taskbar: ${S.data.tbAlign}-aligned at the ${S.data.tbPos}${S.data.tbFloat ? ', floating' : ''}.`,
-    `Apps you can open: ${Object.keys(APPS).filter((k) => appAvailable(k) && k !== 'assistant').map((k) => `${k} (${APPS[k].name})`).join(', ')}.`,
+    `Apps you can open: ${Object.keys(APPS).filter((k) => appListed(k) && k !== 'assistant').map((k) => `${k} (${APPS[k].name})`).join(', ')}.`,
     `Wallpapers: ${WALLS.map((w) => w.id).join(', ')}.`,
     `Open windows: ${wins.length ? wins.join('; ') : 'none'}.`,
     `Folders: /Desktop/, /Documents/, /Pictures/, /Downloads/${folders.length ? ', ' + folders.join(', ') : ''}.`,
@@ -35,7 +35,7 @@ function osSnapshot() {
   ].join('\n');
 }
 function assistantTools(log) {
-  const appIds = Object.keys(APPS).filter((k) => appAvailable(k) && k !== 'assistant');
+  const appIds = Object.keys(APPS).filter((k) => appListed(k) && k !== 'assistant');
   const ensureDir = (path) => {
     let cur = 'root';
     for (const seg of path.split('/').filter(Boolean)) {

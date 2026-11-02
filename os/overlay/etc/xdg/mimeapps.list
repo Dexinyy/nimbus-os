@@ -1,0 +1,6 @@
+# Web links open in Google Chrome (nimbus-open installs it first if needed); once Chrome is installed,
+# Nimbus also records it as the default browser in ~/.config/mimeapps.list.
+[Default Applications]
+x-scheme-handler/http=nimbus-web.desktop
+x-scheme-handler/https=nimbus-web.desktop
+text/html=nimbus-web.desktop

@@ -23,7 +23,7 @@ log() { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
 die() { printf '\033[1;31mError: %s\033[0m\n' "$*" >&2; exit 1; }
 
 [ "$(id -u)" -eq 0 ] || die "run this as root, for example: sudo ./build.sh"
-for tool in debootstrap mksquashfs grub-mkimage xorriso mformat mmd mcopy mkfs.msdos python3; do
+for tool in debootstrap mksquashfs grub-mkimage xorriso mformat mmd mcopy mkfs.msdos python3 curl gpg; do
   command -v "$tool" >/dev/null || die "missing tool: $tool (see the list at the top of this script)"
 done
 
@@ -115,17 +115,31 @@ PACKAGES=(
   fdisk e2fsprogs
   sudo locales tzdata kbd iproute2 ca-certificates less nano
   procps psmisc htop neofetch curl wget vim-tiny bash-completion
-  cage libgl1-mesa-dri libegl1 libegl-mesa0 libgles2 libgbm1
+  cage libwlroots12t64 libgl1-mesa-dri libegl1 libegl-mesa0 libgles2 libgbm1
   python3 python3-gi gir1.2-gtk-3.0 gir1.2-webkit2-4.1
   adwaita-icon-theme hicolor-icon-theme gsettings-desktop-schemas dconf-gsettings-backend shared-mime-info
   fontconfig fonts-dejavu-core
   gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-alsa
+  # What Google Chrome needs beyond the above, so installing it later only downloads Chrome itself
+  fonts-liberation libcups2t64 libnss3 libvulkan1 xdg-utils
 )
 if [ -n "$APT_CACHE" ]; then
   mkdir -p "$APT_CACHE/apt/partial"
   mount --bind "$(cd "$APT_CACHE/apt" && pwd)" "$CHROOT/var/cache/apt/archives"
 fi
 in_chroot apt-get install -y "${PACKAGES[@]}"
+
+log "Building the window manager (nimbus-wm)"
+WM_BUILD=(build-essential pkg-config libwlroots-dev wayland-protocols libwayland-bin)
+in_chroot apt-get install -y --no-install-recommends "${WM_BUILD[@]}"
+mkdir -p "$CHROOT/tmp/nimbus-wm"
+cp "$REPO/wm/Makefile" "$REPO/wm/nimbus-wm.c" "$CHROOT/tmp/nimbus-wm/"
+in_chroot make -C /tmp/nimbus-wm
+install -m 755 "$CHROOT/tmp/nimbus-wm/nimbus-wm" "$CHROOT/usr/bin/nimbus-wm"
+rm -rf "$CHROOT/tmp/nimbus-wm"
+in_chroot apt-get purge -y --auto-remove "${WM_BUILD[@]}"
+in_chroot ldd /usr/bin/nimbus-wm | grep -q "not found" && die "nimbus-wm is missing a library"
+
 if [ -n "$APT_CACHE" ]; then
   umount "$CHROOT/var/cache/apt/archives"
   rm -rf "$APT_CACHE/apt/partial" "$APT_CACHE/apt/lock"
@@ -141,8 +155,22 @@ echo "Etc/UTC" > "$CHROOT/etc/timezone"
 # Copy our files in as root, without touching the owner or rights of existing folders like /etc.
 tar -C "$HERE/overlay" --owner=0 --group=0 -cf - . | tar -C "$CHROOT" --no-overwrite-dir -xf -
 chmod 755 "$CHROOT/usr/bin/nimbus-shell" "$CHROOT/usr/bin/nimbus-session" "$CHROOT/usr/lib/nimbus/shell-debug" \
-  "$CHROOT/usr/lib/nimbus/test-wifi-ap" "$CHROOT/usr/lib/nimbus/nimbus-storage"
-chmod 440 "$CHROOT/etc/sudoers.d/nimbus-storage"
+  "$CHROOT/usr/lib/nimbus/test-wifi-ap" "$CHROOT/usr/lib/nimbus/nimbus-storage" "$CHROOT/usr/lib/nimbus/nimbus-apps" \
+  "$CHROOT/usr/lib/nimbus/nimbus-open"
+chmod 440 "$CHROOT/etc/sudoers.d/nimbus-storage" "$CHROOT/etc/sudoers.d/nimbus-apps"
+
+# Google Chrome can't be copied into this image, so Nimbus installs it from Google's repository when it's
+# first opened (usr/lib/nimbus/nimbus-apps). Its packages are checked with Google's RSA 4096 signing key.
+GOOGLE_KEY=EB4C1BFD4F042F6DDDCCEC917721F63BD38B4796
+GNUPGHOME="$(mktemp -d)"; export GNUPGHOME
+curl -fsSL --retry 3 https://dl.google.com/linux/linux_signing_key.pub -o "$GNUPGHOME/google.pub"
+gpg --batch --quiet --import "$GNUPGHOME/google.pub" 2>/dev/null || true
+gpg --batch --with-colons --list-keys "$GOOGLE_KEY" 2>/dev/null | grep -q "^fpr:::::::::$GOOGLE_KEY:" \
+  || die "Google's signing key did not have the expected fingerprint"
+mkdir -p "$CHROOT/usr/share/keyrings"
+gpg --batch --export "$GOOGLE_KEY" > "$CHROOT/usr/share/keyrings/google-chrome.gpg"
+rm -rf "$GNUPGHOME"; unset GNUPGHOME
+echo "Google's signing key: $GOOGLE_KEY"
 mkdir -p "$CHROOT/usr/share/nimbus" "$CHROOT/usr/share/fonts/truetype/nimbus" "$CHROOT/usr/share/doc/nimbus-os"
 cp -a "$WORK/shell" "$CHROOT/usr/share/nimbus/shell"
 cp "$HERE/fonts/"*.ttf "$HERE/fonts/"*-OFL.txt "$CHROOT/usr/share/fonts/truetype/nimbus/"

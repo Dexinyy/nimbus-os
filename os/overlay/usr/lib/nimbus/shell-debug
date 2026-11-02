@@ -1,5 +1,6 @@
-#!/bin/sh
+#!/bin/bash
 # Debug start-up only ("nimbus.debug" on the kernel command line): runs the desktop with the
-# Wayland messages about the keyboard, seat and window written to the system log.
-WAYLAND_DEBUG=client /usr/bin/nimbus-shell 2>&1 |
-  grep --line-buffered -E 'wl_keyboard|wl_seat|xdg_toplevel@[0-9]+\.configure|nimbus-shell|page:|Traceback|Error|error'
+# Wayland messages about the keyboard, seat and window written to the system log. The desktop
+# replaces this script, so the window manager sees its own exit status.
+export WAYLAND_DEBUG=client
+exec /usr/bin/nimbus-shell > >(grep --line-buffered -E 'wl_keyboard|wl_seat|xdg_toplevel@[0-9]+\.configure|nimbus-shell|page:|Traceback|Error|error') 2>&1

@@ -1,0 +1,183 @@
+#!/usr/bin/env python3
+"""Install, update and remove programs Nimbus OS offers but may not carry in its image: Google Chrome.
+
+Chrome's terms don't allow copying it into an image like Nimbus's, so it is downloaded from Google's own
+package repository on the computer that uses it, the way other Linux systems offer it. The repository
+is checked with Google's signing key, which the image carries (/usr/share/keyrings/google-chrome.gpg),
+and it is only added when Chrome is installed.
+
+Runs as root through sudo (/etc/sudoers.d/nimbus-apps). Prints one JSON object per line: progress
+({"app", "progress": 0-100, "text"}), then {"ok": true, ...} or {"ok": false, "error": "..."}.
+
+usage: nimbus-apps install|update|remove chrome
+"""
+import fcntl
+import json
+import os
+import subprocess
+import sys
+import threading
+
+KEYRING = "/usr/share/keyrings/google-chrome.gpg"
+SOURCES = "/etc/apt/sources.list.d/google-chrome.list"  # the name Chrome itself uses, so it adds no second one
+SOURCE_LINE = "deb [arch=amd64 signed-by=%s] https://dl.google.com/linux/chrome/deb/ stable main\n" % KEYRING
+# Chrome's package adds its own repository entry unless told not to; ours names the key it must be signed with.
+DEFAULTS = "/etc/default/google-chrome"
+PACKAGE = "google-chrome-stable"
+LOCK = "/run/nimbus-apps.lock"
+ENV = dict(os.environ, DEBIAN_FRONTEND="noninteractive", LC_ALL="C", LANG="C")
+ONLY_GOOGLE = ["-o", "Dir::Etc::SourceList=" + SOURCES, "-o", "Dir::Etc::SourceParts=-", "-o", "APT::Get::List-Cleanup=0"]
+
+
+class Failed(Exception):
+    pass
+
+
+def say(**msg):
+    print(json.dumps(msg), flush=True)
+
+
+def progress(pct, text):
+    say(app="chrome", progress=round(max(0.0, min(100.0, pct)), 1), text=text)
+
+
+def friendly(output):
+    """A sentence for the person, from apt's output."""
+    text = output.lower()
+    if any(s in text for s in ("could not resolve", "temporary failure resolving", "network is unreachable",
+                                "failed to fetch", "connection timed out", "unable to connect", "connection failed")):
+        return "Couldn't reach Google. Check that this computer is connected to the internet, then try again."
+    if "no space left" in text or "enough free space" in text:
+        return "There isn't enough free space to install Chrome."
+    if "no_pubkey" in text or "not signed" in text or "signatures couldn't be verified" in text or "badsig" in text:
+        return "Google's package list couldn't be verified, so nothing was installed."
+    lines = [line for line in output.strip().splitlines() if line.startswith(("E:", "dpkg:"))]
+    return lines[-1].split(":", 1)[1].strip() if lines else "Installing Chrome failed."
+
+
+def apt(args, lo, hi):
+    """Run apt-get; its own progress is reported between lo and hi percent. Returns (status, output)."""
+    r, w = os.pipe()
+    proc = subprocess.Popen(["apt-get", "-q", "-o", "APT::Status-Fd=%d" % w, "-o", "Dpkg::Use-Pty=0"] + args,
+                            pass_fds=(w,), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=ENV, text=True)
+    os.close(w)
+    out = []
+    reader = threading.Thread(target=lambda: out.append(proc.stdout.read()), daemon=True)
+    reader.start()
+    with os.fdopen(r, errors="replace") as status:
+        for line in status:
+            parts = line.strip().split(":", 3)
+            if len(parts) < 4:
+                continue
+            try:
+                pct = float(parts[2])
+            except ValueError:
+                continue
+            if parts[0] == "dlstatus":
+                progress(lo + (hi - lo) * 0.8 * pct / 100, "Downloading Google Chrome")
+            elif parts[0] == "pmstatus":
+                progress(lo + (hi - lo) * (0.8 + 0.2 * pct / 100), "Installing Google Chrome")
+    proc.wait()
+    reader.join()
+    return proc.returncode, "".join(out)
+
+
+def installed_version():
+    r = subprocess.run(["dpkg-query", "-W", "-f=${Status} ${Version}", PACKAGE], capture_output=True, text=True, env=ENV)
+    words = r.stdout.split()
+    return words[-1] if r.returncode == 0 and "installed" in words[:3] and len(words) >= 4 else None
+
+
+def add_repository():
+    if not os.path.exists(KEYRING):
+        raise Failed("Google's signing key is missing from this system.")
+    with open(DEFAULTS, "w") as f:
+        f.write('repo_add_once="false"\nrepo_reenable_on_distupgrade="false"\n')
+    with open(SOURCES, "w") as f:
+        f.write("# Google Chrome, added by Nimbus OS (checked with Google's signing key)\n" + SOURCE_LINE)
+
+
+def refresh_google(lo, hi):
+    status, out = apt(ONLY_GOOGLE + ["update"], lo, hi)
+    if status != 0 or "W: Failed to fetch" in out or "E: " in out:
+        raise Failed(friendly(out))
+
+
+def install_package(lo, hi, extra=()):
+    args = ["install", "-y", "--no-install-recommends", *extra, PACKAGE]
+    status, out = apt(args, lo, hi)
+    if status != 0 and "dpkg was interrupted" in out:
+        subprocess.run(["dpkg", "--configure", "-a"], env=ENV, capture_output=True)
+        status, out = apt(args, lo, hi)
+    if status != 0 and ("unmet dependencies" in out.lower() or "unable to locate package" in out.lower()
+                        or "has no installation candidate" in out.lower()):
+        # Chrome needs something the image doesn't have: read Ubuntu's package lists too, and try again
+        progress(lo, "Getting Ubuntu's package lists")
+        st, upd = apt(["update"], lo, lo + 1)
+        if st != 0 and "Failed to fetch" in upd:
+            raise Failed(friendly(upd))
+        status, out = apt(args, lo, hi)
+    if status != 0:
+        raise Failed(friendly(out))
+    return out
+
+
+def install():
+    progress(1, "Connecting to Google")
+    add_repository()
+    refresh_google(1, 5)
+    install_package(5, 99)
+    subprocess.run(["apt-get", "clean"], env=ENV, capture_output=True)  # the download, in memory on a live system
+    version = installed_version()
+    if not version:
+        raise Failed("Chrome didn't install.")
+    progress(100, "Google Chrome is installed")
+    say(ok=True, installed=True, version=version)
+
+
+def update():
+    before = installed_version()
+    if not before:
+        raise Failed("Chrome isn't installed.")
+    add_repository()
+    refresh_google(0, 5)
+    install_package(5, 99, ("--only-upgrade",))
+    subprocess.run(["apt-get", "clean"], env=ENV, capture_output=True)
+    after = installed_version()
+    say(ok=True, version=after, updated=after != before,
+        text=("updated from %s to %s" % (before, after)) if after != before else "up to date (%s)" % after)
+
+
+def remove():
+    if installed_version():
+        status, out = apt(["remove", "-y", PACKAGE], 0, 100)
+        if status != 0:
+            raise Failed(friendly(out))
+    for path in (SOURCES,):
+        if os.path.exists(path):
+            os.remove(path)
+    say(ok=True, installed=False)
+
+
+def main():
+    if len(sys.argv) != 3 or sys.argv[1] not in ("install", "update", "remove") or sys.argv[2] != "chrome":
+        say(ok=False, error="usage: nimbus-apps install|update|remove chrome")
+        return 2
+    if os.geteuid() != 0:
+        say(ok=False, error="nimbus-apps needs to run as root")
+        return 1
+    with open(LOCK, "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)  # one at a time
+        try:
+            {"install": install, "update": update, "remove": remove}[sys.argv[1]]()
+        except Failed as exc:
+            say(ok=False, error=str(exc))
+            return 1
+        except Exception as exc:  # report it rather than leave the desktop waiting
+            say(ok=False, error="Installing Chrome failed: %s" % exc)
+            return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

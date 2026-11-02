@@ -858,6 +858,12 @@ static void view_handle_request_maximize(struct wl_listener *l, void *data) {
 static void view_handle_request_fullscreen(struct wl_listener *l, void *data) {
 	struct view *v = wl_container_of(l, v, request_fullscreen);
 	struct server *s = v->server;
+	if (v->kind == VIEW_SHELL) {
+		/* the desktop covers the screen either way */
+		wlr_xdg_toplevel_set_fullscreen(v->toplevel, v->toplevel->requested.fullscreen);
+		wlr_xdg_toplevel_set_size(v->toplevel, s->screen.width, s->screen.height);
+		return;
+	}
 	if (v->kind != VIEW_APP) {
 		wlr_xdg_surface_schedule_configure(v->toplevel->base);
 		return;
@@ -1029,6 +1035,11 @@ static void handle_new_xdg_surface(struct wl_listener *l, void *data) {
 			wlr_xdg_toplevel_set_wm_capabilities(xs->toplevel, WLR_XDG_TOPLEVEL_WM_CAPABILITIES_WINDOW_MENU |
 				WLR_XDG_TOPLEVEL_WM_CAPABILITIES_MAXIMIZE | WLR_XDG_TOPLEVEL_WM_CAPABILITIES_FULLSCREEN |
 				WLR_XDG_TOPLEVEL_WM_CAPABILITIES_MINIMIZE);
+		/* wlroots announces a window at its first commit; it may have asked for a state before that */
+		if (xs->toplevel->requested.fullscreen)
+			view_configure(v, STATE_FULL, s->screen);
+		else if (xs->toplevel->requested.maximized)
+			view_configure(v, STATE_MAX, w);
 	}
 
 	hook(&xs->surface->events.map, &v->map, view_handle_map);

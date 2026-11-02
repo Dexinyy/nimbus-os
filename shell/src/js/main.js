@@ -81,6 +81,20 @@ function boot() {
       // Boot tests: "nimbus.test=wifi" joins the simulated access point the way the Wi-Fi menu does
       if (info.test === 'wifi') testWifi();
       if (info.test === 'storage') testStorage();
+      // Under the window manager real programs open as windows on this desktop (nwin.js)
+      NativeWin.init();
+      if (NativeWin.on) {
+        Native.call('wmReady').catch(() => {}); // windows that are already open (after the desktop restarts)
+        Apps.refresh();
+        // Chrome is the default browser: pin it for anyone whose taskbar was set up before it was there
+        if (!S.data.chromePinned) {
+          if (!S.data.pinned.includes('chrome')) S.set('pinned', ['chrome', ...S.data.pinned]);
+          if (!S.data.startPins.includes('chrome')) { S.set('startPins', ['chrome', ...S.data.startPins]); Start.render(); }
+          S.set('chromePinned', true);
+        }
+        Taskbar.render(); Start.render();
+      }
+      if (info.test === 'chrome') testChrome();
     });
     Net.refresh();
   } else if (S.data.lockOnStart) Power.lock();
