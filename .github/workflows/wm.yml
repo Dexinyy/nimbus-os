@@ -1,0 +1,47 @@
+name: Window manager
+
+on:
+  push:
+    paths: ["wm/**", ".github/workflows/wm.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: nimbus-wm-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  wm:
+    name: Build and test nimbus-wm
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          sudo sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+            build-essential pkg-config libwlroots-dev wayland-protocols libwayland-bin
+
+      - name: Bundle headers and the wlroots source for offline checks
+        run: |
+          make -C wm protocols
+          mkdir -p /tmp/hdr/include /tmp/hdr/src
+          cd /usr/include
+          cp -a wlr wayland-*.h xkbcommon libinput.h libudev.h libdrm xf86drm*.h pixman-1 EGL GLES2 KHR /tmp/hdr/include/ 2>/dev/null || true
+          cp "$GITHUB_WORKSPACE"/wm/*-protocol.h /tmp/hdr/include/
+          cd /tmp/hdr/src && apt-get source -qq --download-only wlroots >/dev/null 2>&1 || true
+          ls -la /tmp/hdr/src
+          tar -C /tmp/hdr -czf /tmp/headers.tar.gz .
+
+      - name: Upload the headers
+        uses: actions/upload-artifact@v4
+        with:
+          name: headers
+          path: /tmp/headers.tar.gz
+          retention-days: 7
+
+      - name: Build
+        run: make -C wm
