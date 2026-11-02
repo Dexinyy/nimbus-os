@@ -2,7 +2,7 @@
 # Boot a Nimbus OS ISO in virtual machines and check that it works.
 #   1. UEFI: start, open Start, Terminal and Settings, Alt+Tab, shut down
 #   2. BIOS: start, shut down
-#   3. Logs: start with the system log copied to the serial port (for diagnosing problems)
+#   3. Logs: the same as 1, with the system log and keyboard/focus events copied to the serial port
 # usage: os/test-boot.sh ISO [OUTDIR]     results: OUTDIR/*.png, *-serial.log, summary.md
 set -uo pipefail
 
@@ -51,8 +51,9 @@ fi
 run_vm bios short -boot d
 
 xorriso -osirrox on -indev "$ISO" -extract /casper/vmlinuz /tmp/nimbus-vmlinuz -extract /casper/initrd /tmp/nimbus-initrd >/dev/null 2>&1
-run_vm logs logs -kernel /tmp/nimbus-vmlinuz -initrd /tmp/nimbus-initrd \
-  -append "boot=casper noprompt console=tty0 console=ttyS0,115200 systemd.journald.forward_to_console=1 systemd.show_status=1"
+# Same steps again with the system log (and the desktop's keyboard and focus events) on the serial port
+run_vm logs full -kernel /tmp/nimbus-vmlinuz -initrd /tmp/nimbus-initrd \
+  -append "boot=casper noprompt nimbus.debug console=tty0 console=ttyS0,115200 systemd.journald.forward_to_console=1 systemd.show_status=1"
 
 cat "$OUTDIR/summary.md"
 exit "$FAILED"

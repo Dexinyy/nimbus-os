@@ -52,8 +52,17 @@ debootstrap --arch=amd64 --variant=minbase --components=main,restricted,universe
 
 mount -t proc proc "$CHROOT/proc"
 mount -t sysfs sysfs "$CHROOT/sys"
-mount --bind /dev "$CHROOT/dev"
-mount --bind /dev/pts "$CHROOT/dev/pts"
+# A private /dev: binding the build machine's own /dev would let package scripts
+# change its device permissions (systemd resets /dev/kvm, /dev/fuse and others).
+mount -t tmpfs -o mode=755,size=8M nimbusdev "$CHROOT/dev"
+for node in "null 1 3" "zero 1 5" "full 1 7" "random 1 8" "urandom 1 9" "tty 5 0"; do
+  read -r name major minor <<<"$node"
+  mknod -m 666 "$CHROOT/dev/$name" c "$major" "$minor"
+done
+mkdir -p "$CHROOT/dev/pts" "$CHROOT/dev/shm"
+mount -t devpts -o newinstance,ptmxmode=0666,mode=620 devpts "$CHROOT/dev/pts"
+ln -s pts/ptmx "$CHROOT/dev/ptmx"
+ln -s /proc/self/fd "$CHROOT/dev/fd"
 mount -t tmpfs tmpfs "$CHROOT/run"
 
 rm -f "$CHROOT/etc/apt/sources.list.d/"*.sources 2>/dev/null || true
@@ -154,6 +163,8 @@ printf '127.0.0.1 localhost\n127.0.1.1 nimbus\n::1 localhost ip6-localhost ip6-l
 in_chroot systemctl set-default graphical.target
 in_chroot systemctl enable nimbus-session.service systemd-networkd.service systemd-resolved.service systemd-timesyncd.service
 in_chroot systemctl mask systemd-networkd-wait-online.service
+# The ISO has no checksum list to verify, so this check would only report a failure at startup.
+in_chroot systemctl mask casper-md5check.service
 
 log "Building the startup image (initramfs)"
 KVER="$(ls "$CHROOT/usr/lib/modules" | sort -V | tail -n 1)"

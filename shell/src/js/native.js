@@ -29,6 +29,19 @@ const Native = (() => {
     },
     get live() { return !!(api.info && api.info.live); },
   };
+  // Debug start-up ("nimbus.debug" on the kernel command line): log keyboard and focus events to the system journal.
+  if (/[?&]debug=1\b/.test(location.search)) {
+    const log = (text) => { try { handler.postMessage(JSON.stringify({ id: 0, method: 'log', args: { text } })); } catch {} };
+    const where = () => { const a = document.activeElement; return a ? a.tagName.toLowerCase() + (a.className && typeof a.className === 'string' ? '.' + a.className.split(' ')[0] : '') : 'none'; };
+    for (const type of ['keydown', 'keyup']) {
+      window.addEventListener(type, (e) => log(`${type} key=${e.key} code=${e.code} repeat=${e.repeat} focus=${where()} hasFocus=${document.hasFocus()}`), true);
+    }
+    window.addEventListener('focus', () => log('window focus'));
+    window.addEventListener('blur', () => log('window blur'));
+    window.addEventListener('error', (e) => log(`error: ${e.message} at ${e.filename}:${e.lineno}`));
+    window.addEventListener('unhandledrejection', (e) => log(`unhandled rejection: ${e.reason && e.reason.message || e.reason}`));
+    log(`page loaded, hasFocus=${document.hasFocus()}`);
+  }
   return api;
 })();
 const IS_NATIVE = !!Native;

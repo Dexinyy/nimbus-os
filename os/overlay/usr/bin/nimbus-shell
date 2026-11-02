@@ -18,6 +18,7 @@ import time
 
 import gi
 
+gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 gi.require_version("WebKit2", "4.1")
 from gi.repository import Gdk, GLib, Gtk, WebKit2  # noqa: E402
@@ -27,6 +28,8 @@ SHELL_DIR = os.environ.get("NIMBUS_SHELL_DIR", "/usr/share/nimbus/shell")
 DATA_DIR = os.path.join(GLib.get_user_data_dir(), "nimbus")
 CACHE_DIR = os.path.join(GLib.get_user_cache_dir(), "nimbus")
 SOFTWARE = os.environ.get("NIMBUS_SOFTWARE") == "1" or not glob.glob("/dev/dri/renderD*")
+# Start with "nimbus.debug" on the kernel command line to log keyboard and focus events.
+DEBUG = bool(os.environ.get("NIMBUS_DEBUG")) or "nimbus.debug" in open("/proc/cmdline").read().split()
 VENDORS = {"0x8086": "Intel", "0x1002": "AMD", "0x10de": "NVIDIA", "0x1234": "QEMU", "0x1af4": "Virtio",
            "0x15ad": "VMware", "0x80ee": "VirtualBox", "0x1414": "Microsoft Hyper-V", "0x5143": "Qualcomm"}
 
@@ -130,6 +133,7 @@ def info():
         "timezone": timezone(),
         "battery": battery(),
         "software": SOFTWARE,
+        "debug": DEBUG,
     }
 
 
@@ -174,9 +178,24 @@ class Shell:
         self.window.set_default_size(1280, 800)
         self.window.add(self.view)
         self.window.connect("destroy", Gtk.main_quit)
+        if DEBUG:
+            for name in ("key-press-event", "key-release-event"):
+                self.window.connect(name, self.debug_key)
+            for widget, label in ((self.window, "window"), (self.view, "page")):
+                widget.connect("focus-in-event", lambda *_a, l=label: print("nimbus-shell: focus in:", l) and False)
+                widget.connect("focus-out-event", lambda *_a, l=label: print("nimbus-shell: focus out:", l) and False)
         self.window.show_all()
         self.window.fullscreen()
-        self.view.load_uri(GLib.filename_to_uri(os.path.join(SHELL_DIR, "index.html"), None))
+        self.view.grab_focus()  # keys go to the desktop from the first press
+        uri = GLib.filename_to_uri(os.path.join(SHELL_DIR, "index.html"), None)
+        self.view.load_uri(uri + ("?debug=1" if DEBUG else ""))
+
+    def debug_key(self, window, event):
+        focus = window.get_focus()
+        print("nimbus-shell: %s %s (focus: %s, active: %s)" % (
+            "down" if event.type == Gdk.EventType.KEY_PRESS else "up", Gdk.keyval_name(event.keyval),
+            type(focus).__name__ if focus else None, window.is_active()))
+        return False
 
     # ---- page <-> machine ----
     def on_message(self, _manager, value):
