@@ -11,7 +11,7 @@ const APPS = {
   mines: { name: 'Mines', icon: 'mines', mount: mountMines, size: [330, 470], single: true, noResize: true, desc: 'Clear the field without hitting a mine.', keywords: 'game minesweeper puzzle play' },
   taskmgr: { name: 'Task Manager', icon: 'taskmgr', mount: mountTaskmgr, size: [820, 560], minSize: [480, 360], single: true, desc: 'See open apps and live performance.', keywords: 'processes performance memory fps end task' },
   assistant: { name: 'Assistant', icon: 'assistant', mount: mountAssistant, size: [460, 640], minSize: [340, 400], single: true, requires: 'sample', desc: 'Ask questions or have it operate the OS for you.', keywords: 'ai help chat ask claude copilot' },
-  welcome: { name: 'Welcome', icon: 'welcome', mount: mountWelcome, size: [880, 640], minSize: [420, 400], single: true, desc: 'Set up your OS and learn what it can do.', keywords: 'tips getting started setup tour' },
+  welcome: { name: 'Welcome', icon: 'welcome', mount: mountWelcome, size: [880, 660], minSize: [420, 400], single: true, desc: 'Set up your OS and learn what it can do.', keywords: 'tips getting started setup tour' },
 };
 function appAvailable(id) { const a = APPS[id]; return !!a && (!a.requires || !!caps[a.requires]); }
 

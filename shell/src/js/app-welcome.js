@@ -33,8 +33,8 @@ function mountWelcome(root, api) {
     const field = (label, el, forId) => h('div', { class: 'wl-field' }, forId ? h('label', { for: forId, text: label }) : h('span', { class: 'lbl', text: label }), el);
     const left = h('section', { class: 'wl-card' }, h('h2', { text: 'Make it yours' }),
       field('Name your OS', osInp, osInp.id), field('What should we call you?', nameInp, nameInp.id),
-      IS_NATIVE ? field('Time zone', buildTzSelect(api.id + '-tz'), api.id + '-tz') : null,
-      field('Theme', theme), field('Accent color', sw), field('Wallpaper', walls));
+      IS_NATIVE ? h('div', { class: 'wl-row' }, field('Time zone', buildTzSelect(api.id + '-tz'), api.id + '-tz'), field('Theme', theme)) : field('Theme', theme),
+      field('Accent color', sw), field('Wallpaper', walls));
     const list = h('ul', { class: 'wl-list' });
     for (const [ic, t, d] of features()) list.append(h('li', {}, h('span', { class: 'wl-ic', html: ui(ic) }), h('div', {}, h('b', { text: t }), h('span', { class: 'muted', text: d }))));
     const right = h('section', { class: 'wl-card' }, h('h2', { text: 'What is better here' }), list);
