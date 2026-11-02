@@ -18,12 +18,17 @@ import time
 
 import gi
 
+sys.path.insert(0, os.environ.get("NIMBUS_LIB_DIR", "/usr/lib/nimbus"))
+import nimbus_term  # noqa: E402
+
 gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 gi.require_version("WebKit2", "4.1")
 from gi.repository import Gdk, GLib, Gtk, WebKit2  # noqa: E402
 
 VERSION = "0.1"
+# Calls that are quick and touch state shared with the main loop run on the main thread.
+MAIN_THREAD = {"termOpen", "termInput", "termResize", "termClose", "log"}
 SHELL_DIR = os.environ.get("NIMBUS_SHELL_DIR", "/usr/share/nimbus/shell")
 DATA_DIR = os.path.join(GLib.get_user_data_dir(), "nimbus")
 CACHE_DIR = os.path.join(GLib.get_user_cache_dir(), "nimbus")
@@ -174,12 +179,16 @@ class Shell:
         self.view.connect("context-menu", self.on_context_menu)
         self.view.connect("decide-policy", self.on_policy)
         self.view.connect("web-process-terminated", self.on_crash)
-        self.view.connect("load-changed", self.on_load_changed)
-        self.keyboard_woken = False
         self.window = Gtk.Window(title="Nimbus")
         self.window.set_default_size(1280, 800)
         self.window.add(self.view)
-        self.window.connect("destroy", Gtk.main_quit)
+        self.window.connect("destroy", self.on_destroy)
+        self.terminals = nimbus_term.Terminals(
+            emit=self.emit,
+            watch=lambda fd, callback: GLib.io_add_watch(fd, GLib.PRIORITY_DEFAULT, GLib.IO_IN | GLib.IO_HUP | GLib.IO_ERR,
+                                                         lambda *_: callback()),
+            unwatch=GLib.source_remove,
+            later=lambda ms, fn: GLib.timeout_add(ms, lambda: fn() and False))
         if DEBUG:
             for name in ("key-press-event", "key-release-event"):
                 self.window.connect(name, self.debug_key)
@@ -213,6 +222,12 @@ class Shell:
         if not handler:
             self.reply(mid, False, "Unknown method: " + method)
             return
+        if method in MAIN_THREAD:
+            try:
+                self.reply(mid, True, handler(args))
+            except Exception as exc:
+                self.reply(mid, False, str(exc))
+            return
 
         def run():
             try:
@@ -243,6 +258,27 @@ class Shell:
             except (TypeError, AttributeError):
                 continue
         print("nimbus-shell: could not reply to the page", file=sys.stderr)
+
+    def emit(self, name, data):
+        """Send an event to the page (it arrives on the page's bus as 'native:<name>')."""
+        self.run_js("window.__nimbusNative && window.__nimbusNative.event(%s, %s);" % (json.dumps(name), json.dumps(data)))
+
+    def on_destroy(self, *_):
+        self.terminals.close_all()
+        Gtk.main_quit()
+
+    # ---- terminals (bash in a pseudo-terminal, see nimbus_term.py) ----
+    def m_termOpen(self, args):
+        return self.terminals.open(args.get("cols", 80), args.get("rows", 24))
+
+    def m_termInput(self, args):
+        return self.terminals.input(args.get("id"), args.get("data", ""))
+
+    def m_termResize(self, args):
+        return self.terminals.resize(args.get("id"), args.get("cols"), args.get("rows"))
+
+    def m_termClose(self, args):
+        return self.terminals.close(args.get("id"))
 
     def m_info(self, _args):
         return info()
@@ -277,25 +313,8 @@ class Shell:
         return True
 
     def restart(self):
+        self.terminals.close_all()
         os.execv(sys.executable, [sys.executable] + sys.argv)
-
-    # ---- keyboard focus ----
-    def on_load_changed(self, _view, event):
-        if event == WebKit2.LoadEvent.FINISHED and not self.keyboard_woken:
-            self.keyboard_woken = True
-            GLib.timeout_add(300, self.wake_keyboard)
-
-    def wake_keyboard(self):
-        # The compositor gives this window keyboard focus only when the first key arrives, and that
-        # key press is spent on it. Sending one harmless Shift press first means no real key is lost.
-        if shutil.which("wtype"):
-            try:
-                subprocess.Popen(["wtype", "-k", "Shift_L"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                if DEBUG:
-                    print("nimbus-shell: sent a Shift press to wake the keyboard")
-            except OSError as exc:
-                print("nimbus-shell: could not wake the keyboard:", exc, file=sys.stderr)
-        return False
 
     # ---- guard rails ----
     def on_context_menu(self, _view, _menu, _event, hit):

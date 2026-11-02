@@ -7,12 +7,16 @@ export LANG="${LANG:-en_US.UTF-8}"
 export XCURSOR_THEME="${XCURSOR_THEME:-Adwaita}"
 export XCURSOR_SIZE="${XCURSOR_SIZE:-24}"
 export WLR_RENDERER_ALLOW_SOFTWARE=1
-export WLR_LIBINPUT_NO_DEVICES=1
+# Only when there is truly nothing to type or point with: with this set, wlroots also skips
+# its first look for input devices, and the keyboard and mouse would wake up only on first use.
+ls /dev/input/event* >/dev/null 2>&1 || export WLR_LIBINPUT_NO_DEVICES=1
 export NO_AT_BRIDGE=1
 export PYTHONUNBUFFERED=1
 
 software() {
   export WLR_RENDERER=pixman NIMBUS_SOFTWARE=1 WEBKIT_DISABLE_DMABUF_RENDERER=1 LIBGL_ALWAYS_SOFTWARE=1
+  # Virtual graphics cards (VirtualBox especially) can hide a hardware mouse pointer; draw it ourselves.
+  export WLR_NO_HARDWARE_CURSORS=1
 }
 
 # Use the graphics card only for drivers known to work well; virtual machines and

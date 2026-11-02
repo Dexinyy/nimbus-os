@@ -10,6 +10,7 @@ const Native = (() => {
   window.__nimbusNative = {
     resolve(id, data) { const p = pending.get(id); if (!p) return; pending.delete(id); clearTimeout(p.t); p.resolve(data); },
     reject(id, msg) { const p = pending.get(id); if (!p) return; pending.delete(id); clearTimeout(p.t); p.reject(new Error(msg || 'The system refused')); },
+    event(name, data) { bus.emit('native:' + name, data); },
   };
   const api = {
     info: null,

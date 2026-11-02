@@ -904,7 +904,7 @@ window.addEventListener('keydown', (e) => {
     if (e.altKey && e.key === 'F4') { e.preventDefault(); altF4(); return; }
   }
   const k = (e.key || '').toLowerCase(), mod = e.ctrlKey || e.metaKey;
-  if (mod && !e.altKey && !e.shiftKey && k === 'k') { e.preventDefault(); Flyouts.toggle('start'); return; }
+  if (mod && !e.altKey && !e.shiftKey && k === 'k' && !e.target.closest?.('.rterm')) { e.preventDefault(); Flyouts.toggle('start'); return; }
   if (e.ctrlKey && e.altKey && k === 't') { e.preventDefault(); WM.open('terminal'); return; }
   if (e.ctrlKey && e.altKey && k === 'd') { e.preventDefault(); WM.showDesktop(); return; }
   if (e.ctrlKey && e.altKey && k === 'l') { e.preventDefault(); Power.lock(); return; }

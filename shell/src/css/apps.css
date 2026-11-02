@@ -271,6 +271,24 @@
 .term-ps { white-space: pre; flex: none; }
 .term-in { flex: 1; min-width: 40px; border: 0; outline: none; background: none; color: #f1f4fa; font: inherit; padding: 0; caret-color: var(--accent-hi); }
 .term ::selection { background: rgba(var(--accent-rgb), .45); }
+/* Real terminal (installed OS) */
+.app-rterm { --rt-fg: #d6dbe7; --rt-bg: #11131a; }
+.rterm { flex: 1; min-height: 0; position: relative; display: flex; }
+.rt-scroll { flex: 1; min-width: 0; overflow-y: auto; overflow-x: hidden; padding: 8px 10px; cursor: text; }
+.rt-back, .rt-screen { font-family: var(--font-mono); font-size: 14px; line-height: 18px; white-space: pre; font-variant-ligatures: none; }
+.rt-screen { position: relative; }
+.rt-row { height: 18px; overflow: hidden; }
+.rt-row span, .rt-probe { white-space: pre; }
+.rt-w2 { display: inline-block; width: 2ch; text-align: center; overflow: hidden; vertical-align: top; }
+.rt-probe { position: absolute; visibility: hidden; }
+.rterm.alt .rt-back { display: none; } /* full-screen programs (nano, less, top) fill the window */
+.rt-row ::selection, .rt-back ::selection { background: rgba(var(--accent-rgb), .5); }
+.rt-cursor { position: absolute; left: 0; top: 0; width: 1ch; height: 18px; border: 1.5px solid var(--accent-hi); border-radius: 2px; pointer-events: none; }
+.rterm.focused .rt-cursor { background: var(--accent-hi); border-color: var(--accent-hi); opacity: .75; animation: rt-blink 1.1s steps(1) infinite; }
+@keyframes rt-blink { 50% { opacity: 0; } }
+.rt-input { position: absolute; left: 0; top: 0; width: 1px; height: 18px; opacity: 0; border: 0; padding: 0; resize: none; overflow: hidden; pointer-events: none; }
+.rterm.bell .rt-scroll { animation: rt-bell .25s ease; }
+@keyframes rt-bell { 50% { background: rgba(255, 255, 255, .06); } }
 
 /* ---------- Task Manager ---------- */
 .app-taskmgr { display: flex; flex-direction: column; }

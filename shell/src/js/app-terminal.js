@@ -1,6 +1,7 @@
 /* ========== Terminal ========== */
 const BOOT_TIME = Date.now();
 function mountTerminal(root, api, args) {
+  if (IS_NATIVE) return mountRealTerminal(root, api, args);
   let cwd = FS.isFolder(args.cwd) ? args.cwd : 'root';
   const hist = []; let hi = 0; let busy = null;
   root.classList.add('app-term');
@@ -124,4 +125,156 @@ function mountTerminal(root, api, args) {
   setPS();
   if (args.run) exec(args.run).then(setPS);
   requestAnimationFrame(() => inp.focus({ preventScroll: true }));
+}
+
+
+/* ========== Real terminal (installed OS) ==========
+   bash runs in a pseudo-terminal on the computer (nimbus-shell, nimbus_term.py keeps the screen).
+   Updates arrive as 'native:term' events with changed rows as [text, fg, bg, flags, wide?] runs. */
+const TERM_COLORS = ['#1c1f2b', '#ff6b7a', '#4fdc8f', '#f5c451', '#62a8ff', '#c98bf0', '#3fd0d4', '#c9cfdb',
+  '#5d6577', '#ff8f9b', '#7deaae', '#ffd97a', '#8fc1ff', '#dcaaf5', '#7ae3e6', '#ffffff'];
+function termColor(c) {
+  if (c === -1 || c == null) return null;
+  if (typeof c === 'string') return c;
+  if (c < 16) return TERM_COLORS[c];
+  if (c < 232) { c -= 16; const v = (n) => (n ? n * 40 + 55 : 0); return `rgb(${v(Math.floor(c / 36))},${v(Math.floor(c / 6) % 6)},${v(c % 6)})`; }
+  const l = (c - 232) * 10 + 8; return `rgb(${l},${l},${l})`;
+}
+const TERM_KEYS = { Enter: '\r', Tab: '\t', Escape: '\x1b', Insert: '\x1b[2~', Delete: '\x1b[3~', PageUp: '\x1b[5~', PageDown: '\x1b[6~',
+  F1: '\x1bOP', F2: '\x1bOQ', F3: '\x1bOR', F4: '\x1bOS', F5: '\x1b[15~', F6: '\x1b[17~', F7: '\x1b[18~', F8: '\x1b[19~', F9: '\x1b[20~', F10: '\x1b[21~', F11: '\x1b[23~', F12: '\x1b[24~' };
+const TERM_ARROWS = { ArrowUp: 'A', ArrowDown: 'B', ArrowRight: 'C', ArrowLeft: 'D', Home: 'H', End: 'F' };
+function termKey(e, appCursor) {
+  const k = e.key, mod = (e.shiftKey ? 1 : 0) | (e.altKey ? 2 : 0) | (e.ctrlKey ? 4 : 0);
+  if (TERM_ARROWS[k]) { const l = TERM_ARROWS[k]; return mod ? `\x1b[1;${mod + 1}${l}` : (appCursor ? '\x1bO' : '\x1b[') + l; }
+  if (k === 'Backspace') return e.ctrlKey ? '\x08' : (e.altKey ? '\x1b\x7f' : '\x7f');
+  if (k === 'Tab' && e.shiftKey) return '\x1b[Z';
+  if (TERM_KEYS[k]) return (e.altKey && k.length > 1 && k.startsWith('F') === false ? '\x1b' : '') + TERM_KEYS[k];
+  if (e.ctrlKey && !e.altKey && !e.metaKey && k.length === 1) {
+    const c = k.toLowerCase();
+    if (c >= 'a' && c <= 'z') return String.fromCharCode(c.charCodeAt(0) - 96);
+    const special = { ' ': '\x00', '@': '\x00', '2': '\x00', '[': '\x1b', '3': '\x1b', '\\': '\x1c', '4': '\x1c', ']': '\x1d', '5': '\x1d', '^': '\x1e', '6': '\x1e', '_': '\x1f', '-': '\x1f', '7': '\x1f', '/': '\x1f', '8': '\x7f' };
+    if (special[c]) return special[c];
+  }
+  if (e.altKey && !e.ctrlKey && !e.metaKey && k.length === 1) return '\x1b' + k;
+  return null; // printable text arrives through the input event instead
+}
+function mountRealTerminal(root, api, args) {
+  root.classList.add('app-term', 'app-rterm');
+  root.innerHTML = `<div class="rterm" role="application" aria-label="Terminal"><div class="rt-scroll"><div class="rt-back"></div><div class="rt-screen"><div class="rt-cursor"></div><textarea class="rt-input" aria-label="Terminal input" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false"></textarea></div></div></div>`;
+  const box = root.querySelector('.rterm'), scroller = root.querySelector('.rt-scroll'), back = root.querySelector('.rt-back');
+  const screen = root.querySelector('.rt-screen'), cursor = root.querySelector('.rt-cursor'), input = root.querySelector('.rt-input');
+  let id = null, cols = 0, rows = 0, appCursor = false, paste = false, composing = false, closed = false, cw = 8, lh = 18, title = '';
+  const rowEls = [];
+  const send = (data) => { if (id != null && data) Native.call('termInput', { id, data }).catch(() => {}); };
+
+  function measure() {
+    const probe = h('span', { class: 'rt-probe', text: 'MMMMMMMMMM' });
+    screen.append(probe); cw = probe.getBoundingClientRect().width / 10 || 8; probe.remove();
+    lh = parseFloat(getComputedStyle(screen).lineHeight) || 18;
+  }
+  function fit() {
+    const st = getComputedStyle(scroller);
+    const w = scroller.clientWidth - parseFloat(st.paddingLeft) - parseFloat(st.paddingRight);
+    const hh = scroller.clientHeight - parseFloat(st.paddingTop) - parseFloat(st.paddingBottom);
+    return [Math.max(10, Math.floor(w / cw)), Math.max(3, Math.floor(hh / lh))];
+  }
+  function setRows(n) {
+    while (rowEls.length < n) { const r = h('div', { class: 'rt-row' }); screen.insertBefore(r, cursor); rowEls.push(r); }
+    while (rowEls.length > n) rowEls.pop().remove();
+  }
+  function paintRow(el, runs) {
+    const frag = document.createDocumentFragment();
+    for (const [text, fg, bg, flags, wide] of runs) {
+      const span = document.createElement('span');
+      let f = termColor(fg), b = termColor(bg);
+      if (flags & 16) { const t = f || 'var(--rt-fg)'; f = b || 'var(--rt-bg)'; b = t; }
+      if (f) span.style.color = f;
+      if (b) span.style.background = b;
+      if (flags & 1) span.style.fontWeight = '700';
+      if (flags & 2) span.style.opacity = '.62';
+      if (flags & 4) span.style.fontStyle = 'italic';
+      if (flags & 40) span.style.textDecoration = [(flags & 8) && 'underline', (flags & 32) && 'line-through'].filter(Boolean).join(' ');
+      if (flags & 64) span.style.visibility = 'hidden';
+      if (wide === 2) span.className = 'rt-w2';
+      span.textContent = text;
+      frag.append(span);
+    }
+    el.replaceChildren(frag);
+  }
+  function atBottom() { return scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 4; }
+  function apply(u) {
+    const stick = atBottom();
+    if (u.rows !== rowEls.length) setRows(u.rows);
+    if (u.clearBack) back.replaceChildren();
+    for (const runs of u.scrolled || []) { const r = h('div', { class: 'rt-row' }); paintRow(r, runs); back.append(r); }
+    while (back.childElementCount > 5000) back.firstElementChild.remove();
+    for (const [y, runs] of Object.entries(u.lines || {})) { const el = rowEls[+y]; if (el) paintRow(el, runs); }
+    const [x, y, visible] = u.cursor;
+    cursor.style.transform = `translate(${x * cw}px, ${y * lh}px)`;
+    cursor.hidden = !visible;
+    input.style.transform = cursor.style.transform;
+    appCursor = u.appCursor; paste = u.paste;
+    box.classList.toggle('alt', !!u.alt);
+    if (u.title !== title) { title = u.title; api.setTitle(title ? `${title} – Terminal` : 'Terminal'); }
+    if (u.bell) { box.classList.remove('bell'); void box.offsetWidth; box.classList.add('bell'); }
+    if (stick) scroller.scrollTop = scroller.scrollHeight;
+  }
+  const resize = debounce(() => {
+    if (id == null || closed) return;
+    const [c, r] = fit();
+    if (c === cols && r === rows) return;
+    cols = c; rows = r;
+    Native.call('termResize', { id, cols, rows }).catch(() => {});
+  }, 60);
+
+  input.addEventListener('keydown', (e) => {
+    if (e.isComposing || composing) return;
+    const k = e.key.toLowerCase();
+    if (e.ctrlKey && e.shiftKey && k === 'c') { e.preventDefault(); copySel(); return; }
+    if (e.ctrlKey && e.shiftKey && k === 'v') { e.preventDefault(); pasteClip(); return; }
+    if (e.shiftKey && (e.key === 'PageUp' || e.key === 'PageDown')) { e.preventDefault(); scroller.scrollTop += (e.key === 'PageUp' ? -1 : 1) * scroller.clientHeight * 0.9; return; }
+    const seq = termKey(e, appCursor);
+    if (seq != null) { e.preventDefault(); e.stopPropagation(); send(seq); scroller.scrollTop = scroller.scrollHeight; }
+  });
+  input.addEventListener('input', () => { if (composing) return; const v = input.value; input.value = ''; if (v) { send(v.replace(/\n/g, '\r')); scroller.scrollTop = scroller.scrollHeight; } });
+  input.addEventListener('compositionstart', () => { composing = true; });
+  input.addEventListener('compositionend', (e) => { composing = false; input.value = ''; send(e.data); });
+  input.addEventListener('paste', (e) => { e.preventDefault(); typeText(e.clipboardData?.getData('text/plain') || ''); });
+  function typeText(t) { if (!t) return; t = t.replace(/\r?\n/g, '\r'); send(paste ? `\x1b[200~${t}\x1b[201~` : t); }
+  function copySel() { const t = window.getSelection()?.toString(); if (t) navigator.clipboard?.writeText(t).catch(() => {}); }
+  async function pasteClip() { try { typeText(await navigator.clipboard.readText()); } catch { Notif.push({ app: 'terminal', title: 'Could not paste', body: 'Use Ctrl+Shift+V or the right-click menu.', silent: true }); } }
+  box.addEventListener('mouseup', () => { if (!window.getSelection()?.toString()) input.focus({ preventScroll: true }); });
+  api.body.addEventListener('focus', () => input.focus({ preventScroll: true }));
+  box.addEventListener('focusin', () => box.classList.add('focused'));
+  box.addEventListener('focusout', () => box.classList.remove('focused'));
+  box.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    const sel = window.getSelection()?.toString();
+    Menu.show([
+      { label: 'Copy', icon: 'copy', disabled: !sel, action: copySel },
+      { label: 'Paste', icon: 'paste', action: pasteClip },
+      'sep',
+      { label: 'Clear scrollback', icon: 'trash', action: () => back.replaceChildren() },
+    ], e.clientX, e.clientY);
+  });
+  api.on('native:term', (u) => { if (u.id === id) apply(u); });
+  api.on('native:term-exit', (u) => { if (u.id !== id) return; closed = true; api.close(true); });
+  api.onClose(() => { if (id != null && !closed) Native.call('termClose', { id }).catch(() => {}); closed = true; });
+  new ResizeObserver(resize).observe(scroller);
+
+  requestAnimationFrame(async () => {
+    try { await document.fonts.load(`14px ${getComputedStyle(screen).fontFamily}`); } catch {}
+    measure();
+    [cols, rows] = fit();
+    setRows(rows);
+    try {
+      ({ id } = await Native.call('termOpen', { cols, rows }));
+      if (closed) { Native.call('termClose', { id }).catch(() => {}); return; }
+      if (args.run) send(args.run + '\r');
+      resize();
+    } catch (e) {
+      rowEls[0]?.replaceChildren(document.createTextNode('Could not start the terminal: ' + e.message));
+    }
+    input.focus({ preventScroll: true });
+  });
 }

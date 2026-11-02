@@ -112,7 +112,8 @@ PACKAGES=(
   casper user-setup initramfs-tools
   systemd-sysv systemd-resolved systemd-timesyncd udev dbus dbus-user-session libpam-systemd polkitd kmod
   sudo locales tzdata kbd iproute2 ca-certificates less nano
-  cage wtype libgl1-mesa-dri libegl1 libegl-mesa0 libgles2 libgbm1
+  procps psmisc htop neofetch curl wget vim-tiny bash-completion
+  cage libgl1-mesa-dri libegl1 libegl-mesa0 libgles2 libgbm1
   python3 python3-gi gir1.2-gtk-3.0 gir1.2-webkit2-4.1
   adwaita-icon-theme hicolor-icon-theme gsettings-desktop-schemas dconf-gsettings-backend shared-mime-info
   fontconfig fonts-dejavu-core

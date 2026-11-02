@@ -17,7 +17,12 @@ import time
 
 from PIL import Image
 
-QCODES = {" ": "spc", "\n": "ret", "-": "minus", ".": "dot", "/": "slash", ",": "comma", "=": "equal", ";": "semicolon"}
+QCODES = {" ": "spc", "\n": "ret", "\t": "tab", "-": "minus", ".": "dot", "/": "slash", ",": "comma", "=": "equal", ";": "semicolon",
+          "'": "apostrophe", "\\": "backslash", "`": "grave_accent", "[": "bracket_left", "]": "bracket_right"}
+# Characters typed with Shift held, on a US keyboard
+SHIFTED = {"!": "1", "@": "2", "#": "3", "$": "4", "%": "5", "^": "6", "&": "7", "*": "8", "(": "9", ")": "0",
+           "_": "minus", "+": "equal", ":": "semicolon", '"': "apostrophe", "<": "comma", ">": "dot", "?": "slash",
+           "|": "backslash", "~": "grave_accent", "{": "bracket_left", "}": "bracket_right"}
 
 
 class VM:
@@ -88,6 +93,8 @@ class VM:
                 self.key("shift", ch.lower()) if ch.isupper() else self.key(ch)
             elif ch.isdigit():
                 self.key(ch)
+            elif ch in SHIFTED:
+                self.key("shift", SHIFTED[ch])
             else:
                 self.key(QCODES[ch])
 
@@ -100,6 +107,18 @@ class VM:
         except (EOFError, OSError, ValueError):
             return True
         return False
+
+
+def changed(path_a, path_b):
+    """Share of the screen that differs between two screenshots (0..1)."""
+    try:
+        a = Image.open(path_a).convert("L").resize((160, 100))
+        b = Image.open(path_b).convert("L").resize((160, 100))
+    except OSError:
+        return 0.0
+    pa, pb = a.load(), b.load()
+    diff = sum(1 for x in range(160) for y in range(100) if abs(pa[x, y] - pb[x, y]) > 24)
+    return diff / 16000
 
 
 def main():
@@ -161,11 +180,15 @@ def main():
         vm.key("meta_l")
         time.sleep(1.5 * slow)
         snap("03-start-menu")
+        share = changed(os.path.join(outdir, f"{name}-02-desktop.png"), os.path.join(outdir, f"{name}-03-start-menu.png"))
+        note("The first Windows key press opens Start", share > 0.05, f"{share:.0%} of the screen changed")
         vm.type("terminal")
         time.sleep(1.2 * slow)
         vm.key("ret")
         time.sleep(2.5 * slow)
         vm.type("neofetch\n")
+        time.sleep(3 * slow)
+        vm.type("echo $USER on $(uname -sr), sudo says $(sudo -n whoami)\n")
         time.sleep(1.5 * slow)
         snap("04-terminal")
         vm.key("meta_l")
