@@ -26,14 +26,15 @@ jobs:
           sudo sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources
           sudo apt-get update -qq
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
-            build-essential pkg-config libwlroots-dev wayland-protocols libwayland-bin
+            build-essential pkg-config libwlroots-dev wayland-protocols libwayland-bin \
+            libxcb1-dev libxcb-ewmh-dev libxcb-icccm4-dev
 
       - name: Bundle headers and the wlroots source for offline checks
         run: |
           make -C wm protocols
           mkdir -p /tmp/hdr/include /tmp/hdr/src
           cd /usr/include
-          cp -a wlr wayland-*.h xkbcommon libinput.h libudev.h libdrm xf86drm*.h pixman-1 EGL GLES2 KHR /tmp/hdr/include/ 2>/dev/null || true
+          cp -a wlr wayland-*.h xkbcommon libinput.h libudev.h libdrm xf86drm*.h pixman-1 EGL GLES2 KHR xcb /tmp/hdr/include/ 2>/dev/null || true
           cp "$GITHUB_WORKSPACE"/wm/*-protocol.h /tmp/hdr/include/
           cd /tmp/hdr/src && apt-get source -qq --download-only wlroots >/dev/null 2>&1 || true
           ls -la /tmp/hdr/src
