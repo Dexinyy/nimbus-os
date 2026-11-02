@@ -142,6 +142,18 @@ in_chroot apt-get install -y "${PACKAGES[@]}"
 # Printing: driverless (IPP Everywhere) printers on the network and on USB, without a pile of drivers
 in_chroot apt-get install -y --no-install-recommends cups-daemon cups-client cups-filters cups-ipp-utils avahi-daemon ipp-usb libnss-mdns
 
+# bubblewrap builds every Flatpak app's sandbox, and refuses to run with file capabilities ("Unexpected capabilities
+# but not setuid"): it needs none, as user namespaces are allowed (etc/sysctl.d/60-nimbus-userns.conf)
+in_chroot python3 -c '
+import os
+try:
+    caps = os.getxattr("/usr/bin/bwrap", "security.capability")
+    os.removexattr("/usr/bin/bwrap", "security.capability")
+    print("bwrap had file capabilities (%s): removed" % caps.hex())
+except OSError as exc:
+    print("bwrap has no file capabilities (%s)" % exc.strerror)
+'
+
 log "Building the window manager (nimbus-wm)"
 WM_BUILD=(build-essential pkg-config libwlroots-dev wayland-protocols libwayland-bin libxcb1-dev libxcb-ewmh-dev libxcb-icccm4-dev)
 in_chroot apt-get install -y --no-install-recommends "${WM_BUILD[@]}"

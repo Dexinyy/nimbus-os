@@ -949,5 +949,15 @@ class StoreMethods:
                 tail = f.read()[-6000:].splitlines()[-40:]
         except OSError:
             tail = []
+        caps = " ".join(l.replace("\t", "=") for l in read("/proc/self/status").splitlines() if l.startswith(("CapInh", "CapPrm", "CapAmb")))
+        try:
+            fcaps = os.getxattr("/usr/bin/bwrap", "security.capability").hex()
+        except OSError as exc:
+            fcaps = "none (%s)" % exc.strerror
+        try:
+            mode = oct(os.stat("/usr/bin/bwrap").st_mode & 0o7777)
+        except OSError:
+            mode = "?"
         return {"restrictUserns": read("/proc/sys/kernel/apparmor_restrict_unprivileged_userns"),
-                "maxUserns": read("/proc/sys/user/max_user_namespaces"), "bwrap": bwrap, "log": tail}
+                "maxUserns": read("/proc/sys/user/max_user_namespaces"), "bwrap": bwrap, "log": tail,
+                "caps": caps, "bwrapCaps": fcaps, "bwrapMode": mode}

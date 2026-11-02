@@ -470,6 +470,7 @@ async function testStore() {
     log(`flatpak ${st.flatpak} flathub ${st.remote} libflatpak ${st.libflatpak}`);
     const diag = await Native.call('storeDiag');
     log(`sandboxes: user namespaces restricted ${diag.restrictUserns}, bubblewrap ${diag.bwrap}`);
+    log(`sandboxes: desktop ${diag.caps}; bwrap mode ${diag.bwrapMode}, file capabilities ${diag.bwrapCaps}`);
     const t0 = Date.now();
     WM.open('store');
     const cat = await Native.call('storeCatalog', {}, 30 * 60 * 1000);
