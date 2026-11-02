@@ -712,6 +712,7 @@ class SecurityMethods:
             folders += ["Desktop", "Documents", ".config/autostart", ".local/bin", ".local/share/applications"]
         if p["realtime"] or p["downloads"]:
             folders.append("Downloads")
+            os.makedirs(os.path.join(HOME, "Downloads"), exist_ok=True)  # where Chrome saves, even on a fresh system
         for name in folders:
             path = os.path.join(HOME, name)
             if not os.path.isdir(path):
@@ -825,7 +826,10 @@ class SecurityMethods:
         sample = test_sample()
         with open(os.path.join(DB_DIR, "nimbus-test.hdb"), "w") as f:
             f.write("44d88612fea8a8f36de82e1278abb02f:68:Nimbus.Test.EICAR\n")
-        self.sec_watch()
+        # folder watches belong to the main loop's thread; wait until they're set up
+        ready = threading.Event()
+        GLib.idle_add(lambda: (self.sec_watch(), ready.set()) and False)
+        ready.wait(10)
         return {"db": DB_DIR, "size": len(sample)}
 
     def m_securityTestFile(self, args):
