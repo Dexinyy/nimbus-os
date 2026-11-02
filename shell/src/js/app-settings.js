@@ -123,7 +123,7 @@ function mountSettings(root, api, args) {
           row({ id: 'theme', icon: 'contrast', title: 'Mode', desc: 'Auto follows your device, or Claude when this OS is open there.', ctl: seg('theme', [['light', 'Light'], ['dark', 'Dark'], ['auto', 'Auto']], 'Theme mode') }),
           row({ id: 'accent', icon: 'palette', title: 'Accent color', desc: 'Used for highlights, buttons and your logo.', cls: 'tall' }),
           h('div', { class: 'srow sub' }, sw),
-          row({ id: 'transparency', icon: 'eye', title: 'Transparency effects', desc: 'Frosted glass behind the taskbar, Start and menus.', ctl: toggle('transparency', 'Transparency effects') })),
+          row({ id: 'transparency', icon: 'eye', title: 'Transparency effects', desc: IS_NATIVE && Native.info && Native.info.software ? 'Frosted glass behind the taskbar, Start and menus. It needs graphics acceleration, so panels stay solid on this computer.' : 'Frosted glass behind the taskbar, Start and menus.', ctl: toggle('transparency', 'Transparency effects') })),
         section('Wallpaper', h('div', { class: 'srow sub', 'data-sid': 'wallpaper' }, gal), h('div', { class: 'srow sub end' }, browse)),
         section('Desktop', row({ id: 'showDesktopIcons', icon: 'desktop', title: 'Show desktop icons', ctl: toggle('showDesktopIcons', 'Show desktop icons') })),
       ];

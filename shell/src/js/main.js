@@ -72,6 +72,7 @@ function boot() {
   if (IS_NATIVE) {
     // This page is the desktop of a real computer: show the startup screen and read the hardware.
     Power.boot();
+    bus.on('native-info', applyEffects);
     Native.refresh().then(() => bus.emit('store'));
   } else if (S.data.lockOnStart) Power.lock();
   if (!S.data.setupDone) WM.open('welcome');

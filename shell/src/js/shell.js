@@ -48,7 +48,9 @@ function applyAccent() {
 }
 function applyEffects() {
   const root = document.documentElement;
-  if (!S.data.transparency || S.data.energySaver) root.setAttribute('data-solid', ''); else root.removeAttribute('data-solid');
+  // Frosted glass needs graphics acceleration; when the processor draws the screen, see-through panels would just look busy.
+  const noBlur = IS_NATIVE && !!(Native.info && Native.info.software);
+  if (!S.data.transparency || S.data.energySaver || noBlur) root.setAttribute('data-solid', ''); else root.removeAttribute('data-solid');
   if (S.data.reduceMotion || S.data.energySaver) root.setAttribute('data-reduce-motion', ''); else root.removeAttribute('data-reduce-motion');
 }
 function applyTextSize() { document.documentElement.style.fontSize = clamp(S.data.textSize || 14, 12, 18) + 'px'; }
