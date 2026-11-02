@@ -23,7 +23,7 @@ log() { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
 die() { printf '\033[1;31mError: %s\033[0m\n' "$*" >&2; exit 1; }
 
 [ "$(id -u)" -eq 0 ] || die "run this as root, for example: sudo ./build.sh"
-for tool in debootstrap mksquashfs grub-mkrescue xorriso mformat python3; do
+for tool in debootstrap mksquashfs grub-mkimage xorriso mformat mmd mcopy mkfs.msdos python3; do
   command -v "$tool" >/dev/null || die "missing tool: $tool (see the list at the top of this script)"
 done
 
@@ -225,8 +225,39 @@ printf 'Nimbus OS %s "%s" - amd64 (%s)\n' "$VERSION" "$SUITE" "$(date -u +%Y%m%d
 cp "$HERE/grub.cfg" "$ISODIR/boot/grub/grub.cfg"
 
 log "Making the bootable ISO"
+# The same layout as Ubuntu's own ISOs: the ISO 9660 file system is also readable as partition 1
+# (-partition_offset 16), with the EFI boot image as partition 2. casper mounts partition 1, so
+# it can still mount the storage area it adds to a USB stick (it can't while the whole stick is in use).
+GRUB_LIB=/usr/lib/grub
+mkdir -p "$ISODIR/boot/grub/i386-pc" "$ISODIR/boot/grub/x86_64-efi" "$ISODIR/boot/grub/fonts"
+cp "$GRUB_LIB"/i386-pc/*.mod "$GRUB_LIB"/i386-pc/*.lst "$ISODIR/boot/grub/i386-pc/"
+cp "$GRUB_LIB"/x86_64-efi/*.mod "$GRUB_LIB"/x86_64-efi/*.lst "$ISODIR/boot/grub/x86_64-efi/"
+cp /usr/share/grub/unicode.pf2 "$ISODIR/boot/grub/fonts/"
+: > "$ISODIR/.disk/nimbus-os"  # GRUB on UEFI finds the Nimbus disc or stick by this file
+# BIOS: GRUB as an El Torito image; on a USB stick the hybrid MBR code starts it
+grub-mkimage -O i386-pc-eltorito -p /boot/grub -o "$ISODIR/boot/grub/i386-pc/eltorito.img" biosdisk iso9660
+# UEFI: GRUB in a small FAT image, which finds the Nimbus file system and reads its grub.cfg
+cat > "$WORK/grub-efi.cfg" <<'EOF'
+search --no-floppy --set=root --file /.disk/nimbus-os
+set prefix=($root)/boot/grub
+configfile $prefix/grub.cfg
+EOF
+grub-mkimage -O x86_64-efi -p /boot/grub -c "$WORK/grub-efi.cfg" -o "$WORK/bootx64.efi" \
+  part_gpt part_msdos fat iso9660 search search_fs_file configfile normal
+rm -f "$WORK/efi.img"
+mkfs.msdos -C "$WORK/efi.img" 4096 >/dev/null
+mmd -i "$WORK/efi.img" ::/EFI ::/EFI/BOOT
+mcopy -i "$WORK/efi.img" "$WORK/bootx64.efi" ::/EFI/BOOT/BOOTX64.EFI
 rm -f "$ISO"
-grub-mkrescue -o "$ISO" "$ISODIR" -- -volid NIMBUS_OS
+xorriso -as mkisofs -r -J -joliet-long -V NIMBUS_OS -o "$ISO" \
+  --grub2-mbr "$GRUB_LIB/i386-pc/boot_hybrid.img" \
+  --protective-msdos-label -partition_cyl_align off -partition_offset 16 --mbr-force-bootable \
+  -append_partition 2 28732ac11ff8d211ba4b00a0c93ec93b "$WORK/efi.img" -appended_part_as_gpt \
+  -iso_mbr_part_type a2a0d0ebe5b9334487c068b6b72699c7 \
+  -c /boot.catalog \
+  -b /boot/grub/i386-pc/eltorito.img -no-emul-boot -boot-load-size 4 -boot-info-table --grub2-boot-info \
+  -eltorito-alt-boot -e '--interval:appended_partition_2:::' -no-emul-boot \
+  "$ISODIR"
 (cd "$OUT" && sha256sum "$(basename "$ISO")" > "$(basename "$ISO").sha256")
 ls -lh "$ISO"
 log "Done: $ISO"

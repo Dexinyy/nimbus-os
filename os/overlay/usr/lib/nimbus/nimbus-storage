@@ -54,6 +54,18 @@ def mounted(dev):
     return any(m for m in (dev.get("mountpoints") or []) if m)
 
 
+def in_use(dev):
+    """Mounted somewhere, including where this system can't see it: casper mounts the storage area
+    before the system starts and doesn't move that mount over. The kernel still lists every mounted
+    ext4 file system in /proc/fs/ext4."""
+    return mounted(dev) or os.path.isdir("/proc/fs/ext4/%s" % dev["name"])
+
+
+def booted_persistent():
+    args = open("/proc/cmdline").read().split()
+    return "persistent" in args and "nopersistent" not in args
+
+
 def first_mib_is_zero(path):
     with open(path, "rb") as f:
         return f.read(MIB).count(0) == MIB
@@ -71,11 +83,12 @@ def current(devs):
     """The storage area in use (or present but not in use)."""
     for d in walk(devs):
         if d.get("label") == LABEL:
-            info = {"device": d["path"], "active": mounted(d)}
+            info = {"device": d["path"], "active": in_use(d) and booted_persistent()}
             disk = next((x for x in devs if d is x or d in walk(x.get("children") or [])), d)
             info["disk"] = describe(disk)
             info.update(size=int(d.get("size") or 0), free=None)
-            for mount in (m for m in (d.get("mountpoints") or []) if m):
+            # In use as casper's storage area, the root file system reports its size and free space
+            for mount in [m for m in (d.get("mountpoints") or []) if m] + (["/"] if info["active"] else []):
                 try:
                     st = os.statvfs(mount)
                 except OSError:
@@ -102,8 +115,7 @@ def candidates(devs):
 def status():
     devs = block_devices()
     cur = current(devs)
-    persistent = "persistent" in open("/proc/cmdline").read().split()
-    return {"label": LABEL, "persistentBoot": persistent, "storage": cur, "candidates": candidates(devs)}
+    return {"label": LABEL, "persistentBoot": booted_persistent(), "storage": cur, "candidates": candidates(devs)}
 
 
 def wait_for_partition(disk_path, start_bytes):

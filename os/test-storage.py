@@ -78,14 +78,29 @@ small = dict(devs[2], size=GiB // 2)
 check("a disk under 1 GiB isn't offered", st.candidates([small]) == [], st.candidates([small]))
 
 devs[2]["children"] = [{"name": "sdc1", "path": "/dev/sdc1", "type": "part", "label": st.LABEL, "mountpoints": ["/cow"]}]
+# Mounted out of sight (as casper does): only /proc/fs/ext4 knows, and the root reports the size
+hidden = [dict(devs[0]), dict(devs[1]), dict(devs[2], children=[{"name": "sdc1", "path": "/dev/sdc1", "type": "part", "label": st.LABEL, "mountpoints": [None]}])]
+real_isdir, real_cmdline = os.path.isdir, st.booted_persistent
+os.path.isdir = lambda p: p == "/proc/fs/ext4/sdc1" or real_isdir(p)
+st.booted_persistent = lambda: True
+cur = st.current(hidden)
+check("a storage area casper mounted out of sight counts as in use", cur and cur["active"] and cur["size"] > 0, cur)
+st.booted_persistent = lambda: False
+cur = st.current(hidden)
+check("...but not when started without 'persistent' (then casper only keeps logs there)", cur and not cur["active"], cur)
+os.path.isdir, st.booted_persistent = real_isdir, real_cmdline
+
 real_statvfs = os.statvfs
 os.statvfs = lambda p: real_statvfs("/")
+st.booted_persistent = lambda: True
 cur = st.current(devs)
 check("finds a storage area that's in use", cur and cur["device"] == "/dev/sdc1" and cur["active"], cur)
 check("offers nothing more once one exists", st.candidates(devs) == [], st.candidates(devs))
 os.statvfs = real_statvfs
+st.booted_persistent = lambda: False
 cur = st.current(devs)
 check("a storage area whose mount can't be read still counts", cur and cur["size"] == 0 and cur["free"] is None, cur)
+st.booted_persistent = real_cmdline
 
 st.run = real_run
 for path in (iso, zero, data):

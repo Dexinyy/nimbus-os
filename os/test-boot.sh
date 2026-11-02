@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Boot a Nimbus OS ISO in virtual machines and check that it works.
-#   1. UEFI: start, open Start, Terminal and Settings, Alt+Tab, shut down
-#   2. BIOS: start, shut down
+#   1. UEFI (DVD): start, open Start, Terminal and Settings, Alt+Tab, shut down
+#   2. BIOS (DVD): start, shut down; then the same from a USB stick, on BIOS and on UEFI
 #   3. Logs: the same as 1, with the system log and keyboard/focus events copied to the serial port
 #   4. Wi-Fi: joins a simulated access point through the desktop's Wi-Fi code
 #   5. Saving from a USB image: casper saves in its free space; a setting survives a restart
@@ -44,13 +44,29 @@ run_vm() { # name scenario [extra qemu arguments]
   return 0
 }
 
+usb_image() { # a fresh copy of the ISO as a 3 GB "USB stick"
+  cp --sparse=always "$ISO" "$1" && truncate -s 3G "$1"
+}
+uefi_firmware() {
+  cp "$OVMF_VARS" "/tmp/nimbus-ovmf-vars-$1.fd"
+  echo -drive if=pflash,format=raw,readonly=on,file="$OVMF_CODE" -drive if=pflash,format=raw,file="/tmp/nimbus-ovmf-vars-$1.fd"
+}
 if [ -n "$OVMF_CODE" ]; then
-  cp "$OVMF_VARS" /tmp/nimbus-ovmf-vars.fd
-  run_vm uefi full -cdrom "$ISO" -drive if=pflash,format=raw,readonly=on,file="$OVMF_CODE" -drive if=pflash,format=raw,file=/tmp/nimbus-ovmf-vars.fd
+  # shellcheck disable=SC2046
+  run_vm uefi full -cdrom "$ISO" $(uefi_firmware cd)
 else
-  echo "OVMF is not installed: skipping the UEFI test"
+  echo "OVMF is not installed: skipping the UEFI tests"
 fi
 run_vm bios short -cdrom "$ISO" -boot d
+# Started from a USB stick by the PC's firmware: BIOS through the hybrid MBR, UEFI through the EFI partition.
+# The default menu entry saves by itself, so these also cover casper adding the storage area.
+usb_image /tmp/nimbus-usb-bios.img
+run_vm usb-bios short -drive if=none,id=stick,file=/tmp/nimbus-usb-bios.img,format=raw -device usb-storage,drive=stick,bootindex=0
+if [ -n "$OVMF_CODE" ]; then
+  usb_image /tmp/nimbus-usb-uefi.img
+  # shellcheck disable=SC2046
+  run_vm usb-uefi short $(uefi_firmware usb) -drive if=none,id=stick,file=/tmp/nimbus-usb-uefi.img,format=raw -device usb-storage,drive=stick,bootindex=0
+fi
 
 xorriso -osirrox on -indev "$ISO" -extract /casper/vmlinuz /tmp/nimbus-vmlinuz -extract /casper/initrd /tmp/nimbus-initrd >/dev/null 2>&1
 # Same steps again with the system log (and the desktop's keyboard and focus events) on the serial port
@@ -61,8 +77,7 @@ run_vm logs full -cdrom "$ISO" -kernel /tmp/nimbus-vmlinuz -initrd /tmp/nimbus-i
 run_vm wifi wifi -cdrom "$ISO" -kernel /tmp/nimbus-vmlinuz -initrd /tmp/nimbus-initrd \
   -append "boot=casper noprompt nimbus.debug nimbus.test=wifi nimbus.open=settings:network $SERIAL"
 # Saving from a USB stick: the ISO written to a 3 GB image file; casper saves in its free space by itself
-cp --sparse=always "$ISO" /tmp/nimbus-usb.img
-truncate -s 3G /tmp/nimbus-usb.img
+usb_image /tmp/nimbus-usb.img
 run_vm usb storage -drive if=none,id=stick,file=/tmp/nimbus-usb.img,format=raw -device usb-storage,drive=stick \
   -kernel /tmp/nimbus-vmlinuz -initrd /tmp/nimbus-initrd \
   -append "boot=casper noprompt persistent nimbus.debug nimbus.test=storage nimbus.open=settings:system $SERIAL"
