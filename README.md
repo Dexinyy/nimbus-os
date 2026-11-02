@@ -12,7 +12,7 @@ Download `nimbus-os-0.1-amd64.iso` from the [latest release](../../releases/tag/
 
 1. Install [VirtualBox](https://www.virtualbox.org/) (free).
 2. Click **New**. Name it Nimbus OS, pick the ISO file, set the type to **Linux** and the version to **Ubuntu (64-bit)**, and tick **Skip Unattended Installation**.
-3. Give it **4096 MB** of memory and 2 processors. It doesn't need a hard disk.
+3. Give it **4096 MB** of memory and 2 processors. To keep your work between restarts, also add a new hard disk (8 GB is plenty); otherwise choose **Do Not Add a Virtual Hard Disk**.
 4. In **Settings → Display**, choose the **VMSVGA** graphics controller.
 5. Click **Start**. The desktop appears in about 30 seconds.
 
@@ -22,11 +22,12 @@ Download `nimbus-os-0.1-amd64.iso` from the [latest release](../../releases/tag/
 2. Restart the PC and open its boot menu (usually **F12**, **F11**, **F8** or **Esc** while it starts). Choose the USB stick.
 3. **Secure Boot must be turned off** in your PC's firmware settings for now.
 
-Nothing gets installed and your drive isn't touched. When you shut down, the live session is gone.
+Nothing gets installed and your drive isn't touched. Until you set up saving, everything is gone when you shut down.
 
-If the screen stays black, pick **Start Nimbus OS with basic graphics** in the boot menu.
+### Keeping your work
 
-Every build is started in virtual machines (UEFI and BIOS) before it's published. The test opens Start, Terminal and Settings, switches windows with Alt+Tab and shuts down from the keyboard. The screenshots are on the [`ci-results`](../../tree/ci-results) branch.
+- **From a USB stick**, Nimbus saves your files, settings, Wi-Fi passwords and installed programs by itself, in the stick's free space. Nothing else on the stick changes.
+- **In a virtual machine or from a DVD**, add an empty disk (in VirtualBox: a new hard disk, 8 GB is plenty), then click **Set up saving** in the Welcome window or in **Settings › System**. Nimbus only offers disks that are completely empty, and asks once more before using one. Restart once, and from then on your work is kept.
 
 ## What works in 0.1
 
@@ -34,6 +35,9 @@ Every build is started in virtual machines (UEFI and BIOS) before it's published
 - The full Nimbus desktop: windows, snap layouts, Task View, Start and search, quick settings, notifications
 - Apps: Files, Notes, Paint, Photos, Calculator, Terminal, Clock, Mines, Task Manager, Settings
 - **Shut down, Restart and Sleep** control the real computer
+- **Wi-Fi**: the Wi-Fi tile in quick settings and **Settings › Network & internet** list nearby networks; click one and type its password. Airplane mode too.
+- **Terminal** runs real `bash`: `sudo`, `nano`, `less`, `top`, `htop`, `neofetch` and the rest, with colors, scrollback and copy/paste (Ctrl+Shift+C / Ctrl+Shift+V)
+- **Saving between restarts**: automatic from a USB stick, or on an empty disk (see above)
 - **Settings → About** shows your real hardware, and you can set the **time zone**
 - Keyboard: **Windows key** opens Start, **Alt+Tab** switches windows, **Alt+F4** closes a window or offers to shut down. Win+E opens Files, Win+I opens Settings, Win+D shows the desktop, Win+L locks, and Win+arrow keys snap the active window.
 - Wired internet connects automatically, and the clock sets itself
@@ -41,9 +45,9 @@ Every build is started in virtual machines (UEFI and BIOS) before it's published
 
 ## Not yet
 
-- Installing to a drive, so nothing you do is kept after shutdown
-- Wi-Fi, Bluetooth, sound volume, display settings
-- Running other programs such as a web browser or Steam. The Terminal app is Nimbus's own; a real Linux shell in a window comes with milestone 2.
+- Installing to a drive (saving between restarts works from the USB stick or an empty disk)
+- Bluetooth, sound volume, display settings
+- Running graphical programs such as a web browser or Steam as Nimbus windows
 - Opening files from your own drives
 - Secure Boot
 
@@ -51,7 +55,7 @@ Every build is started in virtual machines (UEFI and BIOS) before it's published
 
 1. ✅ Starts into the Nimbus desktop (0.1)
 2. Real programs (a web browser, for example) open as Nimbus windows with snapping and the taskbar
-3. Settings controls Wi-Fi, Bluetooth, sound and displays, and Files opens your real drives
+3. Settings controls Bluetooth, sound and displays, and Files opens your real drives (Wi-Fi ✅)
 4. An installer
 5. Polish on real hardware, and Secure Boot
 
@@ -63,7 +67,9 @@ Every build is started in virtual machines (UEFI and BIOS) before it's published
 | `os/overlay/usr/bin/nimbus-shell` | Shows the desktop full screen with WebKitGTK and gives it a few system abilities: power, hardware info, time zone. |
 | `os/overlay/usr/bin/nimbus-session` and `nimbus-session.service` | Start the desktop on the screen at boot, using the cage Wayland compositor. |
 | `os/build-iso.sh` | Builds the bootable ISO from Ubuntu 24.04 packages. |
-| `os/test-boot.sh`, `os/qmp.py` | Boot the ISO in virtual machines (UEFI and BIOS), take screenshots, try the desktop, and check that Shut down powers off. |
+| `os/overlay/usr/lib/nimbus/` | `nimbus_term.py` (the terminal's screen), `nimbus_net.py` (Wi-Fi through NetworkManager), `nimbus-storage` (sets up saving, run as root). |
+| `os/test-boot.sh`, `os/qmp.py` | Boot the ISO in virtual machines and check it: UEFI and BIOS start, Start and Terminal, Alt+Tab, joining a simulated Wi-Fi network, saving across restarts from a USB image, and Shut down. |
+| `os/test-*.py`, `shell/test/` | Tests for the terminal, network and storage helpers, and for the desktop's terminal, Wi-Fi and saving screens. |
 | `.github/workflows/build.yml` | Builds and tests on every push to `main`. It publishes the ISO as the **latest** release and saves test screenshots to the `ci-results` branch. |
 
 ## Troubleshooting

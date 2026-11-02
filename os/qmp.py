@@ -243,12 +243,15 @@ def main():
                 time.sleep(2)
             return [], open(serial, errors="replace").read() if os.path.exists(serial) else ""
 
-        found, text = wait_log(r"test storage: set up on (\S+), restarting", 150)
+        # From a USB image casper saves by itself ("marker written" first); with an empty disk Nimbus sets it up first
+        found, text = wait_log(r"test storage: (set up on \S+|marker written), restarting", 150)
         failed = re.search(r"test storage: failed: ([^\r\n]*)", text)
-        note("Sets up saving on the USB stick", bool(found), failed.group(1) if failed else "no result in the system log")
-        if found:
+        if found and found[0].startswith("set up"):
+            note("Sets up saving on the empty disk", True)
             found, text = wait_log(r"test storage: marker written, restarting", 240)
             note("Starts with saving on after a restart", bool(found), "the second start didn't use the storage area")
+        else:
+            note("Saves by itself from the first start", bool(found), failed.group(1) if failed else "no result in the system log")
         if found:
             # The third start reports "kept"; a second "marker written" means the second start's changes were lost
             result, end = "", time.time() + 240 * slow

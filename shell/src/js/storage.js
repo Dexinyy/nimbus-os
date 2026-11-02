@@ -1,7 +1,8 @@
 /* ========== Saving between restarts (installed OS, live session) ==========
    Nimbus starts with casper's "persistent" option: when a storage area exists, everything that
-   changes (files, settings, Wi-Fi passwords, installed programs) is kept on it. The root helper
-   nimbus-storage creates one, only in free space on the boot USB stick or on a completely empty disk. */
+   changes (files, settings, Wi-Fi passwords, installed programs) is kept on it. Started from a USB
+   stick, casper makes one in the stick's free space by itself. Otherwise (a DVD, a virtual machine)
+   the root helper nimbus-storage can make one on a completely empty disk. */
 const Storage = {
   info: null, busy: false,
   get saving() { return IS_NATIVE && !!(Native.info && Native.info.persistent); },
@@ -16,10 +17,7 @@ const Storage = {
     finally { this.busy = false; bus.emit('storage'); }
   },
   placeText(c) {
-    const where = `${c.disk.name} (${fmtBytes(c.disk.size)})`;
-    return c.kind === 'free'
-      ? { title: `Free space on this ${c.disk.kind}`, desc: `${fmtBytes(c.size)} on ${where}, after the Nimbus OS files. Nothing on it is changed.` }
-      : { title: `Empty ${c.disk.kind}: ${c.disk.name}`, desc: `${fmtBytes(c.size)}. It looks completely empty; it will be prepared for Nimbus OS.` };
+    return { title: `Empty ${c.disk.kind}: ${c.disk.name}`, desc: `${fmtBytes(c.size)}. It looks completely empty; it will be prepared for Nimbus OS.` };
   },
   /* The setup dialog: pick a place, confirm, then offer a restart. */
   async open() {
@@ -35,7 +33,7 @@ const Storage = {
     }
     if (!info.candidates.length) {
       Dialog.show({ title: 'No place to save yet',
-        message: 'Nimbus OS can keep your work in free space on the USB stick it started from, or on an empty disk. This PC has neither right now. '
+        message: 'Started from a USB stick with free space, Nimbus OS saves your work by itself. This time it started from a DVD or a disk image, and there’s no empty disk to use. '
           + 'In VirtualBox: shut down, open Settings → Storage, add a new hard disk (8 GB is plenty), and start Nimbus OS again.' });
       return;
     }
@@ -53,12 +51,10 @@ const Storage = {
       buttons: [{ label: 'Set up saving', value: true, primary: true }, { label: 'Cancel', value: null }] });
     if (!go) return;
     const c = info.candidates.find((x) => x.id === pick);
-    if (c.kind === 'empty') {
-      const sure = await Dialog.show({ title: `Use ${c.disk.name}?`,
-        message: `Everything on ${c.disk.name} (${fmtBytes(c.disk.size)}) will be erased. It looks empty, so nothing should be lost, but if you keep anything on it, cancel now.`,
-        buttons: [{ label: 'Erase and use it', value: true, primary: true }, { label: 'Cancel', value: null }] });
-      if (!sure) return;
-    }
+    const sure = await Dialog.show({ title: `Use ${c.disk.name}?`,
+      message: `Everything on ${c.disk.name} (${fmtBytes(c.disk.size)}) will be erased. It looks empty, so nothing should be lost, but if you keep anything on it, cancel now.`,
+      buttons: [{ label: 'Erase and use it', value: true, primary: true }, { label: 'Cancel', value: null }] });
+    if (!sure) return;
     Notif.push({ app: 'settings', title: 'Setting up saving…', body: 'This takes a few seconds.', silent: true });
     try { await this.setup(pick); } catch (e) { Dialog.show({ title: 'Couldn’t set up saving', message: e.message }); return; }
     const again = await Dialog.show({ title: 'Saving is ready', message: 'Restart Nimbus OS to start keeping your work. Changes you make before restarting aren’t kept.',
@@ -67,9 +63,9 @@ const Storage = {
   },
 };
 
-/* Boot tests only ("nimbus.test=storage", started from a USB image with free space):
-   1st start: set up saving and restart. 2nd start (saving on): write a marker and restart.
-   3rd start: report whether the marker is still there. os/qmp.py follows along in the system log. */
+/* Boot tests only ("nimbus.test=storage"). From a USB image, casper starts saving by itself; from a
+   DVD with an empty disk, the first start sets up saving there and restarts. Once saving is on: write
+   a marker and restart, then report whether it's still there. os/qmp.py follows the system log. */
 async function testStorage() {
   const log = (text) => Native.call('log', { text: 'test storage: ' + text }).catch(() => {});
   const restart = async (why) => { await sleep(1500); Store.flushLocal(); await sleep(2000); log(why + ', restarting'); await sleep(500); await Native.call('power', { action: 'reboot' }); };
@@ -81,8 +77,8 @@ async function testStorage() {
       await restart('marker written');
       return;
     }
-    const c = info.candidates.find((x) => x.kind === 'free');
-    if (!c) { log('failed: no free space offered: ' + JSON.stringify(info)); return; }
+    const c = info.candidates[0];
+    if (!c) { log('failed: nowhere to save: ' + JSON.stringify(info)); return; }
     await Storage.setup(c.id);
     await restart('set up on ' + c.device);
   } catch (e) {

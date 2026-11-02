@@ -4,7 +4,8 @@
 #   2. BIOS: start, shut down
 #   3. Logs: the same as 1, with the system log and keyboard/focus events copied to the serial port
 #   4. Wi-Fi: joins a simulated access point through the desktop's Wi-Fi code
-#   5. Saving: from a USB image with free space, sets up saving, restarts, and checks a setting survives
+#   5. Saving from a USB image: casper saves in its free space; a setting survives a restart
+#   6. Saving from a DVD with an empty disk: Nimbus sets the disk up; a setting survives a restart
 # usage: os/test-boot.sh ISO [OUTDIR]     results: OUTDIR/*.png, *-serial.log, summary.md
 set -uo pipefail
 
@@ -59,10 +60,15 @@ run_vm logs full -cdrom "$ISO" -kernel /tmp/nimbus-vmlinuz -initrd /tmp/nimbus-i
 # Wi-Fi: a simulated access point (mac80211_hwsim), joined with its password
 run_vm wifi wifi -cdrom "$ISO" -kernel /tmp/nimbus-vmlinuz -initrd /tmp/nimbus-initrd \
   -append "boot=casper noprompt nimbus.debug nimbus.test=wifi nimbus.open=settings:network $SERIAL"
-# Saving: the ISO written to a 3 GB "USB stick" (an image file); set up saving there, restart twice
+# Saving from a USB stick: the ISO written to a 3 GB image file; casper saves in its free space by itself
 cp --sparse=always "$ISO" /tmp/nimbus-usb.img
 truncate -s 3G /tmp/nimbus-usb.img
-run_vm storage storage -drive if=none,id=stick,file=/tmp/nimbus-usb.img,format=raw -device usb-storage,drive=stick \
+run_vm usb storage -drive if=none,id=stick,file=/tmp/nimbus-usb.img,format=raw -device usb-storage,drive=stick \
+  -kernel /tmp/nimbus-vmlinuz -initrd /tmp/nimbus-initrd \
+  -append "boot=casper noprompt persistent nimbus.debug nimbus.test=storage nimbus.open=settings:system $SERIAL"
+# Saving from a DVD with an empty disk (like VirtualBox): Nimbus sets the disk up
+truncate -s 2G /tmp/nimbus-empty.img
+run_vm disk storage -cdrom "$ISO" -drive file=/tmp/nimbus-empty.img,format=raw,if=virtio \
   -kernel /tmp/nimbus-vmlinuz -initrd /tmp/nimbus-initrd \
   -append "boot=casper noprompt persistent nimbus.debug nimbus.test=storage nimbus.open=settings:system $SERIAL"
 

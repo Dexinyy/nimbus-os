@@ -173,6 +173,27 @@ in_chroot systemctl mask systemd-networkd-wait-online.service NetworkManager-wai
 # The ISO has no checksum list to verify, so this check would only report a failure at startup.
 in_chroot systemctl mask casper-md5check.service
 
+log "Adjusting the live boot scripts"
+# casper creates the storage area ("writable") in a USB stick's free space by itself, then mounts it
+# a moment later, while udev may still be rescanning the stick ("Device or resource busy"). Retry
+# for a few seconds instead of stopping the boot.
+CASPER_SCRIPT="$CHROOT/usr/share/initramfs-tools/scripts/casper"
+COW_MOUNT='    mount -t ${cow_fstype} -o ${cow_mountopt} ${cowdevice} /cow || panic "Can not mount $cowdevice on /cow"'
+grep -qxF "$COW_MOUNT" "$CASPER_SCRIPT" || die "casper's storage mount line changed; review the Nimbus patch in build-iso.sh"
+python3 - "$CASPER_SCRIPT" "$COW_MOUNT" <<'PATCH'
+import sys
+path, line = sys.argv[1], sys.argv[2]
+retry = """    # Nimbus: a storage area casper has just created can be busy for a moment while udev rescans the disk
+    for _try in 1 2 3 4 5 6 7 8 9 10; do
+        mount -t ${cow_fstype} -o ${cow_mountopt} ${cowdevice} /cow && break
+        udevadm settle; sleep 1
+    done
+    grep -qs " /cow " /proc/mounts || panic "Can not mount $cowdevice on /cow\""""
+text = open(path).read()
+open(path, "w").write(text.replace(line, retry, 1))
+PATCH
+grep -q "Nimbus: a storage area casper has just created" "$CASPER_SCRIPT" || die "patching casper failed"
+
 log "Building the startup image (initramfs)"
 KVER="$(ls "$CHROOT/usr/lib/modules" | sort -V | tail -n 1)"
 in_chroot update-initramfs -d -k "$KVER" >/dev/null 2>&1 || true

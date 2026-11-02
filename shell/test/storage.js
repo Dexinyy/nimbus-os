@@ -41,8 +41,8 @@ const clickButton = (page, label) => page.evaluate((label) => { const b = [...do
 (async () => {
   const browser = await chromium.launch();
   const offers = [
-    { id: 'free:sdb', kind: 'free', device: '/dev/sdb', disk: { name: 'SanDisk Ultra', kind: 'USB stick', size: 16 * GB }, size: 14.8 * GB },
-    { id: 'empty:sdc', kind: 'empty', device: '/dev/sdc', disk: { name: 'VBOX HARDDISK', kind: 'disk', size: 8.6 * GB }, size: 8.6 * GB },
+    { id: 'empty:sdb', kind: 'empty', device: '/dev/sdb', disk: { name: 'VBOX HARDDISK', kind: 'disk', size: 8.6 * GB }, size: 8.6 * GB },
+    { id: 'empty:sdc', kind: 'empty', device: '/dev/sdc', disk: { name: 'Spare SSD', kind: 'disk', size: 120 * GB }, size: 120 * GB },
   ];
 
   let page = await boot(browser, { candidates: offers });
@@ -55,13 +55,13 @@ const clickButton = (page, label) => page.evaluate((label) => { const b = [...do
   await page.click('[data-sid="saving"] .btn');
   await sleep(600);
   const opts = await page.evaluate(() => [...document.querySelectorAll('.stg-opt b')].map((b) => b.textContent));
-  check('the dialog offers the stick’s free space and the empty disk', opts.length === 2 && opts[0] === 'Free space on this USB stick' && opts[1] === 'Empty disk: VBOX HARDDISK', opts.join(' | '));
+  check('the dialog offers the empty disks by name', opts.length === 2 && opts[0] === 'Empty disk: VBOX HARDDISK' && opts[1] === 'Empty disk: Spare SSD', opts.join(' | '));
   await page.screenshot({ path: path.join(shots, 'storage-choose.png') });
   await page.click('.stg-opt >> nth=1');
   await clickButton(page, 'Set up saving');
   await sleep(500);
   const warn = await dialogTitle(page);
-  check('an empty disk needs a second, explicit confirmation', warn === 'Use VBOX HARDDISK?', warn);
+  check('using a disk needs a second, explicit confirmation naming it', warn === 'Use Spare SSD?', warn);
   await clickButton(page, 'Cancel');
   await sleep(400);
   check('cancelling sets up nothing', (await page.evaluate(() => window.__state.setups.length)) === 0);
@@ -69,10 +69,12 @@ const clickButton = (page, label) => page.evaluate((label) => { const b = [...do
   await page.click('[data-sid="saving"] .btn');
   await sleep(600);
   await clickButton(page, 'Set up saving');
+  await sleep(500);
+  await clickButton(page, 'Erase and use it');
   await sleep(800);
   const ready = await dialogTitle(page);
   const setups = await page.evaluate(() => window.__state.setups);
-  check('the stick’s free space is set up without an erase warning', setups.join() === 'free:sdb' && ready === 'Saving is ready', `${setups} / ${ready}`);
+  check('confirming sets up the chosen disk', setups.join() === 'empty:sdb' && ready === 'Saving is ready', `${setups} / ${ready}`);
   await clickButton(page, 'Restart now');
   await sleep(1500);
   check('Restart now restarts the computer', (await page.evaluate(() => window.__state.power)) === 'reboot', await page.evaluate(() => window.__state.power));
@@ -83,7 +85,7 @@ const clickButton = (page, label) => page.evaluate((label) => { const b = [...do
   await page.evaluate(() => __n.Storage.open());
   await sleep(600);
   const none = await page.evaluate(() => document.querySelector('.modal-scrim')?.textContent || '');
-  check('with no place to save, it explains how to add one', none.includes('No place to save yet') && none.includes('VirtualBox'), none.slice(0, 120));
+  check('with no place to save, it explains how to add one', none.includes('No place to save yet') && none.includes('VirtualBox') && none.includes('USB stick'), none.slice(0, 160));
   await page.close();
 
   page = await boot(browser, { persistent: true, candidates: [] });
