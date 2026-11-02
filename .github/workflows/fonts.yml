@@ -1,7 +1,7 @@
 name: Build the Selawik font
 
-# Selawik is Microsoft's open-source stand-in for Segoe UI (SIL Open Font License). Its repository has only the
-# sources, so this builds the font files and saves them to the selawik-fonts branch, from where they are copied
+# Selawik is Microsoft's open-source stand-in for Segoe UI (SIL Open Font License). This takes the font files
+# from Microsoft's release, unchanged, and saves them to the selawik-fonts branch, from where they are copied
 # into os/fonts.
 on:
   workflow_dispatch:
@@ -16,21 +16,29 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - name: Build
+      - name: Get Microsoft's own font files
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -eo pipefail
           git clone -q --depth 1 https://github.com/microsoft/Selawik /tmp/selawik
-          python3 -m venv /tmp/venv && /tmp/venv/bin/pip install -q fontmake
-          cd /tmp/selawik/"Source files"/Glyphs
-          /tmp/venv/bin/fontmake -g selawik.glyphs -o ttf -i --no-autohint --output-dir /tmp/out 2>&1 | tail -5
+          mkdir -p /tmp/out /tmp/rel
+          # The released files, unchanged (the font's license reserves its name for unmodified versions)
+          if gh release download --repo microsoft/Selawik --pattern '*.zip' -D /tmp/rel 2>/dev/null; then
+            (cd /tmp/rel && for z in *.zip; do unzip -oq "$z"; done)
+            find /tmp/rel -iname '*.ttf' -exec cp {} /tmp/out/ \;
+          fi
           ls -la /tmp/out
-          test "$(ls /tmp/out/*.ttf | wc -l)" -ge 4
+          test "$(ls /tmp/out/*.ttf 2>/dev/null | wc -l)" -ge 4 || { echo "no released font files"; exit 1; }
       - name: Save to the selawik-fonts branch
         env:
           TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p /tmp/pub && cd /tmp/pub
           cp /tmp/out/*.ttf . && cp /tmp/selawik/LICENSE.txt Selawik-OFL.txt
+          git -C /tmp/selawik log -1 --format='Selawik repository at %H' > SOURCE.txt
+          gh release view --repo microsoft/Selawik --json tagName,name -q '"Release " + .tagName + " (" + .name + ")"' >> SOURCE.txt || true
           git init -q -b selawik-fonts
           git config user.name "nimbus-ci"
           git config user.email "nimbus-ci@users.noreply.github.com"
