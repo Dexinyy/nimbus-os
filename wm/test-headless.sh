@@ -55,7 +55,16 @@ shot 01-desktop
 if wait_log "test chrome: ready" 90; then note ok "Chrome opens as a window and maximizes"; else note fail "Chrome opens as a window and maximizes ($(grep -o 'test chrome: failed.*' "$OUT/wm.log" | head -1))"; fi
 sleep 2
 shot 02-chrome
-[ "$(differs 01-desktop 02-chrome)" -gt 30 ] && note ok "Chrome covers the desktop" || note fail "Chrome covers the desktop"
+blue() { # share of the screen showing the test page's blue, as a percentage
+  python3 - "$OUT/$1.png" <<'PY'
+import sys
+from PIL import Image
+px = Image.open(sys.argv[1]).convert("RGB").resize((160, 90)).load()
+print(round(100 * sum(1 for x in range(160) for y in range(90)
+                      if abs(px[x, y][0] - 0x1a) < 40 and abs(px[x, y][1] - 0x73) < 40 and abs(px[x, y][2] - 0xe8) < 40) / 14400))
+PY
+}
+[ "$(blue 02-chrome)" -gt 50 ] && note ok "Chrome shows its page over the desktop" || note fail "Chrome shows its page over the desktop ($(blue 02-chrome)% blue)"
 
 wtype -k Super_L; sleep 2
 shot 03-start-over-chrome
