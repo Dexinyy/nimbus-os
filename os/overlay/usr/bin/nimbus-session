@@ -3,8 +3,10 @@
 export XDG_SESSION_TYPE=wayland
 export XDG_CURRENT_DESKTOP=Nimbus
 export GDK_BACKEND=wayland
-export LANG="${LANG:-en_US.UTF-8}"
-export XCURSOR_THEME="${XCURSOR_THEME:-Adwaita}"
+# The live system starts in the plain "C" locale; the desktop and programs speak US English (it is generated)
+case "${LANG:-}" in "" | C | C.* | POSIX) export LANG=en_US.UTF-8 ;; esac
+[ -d /usr/share/icons/DMZ-White/cursors ] && cursor=DMZ-White || cursor=Adwaita  # white pointers, as on Windows
+export XCURSOR_THEME="${XCURSOR_THEME:-$cursor}"
 export XCURSOR_SIZE="${XCURSOR_SIZE:-24}"
 export WLR_RENDERER_ALLOW_SOFTWARE=1
 # Only when there is truly nothing to type or point with: with this set, wlroots also skips

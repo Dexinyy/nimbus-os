@@ -63,6 +63,8 @@ const answers = {
   storageStatus: { live: true, saving: false },
   hostnameSet: true, timeSet: true, timeSync: true, cursorSet: true, clipWatch: true, proxySet: true, privacySet: true, wmReady: 0,
 };
+// a fresh live system's WebKit reports the plain "C" locale
+Object.defineProperty(navigator, 'language', { get: () => 'C' });
 window.webkit = { messageHandlers: { nimbus: { postMessage(json) {
   const m = JSON.parse(json); window.__calls.push(m);
   setTimeout(() => window.__nimbusNative.resolve(m.id, m.method in answers ? answers[m.method] : null), 15);

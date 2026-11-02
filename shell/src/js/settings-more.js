@@ -1,12 +1,13 @@
 /* ========== Settings: Time & language, Gaming, Accessibility, Privacy & security, Nimbus Update ========== */
 const curLocale = () => S.data.locale || undefined;
+// The browser's language, unless it is the plain "C" locale a fresh Linux system may start in
+const sysLang = () => { const l = navigator.language || ''; try { if (!/^(c|posix)([._-]|$)/i.test(l)) { new Intl.Locale(l); return l; } } catch {} return 'en-US'; };
 function clockHero(ctx) {
   const t = h('div', { class: 'ws-clock-big' }), d = h('div', { class: 'ws-d' });
   const tick = () => { t.textContent = fmtTime(false); d.textContent = fmtDT(Date.now(), { dateStyle: 'full' }); };
   tick(); ctx.every(1000, tick);
   const tz = IS_NATIVE ? (Sys.time.st.timezone || (Native.info && Native.info.timezone) || 'UTC') : Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const lang = new Intl.DisplayNames([curLocale() || navigator.language || 'en'], { type: 'language' });
-  let langName = 'English (United States)'; try { langName = lang.of(curLocale() || navigator.language || 'en-US'); } catch {}
+  let langName = 'English (United States)'; try { langName = new Intl.DisplayNames([curLocale() || sysLang()], { type: 'language' }).of(curLocale() || sysLang()); } catch {}
   return h('div', { class: 'ws-hero time' }, h('div', { class: 'ws-hero-meta' }, t, d), h('div', { class: 'ws-hero-tiles' },
     h('div', { class: 'ws-tile static', html: `<span class="ws-tile-ic">${fi('globeLocation')}</span><span class="ws-tile-t"><b>Time zone</b><span class="ws-d">${esc(tz.replace(/_/g, ' '))}</span></span>` }),
     h('div', { class: 'ws-tile static', html: `<span class="ws-tile-ic">${fi('language')}</span><span class="ws-tile-t"><b>Language</b><span class="ws-d">${esc(langName)}</span></span>` })));
@@ -72,7 +73,7 @@ defPage('region', { title: 'Language & region', parent: 'time', icon: 'language'
 defSettings('region', [['locale', 'Regional format', 'date format locale country'], ['clock24', '24-hour time', 'clock format 12 hour']]);
 function firstDayOfWeek() {
   if (S.data.weekStart != null) return S.data.weekStart;
-  try { const l = new Intl.Locale(curLocale() || navigator.language || 'en-US'); const wi = l.getWeekInfo?.() || l.weekInfo; return wi ? wi.firstDay % 7 : 0; } catch { return 0; }
+  try { const l = new Intl.Locale(curLocale() || sysLang()); const wi = l.getWeekInfo?.() || l.weekInfo; return wi ? wi.firstDay % 7 : 0; } catch { return 0; }
 }
 function fmtTimeOf(d, withSeconds) {
   const o = { hour: 'numeric', minute: '2-digit' }; if (withSeconds) o.second = '2-digit';

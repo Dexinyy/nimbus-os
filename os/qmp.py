@@ -314,6 +314,9 @@ def main():
             if got(r"test settings: page " + page, 30):
                 time.sleep(0.4 * slow)
                 snap(f"{i + 4:02d}-settings-{page}")
+        m = got(r"test settings: all pages: (\d+) opened, (\d+) failed([^\r\n]*)", 120)
+        bad = re.findall(r"test settings: page (\S+) failed", slog())
+        note("Every Settings page opens", bool(m) and m.group(2) == "0" and not bad, (m.group(0).split(": ", 1)[1] if m else "no result") + (" (" + ", ".join(bad) + ")" if bad else ""))
         failed = re.search(r"test settings: failed: ([^\r\n]*)", slog())
         note("The Settings test finished", bool(re.search(r"test settings: done", slog())), failed.group(1) if failed else "")
         try:

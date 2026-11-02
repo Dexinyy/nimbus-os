@@ -225,8 +225,18 @@ async function testSettings() {
     const pr = await Sys.call('printers').catch((e) => ({ available: false, error: e.message })); log('printing ' + (pr.available ? 'ready' : 'unavailable (' + pr.error + ')'));
     const st = await Sys.call('storageUsage', {}, 60000).catch((e) => ({ error: e.message })); log('storage ' + (st.total ? fmtBytes(st.total) + ' total' : 'failed (' + st.error + ')'));
     for (const p of ['system', 'sound', 'display', 'devices', 'network', 'personalization', 'time', 'update']) {
-      WM.open('settings', { page: p }); await sleep(3500); log('page ' + p);
+      WM.open('settings', { page: p }); await sleep(3500);
+      const err = [...document.querySelectorAll('.app-settings .ws-info.error')].map((e) => e.textContent).find((t) => /couldn’t open/.test(t));
+      log('page ' + p + (err ? ' failed: ' + err : ''));
     }
+    // every other page, quickly
+    const broken = [];
+    for (const p of Object.keys(SPAGES)) {
+      WM.open('settings', { page: p }); await sleep(120);
+      if ([...document.querySelectorAll('.app-settings .ws-info.error')].some((e) => /couldn’t open/.test(e.textContent))) broken.push(p);
+    }
+    log(`all pages: ${Object.keys(SPAGES).length} opened, ${broken.length} failed${broken.length ? ': ' + broken.join(', ') : ''}`);
+    WM.open('settings', { page: 'system' });
     log('done');
   } catch (e) { log('failed: ' + e.message); }
 }
