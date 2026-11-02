@@ -112,7 +112,7 @@ PACKAGES=(
   casper user-setup initramfs-tools
   systemd-sysv systemd-resolved systemd-timesyncd udev dbus dbus-user-session libpam-systemd polkitd kmod
   sudo locales tzdata kbd iproute2 ca-certificates less nano
-  cage libgl1-mesa-dri libegl1 libegl-mesa0 libgles2 libgbm1
+  cage wtype libgl1-mesa-dri libegl1 libegl-mesa0 libgles2 libgbm1
   python3 python3-gi gir1.2-gtk-3.0 gir1.2-webkit2-4.1
   adwaita-icon-theme hicolor-icon-theme gsettings-desktop-schemas dconf-gsettings-backend shared-mime-info
   fontconfig fonts-dejavu-core
@@ -137,7 +137,7 @@ echo "Etc/UTC" > "$CHROOT/etc/timezone"
 
 # Copy our files in as root, without touching the owner or rights of existing folders like /etc.
 tar -C "$HERE/overlay" --owner=0 --group=0 -cf - . | tar -C "$CHROOT" --no-overwrite-dir -xf -
-chmod 755 "$CHROOT/usr/bin/nimbus-shell" "$CHROOT/usr/bin/nimbus-session"
+chmod 755 "$CHROOT/usr/bin/nimbus-shell" "$CHROOT/usr/bin/nimbus-session" "$CHROOT/usr/lib/nimbus/shell-debug"
 mkdir -p "$CHROOT/usr/share/nimbus" "$CHROOT/usr/share/fonts/truetype/nimbus" "$CHROOT/usr/share/doc/nimbus-os"
 cp -a "$WORK/shell" "$CHROOT/usr/share/nimbus/shell"
 cp "$HERE/fonts/"*.ttf "$HERE/fonts/"*-OFL.txt "$CHROOT/usr/share/fonts/truetype/nimbus/"

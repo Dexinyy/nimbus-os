@@ -27,13 +27,17 @@ done
 ls /dev/dri/renderD* >/dev/null 2>&1 || gpu=no
 [ "$gpu" = yes ] || software
 
+# "nimbus.debug" on the kernel command line logs the compositor and the desktop's keyboard and focus messages.
+shell=/usr/bin/nimbus-shell debug=
+if grep -qw nimbus.debug /proc/cmdline; then shell=/usr/lib/nimbus/shell-debug debug=-D; fi
+
 # -d: no client-side decorations, -s: allow switching to text consoles (Ctrl+Alt+F2...)
 started=$(date +%s)
-cage -d -s -- /usr/bin/nimbus-shell
+cage $debug -d -s -- "$shell"
 status=$?
 if [ "$status" -ne 0 ] && [ "$gpu" = yes ] && [ $(( $(date +%s) - started )) -lt 15 ]; then
   echo "nimbus-session: the graphics card did not start, drawing with the processor instead" >&2
   software
-  exec cage -d -s -- /usr/bin/nimbus-shell
+  exec cage $debug -d -s -- "$shell"
 fi
 exit "$status"
