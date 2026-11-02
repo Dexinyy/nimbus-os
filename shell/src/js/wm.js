@@ -426,7 +426,7 @@ const WM = (() => {
     const app = APPS[appId];
     const w = { id: 'n' + ev.id, nid: ev.id, native: true, appId, app, x: ev.x, y: ev.y, w: ev.w, h: ev.h,
       state: ev.state === 'max' ? 'max' : 'normal', snap: null, full: ev.state === 'full', min: !!ev.min, z: 0, onTop: false,
-      title: ev.title || app.name, parent: ev.parent || 0, pid: ev.pid || 0, x11: !!ev.x11, deco: 0,
+      title: ev.title || app.name, parent: ev.parent || 0, pid: ev.pid || 0, x11: !!ev.x11, deco: 0, flatpak: ev.flatpak || null, cls: ev.app || '',
       cleanup: [], beforeClose: null, dirty: false, created: Date.now() };
     if (ev.state === 'normal') w.normal = { x: ev.x, y: ev.y, w: ev.w, h: ev.h };
     const card = h('div', { class: 'nwin-card' }, h('span', { class: 'nwin-icon', html: appIcon(app.icon) }), h('span', { class: 'nwin-title', text: w.title }));

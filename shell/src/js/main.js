@@ -86,13 +86,20 @@ function boot() {
       NativeWin.init();
       Sys.wmReady();
       if (NativeWin.on) {
-        Native.call('wmReady').catch(() => {}); // windows that are already open (after the desktop restarts)
+        // the Store's apps first, so windows that are already open (after the desktop restarts) get their buttons
+        Programs.refresh().finally(() => Native.call('wmReady').catch(() => {}));
         Apps.refresh();
         // Chrome is the default browser: pin it for anyone whose taskbar was set up before it was there
         if (!S.data.chromePinned) {
           if (!S.data.pinned.includes('chrome')) S.set('pinned', ['chrome', ...S.data.pinned]);
           if (!S.data.startPins.includes('chrome')) { S.set('startPins', ['chrome', ...S.data.startPins]); Start.render(); }
           S.set('chromePinned', true);
+        }
+        // the Store too, for taskbars set up before it was there
+        if (!S.data.storePinned) {
+          if (!S.data.pinned.includes('store')) { const p = [...S.data.pinned]; p.splice(Math.max(0, p.indexOf('files') + 1), 0, 'store'); S.set('pinned', p); }
+          if (!S.data.startPins.includes('store')) { const p = [...S.data.startPins]; p.splice(Math.max(0, p.indexOf('chrome') + 1), 0, 'store'); S.set('startPins', p); }
+          S.set('storePinned', true);
         }
         Taskbar.render(); Start.render();
       }

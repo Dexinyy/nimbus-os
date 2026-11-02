@@ -66,10 +66,10 @@ const NativeWin = {
     switch (ev.ev) {
       case 'hello': this.lastArea = ''; this.lastLayout = ''; this.lastOverlay = ''; this.area(WM.area()); this.overlay(); this.schedule(); Sys.wmReady(); break;
       case 'output': this.lastArea = ''; this.lastLayout = ''; this.lastOverlay = ''; this.area(WM.area()); this.overlay(); this.schedule(); Sys.display.refresh(); break;
-      case 'new': WM.openNative(ev, Apps.forWindow(ev.app)); if (!ev.min) this.kbd = ev.id; this.schedule(); break; // new windows get the keyboard
+      case 'new': WM.openNative(ev, Apps.forWindow(ev.app, ev)); if (!ev.min) this.kbd = ev.id; this.schedule(); break; // new windows get the keyboard
       case 'gone': WM.nativeGone(ev.id); break;
       case 'title': WM.nativeTitle(ev.id, ev.title); break;
-      case 'app': { const w = WM.byNid(ev.id); if (w) { w.appId = Apps.forWindow(ev.app); w.app = APPS[w.appId]; bus.emit('wm'); } break; }
+      case 'app': { const w = WM.byNid(ev.id); if (w) { w.appId = Apps.forWindow(ev.app, { flatpak: w.flatpak, title: w.title }); w.app = APPS[w.appId]; bus.emit('wm'); } break; }
       case 'parent': { const w = WM.byNid(ev.id); if (w) w.parent = ev.parent; break; }
       case 'deco': WM.nativeDeco(ev.id, ev.deco); break;
       case 'geom': WM.nativeGeom(ev); break;
@@ -148,11 +148,12 @@ const NativeWin = {
       if (!vis(el)) continue;
       layers.push({ z: parseInt(el.style.zIndex, 10) || 0, r: rect(el, el.classList.contains('max') ? 0 : null) });
     }
-    // the title bars (and edges) Nimbus draws for X11 programs' windows go above the program windows below them
+    // the title bars Nimbus draws for X11 programs' windows go above the program windows below them (their resize
+    // edges, being invisible, don't: those work where the desktop shows around the window)
     for (const el of document.querySelectorAll('#windows > .win.native.deco:not(.ghost):not(.full)')) {
       if (!vis(el)) continue;
-      const z = parseInt(el.style.zIndex, 10) || 0;
-      for (const part of el.querySelectorAll(':scope > .win-titlebar, :scope > .rz')) if (vis(part)) layers.push({ z, r: rect(part, 0) });
+      const bar = el.querySelector(':scope > .win-titlebar');
+      if (bar && vis(bar)) layers.push({ z: parseInt(el.style.zIndex, 10) || 0, r: rect(bar, 0) });
     }
     const stack = natives.map((w) => [w.nid, layers.filter((l) => l.z > WM.zOf(w)).map((l) => l.r)]);
     return { top, stack };
@@ -180,14 +181,18 @@ const NativeWin = {
 /* ========== Programs Nimbus can install (Google Chrome) ========== */
 const Apps = {
   status: {},
-  // A window's app id (from the program) to the entry in APPS that shows it
-  forWindow(appId) {
+  // A window's app id (from the program; an X11 window's class) to the entry in APPS that shows it
+  forWindow(appId, ev) {
     const id = String(appId || '');
     if (/^(google-chrome|chrome)/i.test(id)) return 'chrome';
-    const key = 'x:' + (id || 'program');
+    const program = Programs.forWindow(id, ev); // from the Store
+    if (program) return program;
+    const key = 'x:' + (id || (ev && ev.flatpak) || 'program');
     if (!APPS[key]) {
-      const name = id ? id.replace(/^.*\./, '').replace(/[-_]+/g, ' ').replace(/^\w/, (c) => c.toUpperCase()) : 'Program';
-      APPS[key] = { name, icon: 'app', native: true, requires: 'never', desc: '' };
+      // a game Steam started, or a Windows program Lutris runs: its window's title names it best
+      const game = ev && ev.flatpak && /^(com\.valvesoftware\.Steam|net\.lutris\.Lutris)$/.test(ev.flatpak) && ev.title;
+      const name = game ? ev.title : id ? id.replace(/^.*\./, '').replace(/\.exe$/i, '').replace(/[-_]+/g, ' ').replace(/^\w/, (c) => c.toUpperCase()) : 'Program';
+      APPS[key] = { name, icon: game ? 'launcher' : 'app', native: true, requires: 'never', desc: '' };
       if (id) Native.call('appInfo', { appId: id }).then((info) => {
         if (!info) return;
         if (info.name) APPS[key].name = info.name;

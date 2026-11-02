@@ -236,6 +236,16 @@ function appRows() {
   if (caps.programs) {
     const c = Apps.status.chrome || {};
     rows.push({ id: 'chrome', name: 'Google Chrome', icon: APPS.chrome.icon, who: 'Google LLC', meta: c.installed ? [c.version, c.size ? fmtBytes(c.size) : '', c.installedAt ? fmtDT(c.installedAt * 1000, { dateStyle: 'medium' }) : ''].filter(Boolean).join(' · ') : 'Not installed yet. It downloads the first time you open it.', size: c.size || 0, program: true, installed: !!c.installed });
+    // apps from the Store: one row each (some bring several Start entries)
+    const seen = new Set();
+    for (const p of Programs.list) {
+      const key = p.kind === 'lutris' ? p.id : p.app;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const main = (p.kind !== 'lutris' && APPS['fp:' + p.app] && APPS['fp:' + p.app].program) || p;
+      rows.push({ id: main.id, name: main.name, icon: (APPS[main.id] || {}).icon || 'app', who: p.kind === 'lutris' ? 'Lutris' : 'Store (Flathub)',
+        meta: [p.version ? 'Version ' + p.version : '', p.kind === 'lutris' ? 'Runs with Wine' : ''].filter(Boolean).join(' · ') || 'Installed', size: p.size || 0, program: true, installed: true, store: true, app: p.kind === 'lutris' ? p.id : p.app });
+    }
   }
   return rows;
 }
@@ -250,16 +260,18 @@ defPage('installedapps', { title: 'Installed apps', parent: 'apps', icon: 'insta
       const more = h('button', { class: 'ws-iconbtn', 'aria-label': 'More options for ' + r.name, html: fi('more') });
       more.addEventListener('click', (e) => { e.stopPropagation(); Menu.show([
         { label: 'Open', icon: 'external', action: () => WM.open(r.id) },
-        r.program && r.installed ? { label: 'Update now', icon: 'refresh', action: async () => { try { await Sys.call('programUpdate', { app: r.id }, 600000); Notif.push({ app: 'settings', title: r.name + ' is up to date', silent: true }); } catch (err) { Notif.push({ app: 'settings', title: 'Couldn’t update ' + r.name, body: err.message }); } Apps.refresh(); } } : null,
+        r.store ? { label: 'Details in the Store', icon: 'info', action: () => WM.open('store', { app: r.app }) } : null,
+        r.program && r.installed && !r.store ? { label: 'Update now', icon: 'refresh', action: async () => { try { await Sys.call('programUpdate', { app: r.id }, 600000); Notif.push({ app: 'settings', title: r.name + ' is up to date', silent: true }); } catch (err) { Notif.push({ app: 'settings', title: 'Couldn’t update ' + r.name, body: err.message }); } Apps.refresh(); } } : null,
+        r.store ? { label: 'Get updates', icon: 'refresh', action: () => WM.open('store', { page: 'library' }) } : null,
         r.program && r.installed ? 'sep' : null,
-        r.program && r.installed ? { label: 'Uninstall', icon: 'trash', action: () => uninstallProgram(ctx, r) } : null,
+        r.program && r.installed ? { label: 'Uninstall', icon: 'trash', action: () => (r.store ? Programs.uninstall(r.id, ctx.win) : uninstallProgram(ctx, r)) } : null,
       ].filter(Boolean), 0, 0, { anchorEl: more }); });
       return WS.card(ctx, { iconHtml: `<span class="ws-appic">${appIcon(r.icon)}</span>`, title: r.name, desc: `${r.who} · ${r.meta}`, ctl: h('div', { class: 'ws-row' }, r.size ? h('span', { class: 'ws-d', text: fmtBytes(r.size) }) : null, more) });
     }));
   };
   q.addEventListener('input', paint);
   ctx.on('apps', paint); paint();
-  if (IS_NATIVE) Apps.refresh();
+  if (IS_NATIVE) { Apps.refresh(); Programs.refresh(); }
   return [h('div', { class: 'ws-row ws-between' }, q, h('div', { class: 'ws-row' }, h('span', { class: 'ws-d', text: 'Sort by:' }), WS.combo(ctx, [['name', 'Name (A to Z)'], ['size', 'Size (large to small)']], () => sort, (v) => { sort = v; paint(); }, 'Sort by', { width: 180 }))), h('div', { class: 'ws-d ws-count', text: `${appRows().length} apps found` }), list];
 } });
 async function uninstallProgram(ctx, r) {

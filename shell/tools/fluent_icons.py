@@ -42,6 +42,17 @@ ICONS = {
     'narrator': 'Person Voice', 'external': 'Open', 'people': 'People', 'fingerprint': 'Fingerprint', 'cast': 'Cast',
     'speakerBluetooth': 'Speaker Bluetooth', 'speakerUsb': 'Speaker USB', 'arrowUpload': 'Arrow Upload', 'lightbulb': 'Lightbulb',
     'earth': 'Earth', 'imageMultiple': 'Image Multiple', 'windowApps': 'Window Apps', 'record': 'Record', 'globeClock': 'Globe Clock', 'speech': 'Mic', 'hearing': 'Sound Wave Circle', 'textCursor': 'Text Field', 'colorFilter': 'Color Fill',
+    # Store
+    'store': 'Shopping Bag', 'library': 'Library', 'games': 'Games', 'cloudOff': 'Cloud Off', 'tag': 'Tag', 'chat': 'Chat',
+    'book': 'Book', 'toolbox': 'Toolbox', 'puzzle': 'Puzzle Piece',
+    # Security
+    'shieldError': 'Shield Error', 'shieldDismiss': 'Shield Dismiss', 'shieldKeyhole': 'Shield Keyhole', 'shieldTask': 'Shield Task',
+    'shieldLock': 'Shield Lock', 'shieldProhibited': 'Shield Prohibited', 'heartPulse': 'Heart Pulse', 'windowShield': 'Window Shield',
+    'desktopPulse': 'Desktop Pulse', 'bug': 'Bug', 'fire': 'Fire', 'globeShield': 'Globe Shield', 'personLock': 'Person Lock',
+    'scan': 'Scan', 'folderSearch': 'Folder Search', 'documentSearch': 'Document Search', 'dismissCircle': 'Dismiss Circle',
+    'arrowUndo': 'Arrow Undo', 'hardDrive': 'Hard Drive', 'batteryCheck': 'Battery Checkmark', 'key': 'Key', 'status': 'Status',
+    # Game controllers
+    'controller': 'Xbox Controller',
 }
 
 

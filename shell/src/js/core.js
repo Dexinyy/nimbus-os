@@ -279,6 +279,10 @@ const APP_ICONS = {
 APP_ICONS.browser = '<circle cx="24" cy="24" r="19" fill="url(#g-web)"/><g fill="none" stroke="#fff" stroke-width="2.2" stroke-opacity=".92"><ellipse cx="24" cy="24" rx="8.2" ry="19"/><path d="M5.5 24h37M8.6 14.5h30.8M8.6 33.5h30.8"/></g>';
 APP_ICONS.app = '<rect x="5" y="8" width="38" height="32" rx="6" fill="url(#g-slate)"/><path d="M5 14a6 6 0 0 1 6-6h26a6 6 0 0 1 6 6v2H5z" fill="#fff" fill-opacity=".2"/><circle cx="11" cy="12" r="1.5" fill="#fff"/><circle cx="15.5" cy="12" r="1.5" fill="#fff"/><rect x="11" y="21" width="26" height="3" rx="1.5" fill="#fff" fill-opacity=".7"/><rect x="11" y="28" width="17" height="3" rx="1.5" fill="#fff" fill-opacity=".45"/>';
 APP_ICONS.welcome = '<rect x="5" y="5" width="38" height="38" rx="10" fill="url(#g-logo)"/><path d="M24 12.5l3.3 6.9 7.5 1-5.5 5.2 1.4 7.5L24 29.5l-6.7 3.6 1.4-7.5-5.5-5.2 7.5-1z" fill="#fff"/>';
+// The Store: a bag with a spark; Nimbus Security: a shield; a Windows game launcher (Lutris) before its own icon arrives
+APP_ICONS.store = '<path d="M9 16.5h30l-2.4 23.2A3.6 3.6 0 0 1 33 43H15a3.6 3.6 0 0 1-3.6-3.3z" fill="url(#g-web)"/><path d="M17 17v-3.5a7 7 0 0 1 14 0V17" fill="none" stroke="#2347c9" stroke-width="2.8" stroke-linecap="round"/><path d="M9.4 21h29.2l-.3 3H9.7z" fill="#fff" fill-opacity=".18"/><path d="M24 25.5l1.9 4.1 4.4.6-3.2 3.1.8 4.4-3.9-2.1-3.9 2.1.8-4.4-3.2-3.1 4.4-.6z" fill="#fff"/>';
+APP_ICONS.security = '<path d="M24 4.5l16 6v10.8c0 10.2-6.7 18.6-16 22.2-9.3-3.6-16-12-16-22.2V10.5z" fill="url(#g-web)"/><path d="M24 4.5l16 6v10.8c0 10.2-6.7 18.6-16 22.2z" fill="#000" fill-opacity=".12"/><path d="M16.5 24.2l5.2 5.2 10.2-10.6" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>';
+APP_ICONS.launcher = '<rect x="5" y="5" width="38" height="38" rx="9" fill="url(#g-slate)"/><path d="M15.5 18.5h17a6 6 0 0 1 5.8 4.6l1.5 6.4a3.6 3.6 0 0 1-6.3 3l-2.5-3H17l-2.5 3a3.6 3.6 0 0 1-6.3-3l1.5-6.4a6 6 0 0 1 5.8-4.6z" fill="#fff" fill-opacity=".92"/><path d="M16.5 22.5v5M14 25h5" stroke="#2c3344" stroke-width="2" stroke-linecap="round"/><circle cx="30.5" cy="23.5" r="1.6" fill="#2c3344"/><circle cx="33.5" cy="26.5" r="1.6" fill="#2c3344"/>';
 // name: an icon below, or a picture (a program's own icon, as a data: URL)
 function appIcon(name) {
   if (typeof name === 'string' && /^data:image\//.test(name)) return `<svg viewBox="0 0 48 48" aria-hidden="true"><image href="${esc(name)}" x="3" y="3" width="42" height="42"/></svg>`;
@@ -292,8 +296,8 @@ const DEFAULTS = {
   wallMode: 'picture', wallFit: 'fill', wallColor: '#0063b1', slideSource: 'builtin', slideEvery: 30, slideShuffle: false, lockWall: '', myThemes: [],
   transparency: true, energySaver: false, reduceMotion: false, textSize: 14, alwaysScrollbars: false, contrast: 'none',
   tbAlign: 'center', tbPos: 'bottom', tbFloat: false, tbSearch: 'icon', tbTaskView: true, tbAssist: true, tbAutoHide: false, tbBadges: true, tbDeskCorner: true, tbClock: true,
-  pinned: ['chrome', 'files', 'notes', 'terminal', 'paint', 'settings'],
-  startPins: ['chrome', 'files', 'notes', 'calculator', 'settings', 'terminal', 'paint', 'photos', 'clock', 'mines', 'taskmgr', 'assistant', 'welcome'],
+  pinned: ['chrome', 'files', 'store', 'notes', 'terminal', 'settings'],
+  startPins: ['chrome', 'store', 'files', 'notes', 'calculator', 'settings', 'terminal', 'paint', 'photos', 'clock', 'mines', 'taskmgr', 'assistant', 'welcome'],
   startLayout: 'default', startAdded: true, startMostUsed: false, startRecent: true, startFolders: ['settings', 'files'], appUse: {}, appAdded: {},
   brightness: 100, nightLight: false, nightStrength: 45, nightSchedule: false, nightFrom: '21:00', nightTo: '07:00',
   volume: 60, muted: false, sounds: true, dnd: false, dndAuto: false, dndFrom: '22:00', dndTo: '07:00', dndFull: true,

@@ -15,6 +15,8 @@ const APPS = {
   // Real programs, shown by the window manager (nwin.js); Chrome is installed from Google the first time it opens
   chrome: { name: 'Google Chrome', icon: 'browser', launch: (args) => Apps.launch('chrome', args), requires: 'programs', desc: 'Browse the web. Your default browser.', keywords: 'browser web internet google chrome www search sites' },
   installer: { name: 'Get Google Chrome', icon: 'browser', mount: mountInstaller, size: [520, 420], minSize: [400, 320], single: true, noResize: true, hidden: true, taskbarAs: 'chrome', requires: 'programs', desc: '', keywords: '' },
+  // Apps and games from Flathub (and Windows game launchers through Lutris); what's installed joins this list (Programs)
+  store: { name: 'Store', icon: 'store', mount: mountStore, size: [1120, 740], minSize: [600, 440], single: true, requires: 'programs', desc: 'Get apps and games: Steam, Discord, Battle.net and more.', keywords: 'microsoft store apps games install download get steam discord battle.net spotify flathub programs' },
 };
 function appAvailable(id) { const a = APPS[id]; return !!a && (!a.requires || !!caps[a.requires]); }
 // Apps shown in Start, search, Settings and the taskbar (the installer only opens when needed)
@@ -205,6 +207,7 @@ function appMenuItems(id, where) {
     { label: pinnedStart ? 'Unpin from Start' : 'Pin to Start', icon: pinnedStart ? 'unpin' : 'pin', action: () => { S.set('startPins', pinnedStart ? S.data.startPins.filter((x) => x !== id) : [...S.data.startPins, id]); Start.render(); } }];
   if (where === 'start' && pinnedStart) items.push({ label: 'Move to front', icon: 'arrowUp', action: () => { S.set('startPins', [id, ...S.data.startPins.filter((x) => x !== id)]); Start.render(); } });
   if (running.length) items.push('sep', { label: running.length > 1 ? `Close all ${running.length} windows` : 'Close window', icon: 'x', action: () => running.forEach((w) => WM.close(w)) });
+  if (a.program) items.push('sep', { label: 'Uninstall', icon: 'trash', action: () => { Flyouts.close(); Programs.uninstall(id); } });
   return items;
 }
 

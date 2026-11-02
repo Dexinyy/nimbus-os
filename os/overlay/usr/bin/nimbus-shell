@@ -28,6 +28,7 @@ import gi
 
 sys.path.insert(0, os.environ.get("NIMBUS_LIB_DIR", "/usr/lib/nimbus"))
 import nimbus_net  # noqa: E402
+import nimbus_store  # noqa: E402
 import nimbus_sys  # noqa: E402
 import nimbus_term  # noqa: E402
 
@@ -214,6 +215,8 @@ def program_env():
     """The environment programs started from the desktop get."""
     env = {k: v for k, v in os.environ.items() if k not in PRIVATE_ENV}
     env.setdefault("XDG_SESSION_TYPE", "wayland")
+    # The desktop itself must draw through Wayland; programs pick for themselves (X11-only ones use Xwayland)
+    env.pop("GDK_BACKEND", None)
     cursor = nimbus_sys.load_json(os.path.join(nimbus_sys.CONFIG_DIR, "cursor.json"), {})
     if cursor.get("theme"):  # Settings > Accessibility > Mouse pointer
         env["XCURSOR_THEME"], env["XCURSOR_SIZE"] = cursor["theme"], str(cursor.get("size") or 24)
@@ -296,9 +299,10 @@ def icon_url(name):
     for size in ("256x256", "128x128", "96x96", "64x64", "48x48", "scalable"):
         for ext in ("png", "svg"):
             for theme in ("hicolor", "Adwaita"):
-                path = "/usr/share/icons/%s/%s/apps/%s.%s" % (theme, size, name, ext)
-                if os.path.exists(path):
-                    return image_data_url(path)
+                for share in nimbus_store.EXPORTS + ["/usr/share"]:  # Flathub apps' icons too
+                    path = "%s/icons/%s/%s/apps/%s.%s" % (share, theme, size, name, ext)
+                    if os.path.exists(path):
+                        return image_data_url(path)
     for ext in ("png", "svg"):
         if os.path.exists("/usr/share/pixmaps/%s.%s" % (name, ext)):
             return image_data_url("/usr/share/pixmaps/%s.%s" % (name, ext))
@@ -361,7 +365,7 @@ class WMLink:
         return False
 
 
-class Shell(nimbus_sys.SysMethods):
+class Shell(nimbus_sys.SysMethods, nimbus_store.StoreMethods):
     def __init__(self):
         os.makedirs(DATA_DIR, exist_ok=True)
         os.makedirs(CACHE_DIR, exist_ok=True)
@@ -427,6 +431,7 @@ class Shell(nimbus_sys.SysMethods):
         self.focused = None
         self.wm = WMLink(int(os.environ["NIMBUS_WM_FD"]), self.on_wm_event) if os.environ.get("NIMBUS_WM_FD") else None
         self.sys_init()
+        threading.Thread(target=self.share_session_env, daemon=True).start()
         self.listen_for_links()
         if self.wm and os.access(CHROME, os.X_OK):
             GLib.timeout_add_seconds(90, self.update_chrome)
@@ -507,6 +512,8 @@ class Shell(nimbus_sys.SysMethods):
                 self.emit("idle", event)
             return
         if kind == "new":
+            # which Flathub app the window belongs to: its taskbar button and icon come from that app
+            event["flatpak"] = nimbus_store.flatpak_of_pid(event.get("pid"))
             self.windows[wid] = dict(event)
         elif kind == "gone":
             self.windows.pop(wid, None)
@@ -575,6 +582,19 @@ class Shell(nimbus_sys.SysMethods):
     # ---- programs: Google Chrome, installed from Google (see /usr/lib/nimbus/nimbus-apps) ----
     def m_appStatus(self, _args):
         return {"chrome": chrome_status()}
+
+    def share_session_env(self):
+        """Services started through D-Bus (the portals Flathub apps open files with) need to know this display."""
+        names = [n for n in ("WAYLAND_DISPLAY", "DISPLAY", "XDG_CURRENT_DESKTOP", "XDG_SESSION_TYPE", "XDG_DATA_DIRS",
+                             "XCURSOR_THEME", "XCURSOR_SIZE") if os.environ.get(n)]
+        try:
+            subprocess.run(["dbus-update-activation-environment", "--systemd", *names], capture_output=True, timeout=20)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            print("nimbus-shell: session environment:", exc, file=sys.stderr)
+
+    def launch(self, argv):
+        """Start a program (the Store's apps, Lutris's games)."""
+        return spawn(argv)
 
     def m_appInfo(self, args):
         app_id = str(args.get("appId", ""))

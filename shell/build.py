@@ -15,14 +15,14 @@ ROOT = Path(__file__).parent
 SRC = ROOT / "src"
 FONTS = ROOT.parent / "os" / "fonts"
 
-CSS_ORDER = ["base.css", "shell.css", "apps.css", "settings.css"]
+CSS_ORDER = ["base.css", "shell.css", "apps.css", "settings.css", "store.css"]
 JS_ORDER = [
     "core.js", "icons-fluent.js", "native.js", "net.js", "storage.js", "store.js", "walls.js", "ui.js", "wm.js", "shell.js", "nwin.js",
     "sys.js", "extras.js",
     "app-files.js", "app-notes.js", "app-photos.js", "app-paint.js",
     "app-settings.js", "settings-ui.js", "settings-system.js", "settings-devices.js", "settings-personal.js", "settings-more.js",
     "app-calc.js", "app-terminal.js", "app-taskmgr.js",
-    "app-clock.js", "app-mines.js", "app-assistant.js", "app-welcome.js",
+    "app-clock.js", "app-mines.js", "app-assistant.js", "app-welcome.js", "app-store.js",
     "main.js",
 ]
 # Selawik: Microsoft's open-source stand-in for Segoe UI, Windows 11's font (os/fonts, SIL Open Font License)
@@ -48,7 +48,7 @@ def bundle(test_hook=False):
     css = "\n".join((SRC / "css" / f).read_text() for f in CSS_ORDER)
     js = "\n".join(f"/* ---- {f} ---- */\n" + (SRC / "js" / f).read_text() for f in JS_ORDER)
     if test_hook:
-        js += "\nwindow.__n = { WM, S, FS, Store, Flyouts, Power, Notif, Clock, Desktop, Menu, caps, bus, Native, Net, QS, Storage, NativeWin, Apps, APPS, Sys, SPAGES, SINDEX, ClipHistory, Shots };\n"
+        js += "\nwindow.__n = { WM, S, FS, Store, Flyouts, Power, Notif, Clock, Desktop, Menu, caps, bus, Native, Net, QS, Storage, NativeWin, Apps, APPS, Sys, SPAGES, SINDEX, ClipHistory, Shots, Programs, StoreJobs };\n"
     return css, "(() => {\n" + js + "\n})();\n"
 
 

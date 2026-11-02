@@ -9,6 +9,8 @@ case "${LANG:-}" in "" | C | C.* | POSIX) export LANG=en_US.UTF-8 ;; esac
 export XCURSOR_THEME="${XCURSOR_THEME:-$cursor}"
 export XCURSOR_SIZE="${XCURSOR_SIZE:-24}"
 export WLR_RENDERER_ALLOW_SOFTWARE=1
+# Apps from the Store (Flathub, installed for this user) show up like the others
+export XDG_DATA_DIRS="$HOME/.local/share/flatpak/exports/share:/var/lib/flatpak/exports/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
 # Only when there is truly nothing to type or point with: with this set, wlroots also skips
 # its first look for input devices, and the keyboard and mouse would wake up only on first use.
 ls /dev/input/event* >/dev/null 2>&1 || export WLR_LIBINPUT_NO_DEVICES=1
