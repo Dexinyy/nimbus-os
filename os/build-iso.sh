@@ -176,6 +176,9 @@ cp -a "$WORK/shell" "$CHROOT/usr/share/nimbus/shell"
 cp "$HERE/fonts/"*.ttf "$HERE/fonts/"*-OFL.txt "$CHROOT/usr/share/fonts/truetype/nimbus/"
 cp "$REPO/README.md" "$CHROOT/usr/share/doc/nimbus-os/README.md"
 in_chroot fc-cache -f >/dev/null
+# Our defaults for programs' settings (usr/share/glib-2.0/schemas/90_nimbus.gschema.override)
+in_chroot sh -c 'for c in /usr/bin/glib-compile-schemas /usr/lib/x86_64-linux-gnu/glib-2.0/glib-compile-schemas; do
+  [ -x "$c" ] && exec "$c" /usr/share/glib-2.0/schemas; done; echo "glib-compile-schemas not found" >&2; exit 1'
 
 # Our name on the system, keeping a record of the Ubuntu release it is built on
 cp "$CHROOT/usr/lib/os-release" "$CHROOT/usr/lib/os-release.base"

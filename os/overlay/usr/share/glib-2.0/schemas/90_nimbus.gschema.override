@@ -1,0 +1,4 @@
+# Programs that draw their own title bars (Google Chrome, GTK apps) put minimize, maximize and close
+# on the right, as on Windows. The GNOME default shows only close.
+[org.gnome.desktop.wm.preferences]
+button-layout=':minimize,maximize,close'
