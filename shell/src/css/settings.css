@@ -39,6 +39,11 @@
 
 /* ---- navigation ---- */
 .ws-side { display: flex; flex-direction: column; min-height: 0; padding: 4px 4px 12px 16px; overflow: auto; }
+.ws-side::-webkit-scrollbar { width: 6px; }
+.ws-side::-webkit-scrollbar-thumb { background-color: transparent; border-width: 1px; }
+.ws-side:hover::-webkit-scrollbar-thumb { background-color: var(--line-strong); }
+.ws-side { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+.ws-side:hover { scrollbar-color: var(--line-strong) transparent; }
 .ws-user { display: flex; align-items: center; gap: 16px; padding: 8px 12px 16px 2px; border-radius: 6px; text-align: left; }
 .ws-user:hover .ws-user-meta b { text-decoration: underline; }
 .ws-user-av, .ws-avatar { width: 64px; height: 64px; border-radius: 50%; flex: none; overflow: hidden; display: grid; place-items: center; background: color-mix(in srgb, var(--accent) 22%, var(--card)); color: var(--accent-text); font-size: 24px; font-weight: 600; }

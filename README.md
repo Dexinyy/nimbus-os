@@ -2,7 +2,7 @@
 
 Your own desktop operating system, inspired by Windows 11, without ads, without an account to create, and with a taskbar you can move. It runs on Linux, built from Ubuntu 24.04 LTS packages.
 
-**Version 0.1:** the computer starts straight into the Nimbus desktop, from a USB stick or in a virtual machine, and real programs such as Google Chrome open as windows on it.
+**Version 0.1:** the computer starts straight into the Nimbus desktop, from a USB stick or in a virtual machine, and real programs such as Google Chrome open as windows on it. Settings looks and works like Windows 11's and controls the real hardware: sound, displays, Bluetooth, mouse and keyboard, power, networks, printers and more.
 
 ## Try it
 
@@ -13,7 +13,7 @@ Download `nimbus-os-0.1-amd64.iso` from the [latest release](../../releases/tag/
 1. Install [VirtualBox](https://www.virtualbox.org/) (free).
 2. Click **New**. Name it Nimbus OS, pick the ISO file, set the type to **Linux** and the version to **Ubuntu (64-bit)**, and tick **Skip Unattended Installation**.
 3. Give it **4096 MB** of memory and 2 processors. To keep your work between restarts, also add a new hard disk (8 GB is plenty); otherwise choose **Do Not Add a Virtual Hard Disk**.
-4. In **Settings → Display**, choose the **VMSVGA** graphics controller.
+4. In **Settings → Display**, choose the **VMSVGA** graphics controller. In **Settings → Audio**, keep audio on and choose **Intel HD Audio** as the controller (sound plays through your PC's speakers).
 5. Click **Start**. The desktop appears in about 30 seconds.
 
 ### On a real PC
@@ -40,7 +40,18 @@ Nothing gets installed and your drive isn't touched. Until you set up saving, ev
 - **Wi-Fi**: the Wi-Fi tile in quick settings and **Settings › Network & internet** list nearby networks; click one and type its password. Airplane mode too.
 - **Terminal** runs real `bash`: `sudo`, `nano`, `less`, `top`, `htop`, `neofetch` and the rest, with colors, scrollback and copy/paste (Ctrl+Shift+C / Ctrl+Shift+V)
 - **Saving between restarts**: automatic from a USB stick, or on an empty disk (see above)
-- **Settings → About** shows your real hardware, and you can set the **time zone**
+- **Settings, like Windows 11's**: Home, System, Bluetooth & devices, Network & internet, Personalization, Apps, Accounts, Time & language, Gaming, Accessibility, Privacy & security and Nimbus Update, with Find a setting. What they control on the real computer:
+  - **Sound**: the output and input device, volume and mute, volume for each program, a sound troubleshooter. Sound goes through PipeWire (smooth in virtual machines too), and the volume keys work.
+  - **Display**: resolution, refresh rate, scale and orientation (with Windows' "Keep these display settings?" countdown), brightness, night light on a schedule
+  - **Bluetooth**: turn it on, pair headphones, speakers, mice and keyboards, connect and remove them
+  - **Mouse and touchpad**: pointer speed, primary button, scrolling lines and direction, tap to click; **keyboard** layout and repeat speed; pointer size and color
+  - **Power**: screen off and sleep after a while, power modes, battery
+  - **Network**: Wi-Fi and known networks, IP and DNS settings, metered connections, WireGuard VPNs, mobile hotspot, proxy, data usage, network reset
+  - **Printers**: find and add printers on your network or USB (driverless), test page, default printer
+  - **Time**: set automatically or by hand, time zone, 24-hour clock, regional formats
+  - **Personalization**: themes, background (picture, solid color, slideshow), accent color, dark mode, lock screen, Start layout and folders, taskbar (alignment, search box, auto-hide), fonts you can install
+  - Also: PC name, storage use and cleanup, a lock-screen PIN, startup apps, the default browser, camera and microphone access, screenshots with **Print screen**, clipboard history with **Win+V**, and checking for new versions of Nimbus and Chrome
+  - Left out on purpose: the Microsoft account and virus protection
 - Keyboard: **Windows key** opens Start, **Alt+Tab** switches windows, **Alt+F4** closes a window or offers to shut down. Win+E opens Files, Win+I opens Settings, Win+D shows the desktop, Win+L locks, and Win+arrow keys snap the active window.
 - Wired internet connects automatically, and the clock sets itself
 - A text console for the curious: **Ctrl+Alt+F2**, user `nimbus`, no password. **Ctrl+Alt+F1** goes back to the desktop.
@@ -48,7 +59,7 @@ Nothing gets installed and your drive isn't touched. Until you set up saving, ev
 ## Not yet
 
 - Installing to a drive (saving between restarts works from the USB stick or an empty disk)
-- Bluetooth, sound volume, display settings
+- More than one display at a time (the desktop shows on the first one)
 - An app store: programs other than Chrome install from Terminal (`sudo apt install ...`, from Ubuntu's repositories)
 - Opening files from your own drives
 - Secure Boot
@@ -57,7 +68,7 @@ Nothing gets installed and your drive isn't touched. Until you set up saving, ev
 
 1. ✅ Starts into the Nimbus desktop (0.1)
 2. ✅ Real programs open as Nimbus windows with snapping and the taskbar; Google Chrome is the browser
-3. Settings controls Bluetooth, sound and displays, and Files opens your real drives (Wi-Fi ✅)
+3. ✅ Settings, like Windows 11's, controls the real hardware (Files opening your own drives comes next)
 4. An installer
 5. Polish on real hardware, and Secure Boot
 
@@ -70,10 +81,10 @@ Nothing gets installed and your drive isn't touched. Until you set up saving, ev
 | `os/overlay/usr/bin/nimbus-shell` | Shows the desktop with WebKitGTK and gives it a few system abilities: power, hardware info, time zone, starting and installing programs. It passes messages between the page and the window manager. |
 | `os/overlay/usr/bin/nimbus-session` and `nimbus-session.service` | Start the window manager and the desktop at boot (falling back to the cage compositor if it can't start). |
 | `os/build-iso.sh` | Builds the bootable ISO from Ubuntu 24.04 packages. |
-| `os/overlay/usr/lib/nimbus/` | `nimbus_term.py` (the terminal's screen), `nimbus_net.py` (Wi-Fi through NetworkManager), `nimbus-storage` (sets up saving, run as root), `nimbus-apps` (installs Chrome from Google's signed repository, run as root), `nimbus-open` (opens web links). |
-| `os/test-boot.sh`, `os/qmp.py` | Boot the ISO in virtual machines and check it: UEFI and BIOS start, Start and Terminal, Alt+Tab, joining a simulated Wi-Fi network, saving across restarts, installing and using Chrome, and Shut down. |
+| `os/overlay/usr/lib/nimbus/` | `nimbus_term.py` (the terminal's screen), `nimbus_net.py` (Wi-Fi through NetworkManager), `nimbus_sys.py` (what Settings controls: PipeWire, BlueZ, displays and input through the window manager, power, the clock, CUPS, NetworkManager, updates), `nimbus-sys` (the few settings that need root), `nimbus-storage` (sets up saving, run as root), `nimbus-apps` (installs and updates Chrome from Google's signed repository, run as root), `nimbus-open` (opens web links). |
+| `os/test-boot.sh`, `os/qmp.py` | Boot the ISO in virtual machines and check it: UEFI and BIOS start, Start and Terminal, Alt+Tab, joining a simulated Wi-Fi network, saving across restarts, installing and using Chrome, Settings changing the volume and the resolution, and Shut down. |
 | `wm/test-headless.sh` | A quick check of the window manager with the desktop and Chrome, without a virtual machine. |
-| `os/test-*.py`, `shell/test/` | Tests for the terminal, network and storage helpers, and for the desktop's terminal, Wi-Fi, saving and program-window code. |
+| `os/test-*.py`, `shell/test/` | Tests for the terminal, network and storage helpers, and for the desktop's terminal, Wi-Fi, saving, program-window code and every Settings page (`node shell/test/settings.js`). |
 | `.github/workflows/build.yml` | Builds and tests on every push to `main`. It publishes the ISO as the **latest** release and saves test screenshots to the `ci-results` branch. |
 
 ## Troubleshooting
@@ -92,4 +103,4 @@ sudo ./build.sh                                   # writes out/nimbus-os-0.1-amd
 
 ## Credits
 
-Built from Ubuntu 24.04 LTS packages. Nimbus OS is not affiliated with Canonical, Microsoft or Google. Google Chrome is Google's software, downloaded from Google under its own terms; Nimbus doesn't include it. The fonts Figtree, Sora and JetBrains Mono are used under the SIL Open Font License (see `os/fonts`).
+Built from Ubuntu 24.04 LTS packages. Nimbus OS is not affiliated with Canonical, Microsoft or Google. Google Chrome is Google's software, downloaded from Google under its own terms; Nimbus doesn't include it. The fonts Selawik (Microsoft's open-source stand-in for Segoe UI), Figtree, Sora and JetBrains Mono are used under the SIL Open Font License (see `os/fonts`). Settings' icons are Microsoft's Fluent System Icons, under the MIT License (`shell/LICENSE-fluent-icons.txt`, regenerated with `shell/tools/fluent_icons.py`); its category icons are Nimbus's own.

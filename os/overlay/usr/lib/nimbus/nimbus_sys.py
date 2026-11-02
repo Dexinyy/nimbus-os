@@ -218,29 +218,40 @@ AGENT_XML = """<node><interface name="org.bluez.Agent1">
 <method name="Cancel"/></interface></node>"""
 
 
+def has_adapter():
+    return bool(glob.glob("/sys/class/bluetooth/hci*"))
+
+
 class Bluetooth:
+    """BlueZ. Calls are made on worker threads (never the desktop's main loop) and never start BlueZ:
+    without an adapter its service doesn't run, and asking for it would wait 25 seconds for nothing."""
+
     def __init__(self, on_change):
         self.on_change = on_change
         self.bus = None
+        self.agent = False
         try:
             self.bus = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
         except GLib.Error:
             return
         self.bus.signal_subscribe(BLUEZ, None, None, None, None, Gio.DBusSignalFlags.NONE, lambda *a: self.changed())
-        self.agent = False
-        GLib.idle_add(self.register_agent)
+        try:  # the agent object lives on the main loop, where BlueZ's questions are answered
+            node = Gio.DBusNodeInfo.new_for_xml(AGENT_XML)
+            self.bus.register_object(AGENT_PATH, node.interfaces[0], self.agent_call, None, None)
+        except Exception as exc:
+            print("nimbus-shell: Bluetooth agent:", exc)
+        threading.Thread(target=self.register_agent, daemon=True).start()
 
     def register_agent(self):
         """Pairing that asks nothing: like Windows' "Just works" for headphones, mice and speakers."""
+        if self.agent or not has_adapter():
+            return
         try:
-            node = Gio.DBusNodeInfo.new_for_xml(AGENT_XML)
-            self.bus.register_object(AGENT_PATH, node.interfaces[0], self.agent_call, None, None)
             self.call("/org/bluez", "org.bluez.AgentManager1", "RegisterAgent", GLib.Variant("(os)", (AGENT_PATH, "NoInputNoOutput")))
             self.call("/org/bluez", "org.bluez.AgentManager1", "RequestDefaultAgent", GLib.Variant("(o)", (AGENT_PATH,)))
             self.agent = True
-        except Exception as exc:  # no adapter yet, or BlueZ isn't running
+        except Exception as exc:  # BlueZ isn't running yet
             print("nimbus-shell: Bluetooth agent:", exc)
-        return False
 
     def agent_call(self, _conn, _sender, _path, _iface, method, params, invocation):
         if method == "RequestPinCode":
@@ -268,10 +279,10 @@ class Bluetooth:
         GLib.timeout_add(300, fire)
 
     def call(self, path, iface, method, params=None, timeout=25000):
-        if not self.bus:
-            raise SysError("Bluetooth isn't available")
+        if not self.bus or not has_adapter():
+            raise SysError("This PC has no Bluetooth adapter")
         try:
-            return self.bus.call_sync(BLUEZ, path, iface, method, params, None, Gio.DBusCallFlags.NONE, timeout, None)
+            return self.bus.call_sync(BLUEZ, path, iface, method, params, None, Gio.DBusCallFlags.NO_AUTO_START, timeout, None)
         except GLib.Error as exc:
             msg = exc.message.split(":", 1)[-1].strip() if exc.message else "Bluetooth didn't answer"
             raise SysError({"Page Timeout": "The device didn't answer. Make sure it's on and nearby.",
@@ -289,6 +300,8 @@ class Bluetooth:
         return next(((p, i["org.bluez.Adapter1"]) for p, i in sorted(objs.items()) if "org.bluez.Adapter1" in i), (None, None))
 
     def status(self):
+        if not has_adapter():
+            return {"available": False, "devices": []}
         try:
             objs = self.objects()
         except SysError as exc:
@@ -336,7 +349,7 @@ class Bluetooth:
                 time.sleep(1)
                 self.set_prop(path, "org.bluez.Adapter1", "Powered", GLib.Variant("b", True))
             if not self.agent:
-                GLib.idle_add(self.register_agent)
+                self.register_agent()
         elif action == "scan":
             try:
                 self.call(path, "org.bluez.Adapter1", "StartDiscovery" if args.get("on") else "StopDiscovery")
@@ -739,7 +752,7 @@ class SysMethods:
             parts = [{"name": p.get("name"), "label": p.get("label") or "", "fstype": p.get("fstype") or "", "size": p.get("size") or 0,
                       "mount": ", ".join(x for x in (p.get("mountpoints") or []) if x)} for p in d.get("children") or []]
             disks.append({"name": d.get("name"), "model": (d.get("model") or "").strip() or d.get("name"), "size": d.get("size") or 0,
-                          "removable": bool(d.get("rm")) or d.get("tran") == "usb", "parts": parts,
+                          "removable": d.get("rm") in (True, 1, "1") or d.get("tran") == "usb", "parts": parts,
                           "nimbus": d.get("name") in boot or any(p["name"] in boot for p in parts)})
         return disks
 

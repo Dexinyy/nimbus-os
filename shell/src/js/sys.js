@@ -86,7 +86,7 @@ const Sys = (() => {
   }
   // Volume and brightness from the taskbar go to the real hardware
   function applyVolume() { if (sound.st.available) sound.setMainVolume(S.data.volume); }
-  function applyBrightness() { if (display.st.backlight) call('brightnessSet', { percent: S.data.brightness }).catch(() => {}); }
+  function applyHwBrightness() { if (display.st.backlight) call('brightnessSet', { percent: S.data.brightness }).catch(() => {}); }
 
   // The window manager starts fresh: give it the settings it keeps
   function wmReady() {
@@ -106,7 +106,7 @@ const Sys = (() => {
     });
     const prevVol = APPLY.volume, prevBright = APPLY.brightness;
     APPLY.volume = () => { prevVol?.(); applyVolume(); };
-    APPLY.brightness = () => { prevBright?.(); applyBrightness(); };
+    APPLY.brightness = () => { prevBright?.(); applyHwBrightness(); };
     // The main output's volume shows on the taskbar and in quick settings
     bus.on('sys', (name) => {
       if (name === 'sound') {
@@ -114,10 +114,15 @@ const Sys = (() => {
         if (d && (S.data.volume !== d.volume || !!S.data.muted !== !!d.muted)) { S.data.volume = d.volume; S.data.muted = !!d.muted; bus.emit('settings', ['volume']); Taskbar.tray(); }
       }
       if (name === 'power') applyIdle();
-      if (name === 'display') applyBrightness_();
+      if (name === 'display') {
+        // the screen's own brightness is the starting point, as with the volume
+        const bl = display.st.backlight;
+        if (bl && !display.synced) { display.synced = true; S.data.brightness = clamp(bl.percent, 5, 100); bus.emit('settings', ['brightness']); }
+        applyBrightness_();
+      }
     });
   }
-  // A screen with a backlight is dimmed for real, so the dark layer goes away
-  const applyBrightness_ = () => { if (typeof applyBrightness === 'function') applyBrightness(); };
+  // A screen with a backlight is dimmed for real, so the dark layer (shell.js) goes away
+  const applyBrightness_ = () => applyBrightness();
   return { call, sound, display, input, bt, power, time, init, wmReady, applyInput, applyKeyboard, applyIdle, applyDisplay };
 })();
