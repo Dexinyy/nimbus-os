@@ -82,6 +82,7 @@ function boot() {
       // Boot tests: "nimbus.test=wifi" joins the simulated access point the way the Wi-Fi menu does
       if (info.test === 'wifi') testWifi();
       if (info.test === 'storage') testStorage();
+      updStarted(info);
       // Under the window manager real programs open as windows on this desktop (nwin.js)
       NativeWin.init();
       Sys.wmReady();
@@ -107,6 +108,7 @@ function boot() {
       if (info.test === 'chrome') testChrome();
       if (info.test === 'security') testSecurity();
       if (info.test === 'store') testStore();
+      if (info.test === 'update') testUpdate();
       if (info.test === 'settings') testSettings();
     });
     Net.refresh();

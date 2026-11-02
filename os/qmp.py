@@ -13,6 +13,8 @@ usage: qmp.py SOCKET OUTDIR NAME SLOWNESS SCENARIO
                      firewall and network profiles, device security, a virtual game controller
             store - boot with nimbus.test=store: Flathub's catalog, search, installing Discord with the Store and
                      opening it as a window
+            update - boot with nimbus.test=update from a USB image that saves: install a newer build from a test
+                     server through Settings, restart into it, go back from Recovery, restart into the first one
             logs  - boot, take one screenshot, leave the serial log for reading
 
 Screenshots go to OUTDIR/NAME-*.png and results are appended to OUTDIR/summary.md.
@@ -329,7 +331,7 @@ def main():
             pass
         return finish()
 
-    if scenario in ("security", "store"):
+    if scenario in ("security", "store", "update"):
         serial = os.path.join(outdir, f"{name}-serial.log")
         tag = f"test {scenario}: "
 
@@ -373,7 +375,7 @@ def main():
             check("A PlayStation controller is detected", r"controller Nimbus Test DualSense: ([^\r\n]*)", 60, lambda m: "DualSense" in m.group(1) and "playstation" in m.group(1))
             check("Its button presses reach Settings", r"controller input: ([^\r\n]*)", 60, lambda m: "Cross pressed" in m.group(1))
             check("The Security test finished", r"done", 60)
-        else:
+        elif scenario == "store":
             check("Flatpak and Flathub are ready", r"flatpak (\w+) flathub (\w+) libflatpak (\w+)", 120, lambda m: m.group(1) == "true")
             check("The Store downloads Flathub's catalog", r"catalog (\d+) apps in (\d+) s", 900, lambda m: int(m.group(1)) > 1000)
             check("Search finds Discord", r"search discord: (\S+)", 60, lambda m: m.group(1) == "com.discordapp.Discord")
@@ -383,6 +385,32 @@ def main():
             check("Discord opens as a window with its taskbar button", r"window ([^\r\n]*) on the taskbar as (\S+)", 360, lambda m: m.group(2) == "fp:com.discordapp.Discord")
             check("Updates can be checked", r"updates waiting: (\d+)", 180)
             check("The Store test finished", r"done", 120)
+        else:
+            files_ok = lambda m: m.group(2) == m.group(3) and int(m.group(3)) > 20  # noqa: E731
+            first = check("The ISO's files match the list it keeps of them", r"before (\w+) files (\d+)/(\d+)", 180, files_ok,
+                          lambda m: f"build {m.group(1)}, {m.group(2)} of {m.group(3)} files")
+            check("Finds a newer build on the update server", r"found (\w+) (\d+) bytes inplace=(\w+) packages=(\d+)", 240,
+                  lambda m: m.group(1).startswith("7e57") and m.group(3) == "true" and m.group(4) == "1",
+                  lambda m: f"build {m.group(1)}, {int(m.group(2)) / 1e6:.1f} MB to download, {m.group(4)} package to add")
+            check("Downloads and installs it from Settings", r"installed (\w+) in (\d+) s: (\d+) files, packages ([^,]*), warnings (\d+)", 1800,
+                  lambda m: m.group(1).startswith("7e57") and "hello" in m.group(4) and m.group(5) == "0",
+                  lambda m: f"{m.group(2)} s, {m.group(3)} files changed, added {m.group(4).strip()}, {m.group(5)} warnings")
+            check("Starts the new build after a restart", r"now (\w+) files (\d+)/(\d+)", 600, lambda m: m.group(1).startswith("7e57"),
+                  lambda m: "build " + m.group(1))
+            m = re.search(re.escape(tag) + r"now \w+ files (\d+)/(\d+)(?: \(([^)]*)\))? migration=(\w+) package=(\w+) added=(\w+) issue=(\w+)", slog())
+            note("Every file is the new build's", bool(m) and m.group(1) == m.group(2), (f"{m.group(1)} of {m.group(2)}" + (f" ({m.group(3)})" if m.group(3) else "")) if m else "not reported")
+            note("The package it needs is installed", bool(m) and m.group(5) == "true", "hello" if m else "not reported")
+            note("Its one-off setup step ran", bool(m) and m.group(4) == "true", "" if m else "not reported")
+            note("A file it adds is there and one it drops is gone", bool(m) and m.group(6) == "true" and m.group(7) == "false", "" if m else "not reported")
+            check("Settings says it's up to date", r"after: ([^/\r\n]*) / ([^\r\n]*)", 240,
+                  lambda m: "up to date" in m.group(1) and m.group(2).strip() == "nothing newer", lambda m: m.group(1).strip())
+            check("Recovery offers going back", r"recovery offers going back to (\w+)", 180, lambda m: bool(first) and m.group(1) == first.group(1),
+                  lambda m: "build " + m.group(1))
+            check("Goes back from Recovery", r"went back, ([^\r\n]*) waits for a restart", 300)
+            check("Starts the earlier build after a restart", r"back on (\w+) files (\d+)/(\d+)(?: \([^)]*\))? added=(\w+) issue=(\w+)", 600,
+                  lambda m: bool(first) and m.group(1) == first.group(1) and files_ok(m) and m.group(4) == "false" and m.group(5) == "true",
+                  lambda m: f"build {m.group(1)}, {m.group(2)} of {m.group(3)} files as before")
+            check("The Update test finished", r"done", 240)
         try:
             vm.cmd("quit")
         except Exception:

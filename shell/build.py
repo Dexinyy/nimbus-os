@@ -48,7 +48,7 @@ def bundle(test_hook=False):
     css = "\n".join((SRC / "css" / f).read_text() for f in CSS_ORDER)
     js = "\n".join(f"/* ---- {f} ---- */\n" + (SRC / "js" / f).read_text() for f in JS_ORDER)
     if test_hook:
-        js += "\nwindow.__n = { WM, S, FS, Store, Flyouts, Power, Notif, Clock, Desktop, Menu, caps, bus, Native, Net, QS, Storage, NativeWin, Apps, APPS, Sys, SPAGES, SINDEX, ClipHistory, Shots, Programs, StoreJobs, SecState };\n"
+        js += "\nwindow.__n = { WM, S, FS, Store, Flyouts, Power, Notif, Clock, Desktop, Menu, caps, bus, Native, Net, QS, Storage, NativeWin, Apps, APPS, Sys, SPAGES, SINDEX, ClipHistory, Shots, Programs, StoreJobs, SecState, Upd };\n"
     return css, "(() => {\n" + js + "\n})();\n"
 
 

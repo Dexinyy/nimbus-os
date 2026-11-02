@@ -250,10 +250,36 @@ defPage('micperm', { title: 'Microphone', parent: 'privacy', icon: 'mic', keywor
   caps.programs ? WS.card(ctx, { icon: 'globe', title: 'Google Chrome', desc: 'Chrome asks before each website uses your microphone' }) : null)] });
 defSettings('micperm', [['micAccess', 'Microphone access', 'mic privacy mute block']]);
 
-/* ---------- Nimbus Update ---------- */
-const Upd = { st: null, busy: false, error: '' };
+/* ---------- Nimbus Update ----------
+   New versions of Nimbus OS install in place. The update helper (usr/lib/nimbus/nimbus-update) downloads the small
+   package each release publishes next to its ISO, checks it and installs it, and a restart finishes the job. Without
+   saving, or when a version needs a new ISO, the page offers the ISO instead. Recovery can go back to the version
+   from before the last update. */
+const Upd = { st: null, busy: false, error: '', job: null, local: null };
+// job: { phase: 'download' | 'install' | 'done' | 'error', pct, text, error, result }
+const ISO_PAGE = 'https://github.com/Dexinyy/nimbus-os/releases/tag/latest';
+const updWorking = () => !!(Upd.job && (Upd.job.phase === 'download' || Upd.job.phase === 'install'));
+const updPendingInfo = () => (Upd.job && Upd.job.phase === 'done' ? Upd.job.result : (Upd.st && Upd.st.pending) || (Upd.local && Upd.local.pending) || null);
+const updPending = () => !!updPendingInfo();
+const updName = (v) => `${v.name || 'Nimbus OS ' + (v.version || '')} (build ${String(v.commit || '').slice(0, 7)})`.replace(/\s+/g, ' ');
+function updChanged() {
+  bus.emit('sys', 'update');
+  const b = document.getElementById('start-power');
+  if (b) { b.classList.toggle('upd', updPending()); b.setAttribute('aria-label', updPending() ? 'Power (restart to finish updating)' : 'Power'); }
+}
+// The helper's progress while it downloads and installs
+bus.on('native:update-progress', (d) => {
+  if (!d || !updWorking()) return;
+  const phase = d.phase === 'download' ? 'download' : 'install';
+  const moved = phase !== Upd.job.phase;
+  Object.assign(Upd.job, { phase, pct: +d.pct || 0, text: d.text || '' });
+  bus.emit('upd-progress', moved);
+  if (moved) updChanged();
+});
 function updateLine() {
   if (!IS_NATIVE) return 'Updates with the page';
+  if (updPending()) return 'Restart required';
+  if (updWorking()) return Upd.job.phase === 'download' ? 'Downloading an update…' : 'Installing an update…';
   if (Upd.busy) return 'Checking for updates…';
   const s = Upd.st;
   if (s && (s.nimbusNew || (s.chrome && s.chrome.update))) return 'Updates available';
@@ -263,34 +289,160 @@ function updateLine() {
 async function checkUpdates(ctx) {
   if (!IS_NATIVE || Upd.busy) return;
   Upd.busy = true; Upd.error = ''; ctx?.rerender();
-  try { Upd.st = await Sys.call('updateCheck', {}, 120000); S.set('updChecked', Date.now()); }
-  catch (e) { Upd.error = e.message; }
-  Upd.busy = false; bus.emit('sys', 'update'); ctx?.rerender();
+  try {
+    Upd.st = await Sys.call('updateCheck', {}, 150000);
+    if (Upd.st.ok === false) Upd.error = Upd.st.error || 'Couldn’t check for updates';
+    else S.set('updChecked', Date.now());
+  } catch (e) { Upd.error = e.message; }
+  Upd.busy = false; updChanged(); ctx?.rerender();
 }
-defPage('update', { title: 'Nimbus Update', icon: 'update', keywords: 'updates check version upgrade chrome', render: (ctx) => {
+async function installNimbus() {
+  if (!IS_NATIVE || updWorking()) return;
+  Upd.job = { phase: 'download', pct: 0, text: '' };
+  updChanged();
+  try {
+    const r = await Sys.call('updateInstall', {}, 4 * 3600e3);
+    if (r.current) Upd.job = null;
+    else {
+      Upd.job = { phase: 'done', result: r };
+      Upd.local = null;  // Recovery asks again: the version before this one can now come back
+      Notif.push({ app: 'settings', title: 'Restart to finish updating', body: `${updName(r)} is installed. Restart your PC to start using it.`, action: () => WM.open('settings', { page: 'update' }) });
+    }
+    if (Upd.st) { Upd.st.available = null; Upd.st.nimbusNew = false; }
+  } catch (e) {
+    Upd.job = e.message === 'cancelled' ? null : { phase: 'error', error: e.message };
+    if (Upd.job) Notif.push({ app: 'settings', title: 'Nimbus OS couldn’t update', body: e.message, action: () => WM.open('settings', { page: 'update' }) });
+  }
+  updChanged();
+}
+const cancelNimbus = () => { if (Upd.job && Upd.job.phase === 'download') Sys.call('updateCancel').catch(() => {}); };
+const openIso = (url) => (caps.programs ? Apps.openUrl(url || ISO_PAGE) : copyText(url || ISO_PAGE));
+function updNotes(a, within) {
+  const notes = a.notes || [];
+  const list = h('ul', { class: 'upd-notes' }, ...notes.map((n) => h('li', {}, h('span', { text: n.subject }), n.date ? h('span', { class: 'muted', text: ' · ' + fmtDT(n.date * 1000, { month: 'short', day: 'numeric' }) }) : null)));
+  return Dialog.show({ title: `What’s new in build ${a.commit}`, content: notes.length ? list : h('p', { text: 'Fixes and improvements.' }), wide: true, within,
+    buttons: [{ label: 'Close', value: true, primary: true }] });
+}
+// Restarting halfway through an install would leave Nimbus half updated: wait for it (a download just stops)
+async function updGuard(verb) {
+  if (!updWorking() || Upd.job.phase !== 'install') return true;
+  await Dialog.show({ title: 'Nimbus OS is installing an update', message: `${verb} once it’s done (it takes a minute or two), so the update isn’t left half finished.` });
+  return false;
+}
+/* The Nimbus OS line of the page, with its state on the right as Windows shows it */
+function nimbusItem(ctx) {
+  const s = Upd.st || {}, a = s.available, j = Upd.job;
+  const icon = `<span class="ws-appic">${appIcon('logo')}</span>`;
+  const state = (text, cls) => h('span', { class: 'upd-state' + (cls ? ' ' + cls : ''), text });
+  const pend = updPendingInfo();
+  if (pend) {
+    return WS.card(ctx, { iconHtml: icon, title: updName(pend), desc: pend.unfinished ? 'The last update didn’t finish. Restart and Nimbus finishes it.' : pend.back ? 'Going back to this version. Restart to finish.' : 'Installed. Restart to start using it.',
+      ctl: state('Pending restart') });
+  }
+  if (!a) return null;
+  if (updWorking()) {
+    const label = state('');
+    const bar = WS.meter(0, 'small');
+    const detail = h('span', { text: '' });
+    const paint = () => {
+      const jj = Upd.job; if (!jj) return;
+      label.textContent = (jj.phase === 'download' ? 'Downloading' : 'Installing') + ' – ' + Math.floor(jj.pct || 0) + '%';
+      bar.firstChild.style.width = clamp(jj.pct || 0, 0, 100) + '%';
+      detail.textContent = jj.text || (jj.phase === 'download' ? 'Starting the download' : 'Getting ready');
+    };
+    paint();
+    ctx.on('upd-progress', (moved) => (moved ? ctx.rerender() : paint()));
+    return WS.card(ctx, { iconHtml: icon, title: updName(a), desc: detail, cls: 'upd-busy',
+      ctl: h('div', { class: 'upd-prog' }, label, bar, j.phase === 'download' ? WS.link('Cancel', cancelNimbus) : null) });
+  }
+  const when = a.date ? 'Published ' + fmtDT(a.date * 1000, { dateStyle: 'medium' }) : '';
+  if (s.inplace) {
+    const size = `${fmtBytes(a.size || 0)} download` + (a.packages ? ` plus ${a.packages} Ubuntu package${a.packages === 1 ? '' : 's'}` : '');
+    const desc = h('span', {}, [size, when].filter(Boolean).join(' · '), a.notes && a.notes.length ? h('span', { text: ' · ' }) : null,
+      a.notes && a.notes.length ? WS.link('What’s new', () => updNotes(a, ctx.win)) : null);
+    if (j && j.phase === 'error') return WS.card(ctx, { iconHtml: icon, title: updName(a), desc: j.error, ctl: state('Install error', 'err') });
+    return WS.card(ctx, { iconHtml: icon, title: updName(a), desc, ctl: state('Pending download') });
+  }
+  if (s.why === 'saving') {
+    return WS.card(ctx, { iconHtml: icon, title: updName(a), desc: h('span', {}, 'Turn on saving to install updates here. Without it, Nimbus forgets every change when it restarts, updates included. Or ',
+      WS.link('get the new ISO', () => openIso(s.iso)), '.'), ctl: WS.button('Turn on saving', () => Storage.open()) });
+  }
+  return WS.card(ctx, { iconHtml: icon, title: updName(a), desc: (s.reason || 'This version needs the new ISO.') + ' Download it and write it to your USB stick.',
+    ctl: WS.button('Get the ISO', () => openIso(s.iso), { accent: true }) });
+}
+defPage('update', { title: 'Nimbus Update', icon: 'update', keywords: 'updates check version upgrade chrome install restart', render: (ctx) => {
   const s = Upd.st; const paused = S.data.updPause && S.data.updPause > Date.now();
-  const anyNew = s && (s.nimbusNew || (s.chrome && s.chrome.update));
-  const title = !IS_NATIVE ? 'Nimbus updates when the page does' : Upd.busy ? 'Checking for updates…' : Upd.error ? 'We couldn’t check for updates' : anyNew ? 'Updates available' : paused ? 'Updates are paused' : 'You’re up to date';
-  const sub = !IS_NATIVE ? 'Every time you open it, you get the latest version.' : Upd.error ? Upd.error : paused ? 'Until ' + fmtDT(S.data.updPause, { dateStyle: 'medium' }) : S.data.updChecked ? 'Last checked: ' + fmtDT(S.data.updChecked, { dateStyle: 'medium', timeStyle: 'short' }) : '';
-  const items = [];
-  if (s && s.nimbusNew) items.push(WS.card(ctx, { iconHtml: `<span class="ws-appic">${appIcon('logo')}</span>`, title: `Nimbus OS ${s.latest.name || ''}`.trim(), desc: `A new version was published ${fmtDT(s.latest.date, { dateStyle: 'medium' })}. Download it and write it to your USB stick to update.`, ctl: WS.button('Download', () => (caps.programs ? Apps.openUrl(s.latest.url) : copyText(s.latest.url)), { accent: true }) }));
-  if (s && s.chrome && s.chrome.update) items.push(WS.card(ctx, { iconHtml: `<span class="ws-appic">${appIcon(APPS.chrome.icon)}</span>`, title: `Google Chrome ${s.chrome.candidate}`, desc: `You have ${s.chrome.version}`, ctl: WS.button('Update now', async (e, b) => { b.disabled = true; b.textContent = 'Updating…'; try { await Sys.call('programUpdate', { app: 'chrome' }, 600000); Notif.push({ app: 'settings', title: 'Google Chrome is up to date', silent: true }); } catch (err) { Notif.push({ app: 'settings', title: 'Couldn’t update Chrome', body: err.message }); } await Apps.refresh(); checkUpdates(ctx); }, { accent: true }) }));
-  if (IS_NATIVE && !Upd.st && !Upd.busy && !Upd.error && (!S.data.updChecked || Date.now() - S.data.updChecked > 3600e3)) setTimeout(() => checkUpdates(ctx), 50);
+  const chromeNew = !!(s && s.chrome && s.chrome.update);
+  const nimbusNew = !!(s && s.available);
+  const pending = updPending(), working = updWorking();
+  const anyNew = nimbusNew || chromeNew;
+  const pend = updPendingInfo();
+  const title = !IS_NATIVE ? 'Nimbus updates when the page does' : pending ? 'Restart required' : working ? 'Updates available' : Upd.busy ? 'Checking for updates…'
+    : Upd.error && !anyNew ? 'We couldn’t check for updates' : anyNew ? 'Updates available' : paused ? 'Updates are paused' : 'You’re up to date';
+  const sub = !IS_NATIVE ? 'Every time you open it, you get the latest version.' : pending ? `Restart your PC to finish ${pend.back ? 'going back to' : 'installing'} ${updName(pend)}.`
+    : Upd.error && !anyNew ? Upd.error : paused ? 'Until ' + fmtDT(S.data.updPause, { dateStyle: 'medium' })
+    : S.data.updChecked ? 'Last checked: ' + fmtDT(S.data.updChecked, { dateStyle: 'medium', timeStyle: 'short' }) : '';
+  const items = [nimbusItem(ctx)];
+  if (chromeNew) items.push(WS.card(ctx, { iconHtml: `<span class="ws-appic">${appIcon(APPS.chrome.icon)}</span>`, title: `Google Chrome ${s.chrome.candidate}`, desc: `You have ${s.chrome.version}`, ctl: WS.button('Update now', async (e, b) => { b.disabled = true; b.textContent = 'Updating…'; try { await Sys.call('programUpdate', { app: 'chrome' }, 600000); Notif.push({ app: 'settings', title: 'Google Chrome is up to date', silent: true }); } catch (err) { Notif.push({ app: 'settings', title: 'Couldn’t update Chrome', body: err.message }); } await Apps.refresh(); checkUpdates(ctx); }) }));
+  if (IS_NATIVE && !Upd.st && !Upd.busy && !Upd.error && !working && (!S.data.updChecked || Date.now() - S.data.updChecked > 3600e3)) setTimeout(() => checkUpdates(ctx), 50);
+  ctx.on('sys', (what) => { if (what === 'update') ctx.rerender(); });
   const pauseOpts = [[0, paused ? 'Resume updates' : 'Not paused'], ...[1, 2, 3, 4, 5].map((w) => [w, `Pause for ${w} week${w === 1 ? '' : 's'}`])];
   if (paused) pauseOpts.unshift(['p', 'Paused until ' + fmtDT(S.data.updPause, { month: 'short', day: 'numeric' })]);
+  const hero = !IS_NATIVE ? null : pending ? WS.button('Restart now', () => Power.restart(), { accent: true })
+    : working ? null
+    : nimbusNew && s.inplace ? WS.button(Upd.job && Upd.job.phase === 'error' ? 'Try again' : 'Download & install', () => installNimbus(), { accent: true })
+    : WS.button(Upd.busy ? 'Checking…' : 'Check for updates', () => checkUpdates(ctx), { accent: true, disabled: Upd.busy });
+  const ic = pending ? 'restart' : working || Upd.busy ? 'update' : anyNew ? 'download' : Upd.error ? 'warning' : 'updateCheck';
   return [
-    h('div', { class: 'ws-hero upd' + (anyNew ? ' new' : '') }, frag(`<span class="ws-upd-ic">${fi(Upd.busy ? 'update' : anyNew ? 'download' : Upd.error ? 'warning' : 'updateCheck')}</span>`),
-      h('div', { class: 'ws-hero-meta' }, h('div', { class: 'ws-hero-name', text: title }), h('div', { class: 'ws-d', text: sub })),
-      IS_NATIVE ? WS.button(Upd.busy ? 'Checking…' : 'Check for updates', () => checkUpdates(ctx), { accent: true, disabled: Upd.busy }) : null),
-    items.length ? WS.group(null, items) : null,
+    h('div', { class: 'ws-hero upd' + (anyNew || pending ? ' new' : '') + (working || Upd.busy ? ' busy' : '') }, frag(`<span class="ws-upd-ic">${fi(ic)}</span>`),
+      h('div', { class: 'ws-hero-meta' }, h('div', { class: 'ws-hero-name', text: title }), h('div', { class: 'ws-d', text: sub })), hero),
+    items.filter(Boolean).length ? WS.group(null, items) : null,
     caps.programs ? WS.group('Apps and protection', storeUpdatesCard(ctx), securityDefsCard(ctx)) : null,
     WS.group('More options',
-      IS_NATIVE ? WS.card(ctx, { sid: 'updPause', icon: 'pause', title: 'Pause updates', desc: paused ? 'Programs won’t update by themselves until then' : '', ctl: WS.combo(ctx, pauseOpts, () => (paused ? 'p' : 0), (v) => { if (v === 'p') return; S.set('updPause', +v ? Date.now() + (+v) * 7 * 86400e3 : 0); ctx.rerender(); }, 'Pause updates', { width: 200 }) }) : null,
+      IS_NATIVE ? WS.card(ctx, { sid: 'updPause', icon: 'pause', title: 'Pause updates', desc: paused ? 'Nimbus won’t look for updates or update programs by itself until then' : '', ctl: WS.combo(ctx, pauseOpts, () => (paused ? 'p' : 0), (v) => { if (v === 'p') return; S.set('updPause', +v ? Date.now() + (+v) * 7 * 86400e3 : 0); ctx.rerender(); }, 'Pause updates', { width: 200 }) }) : null,
       WS.card(ctx, { icon: 'history', title: 'Update history', go: 'updatehistory' }),
-      WS.card(ctx, { icon: 'settings', title: 'Advanced options', desc: 'Updates for programs, metered connections', go: 'updateadvanced' })),
+      WS.card(ctx, { icon: 'settings', title: 'Advanced options', desc: 'Updates for programs, metered connections', go: 'updateadvanced' }),
+      IS_NATIVE ? WS.card(ctx, { icon: 'arrowUndo', title: 'Go back to the previous version', desc: 'In Recovery', go: 'recovery' }) : null),
   ];
 } });
 defSettings('update', [['updPause', 'Pause updates', 'stop delay']]);
+// After a restart: say what changed, once (Native.info.build is the version that started)
+function updStarted(info) {
+  if (!IS_NATIVE || !info) return;
+  const build = info.build || '';
+  if (build && S.data.lastBuild && S.data.lastBuild !== build) {
+    const back = S.data.updWentBack === build;
+    Notif.push({ app: 'settings', title: back ? 'Nimbus OS went back' : 'Nimbus OS was updated', body: back ? `You’re on build ${build} again.` : `You now have build ${build}.`, action: () => WM.open('settings', { page: 'updatehistory' }) });
+  }
+  if (build && S.data.lastBuild !== build) S.set('lastBuild', build);
+  if (S.data.updWentBack) S.set('updWentBack', '');
+  // An update installed before the desktop restarted still waits for the PC to restart
+  Sys.call('updateStatus', {}, 30000).then((st) => { Upd.local = st; updChanged(); }).catch(() => {});
+}
+/* Recovery's "Go back": the files from before the last update were kept, so the previous version comes back */
+async function goBack(ctx) {
+  const b = Upd.local && Upd.local.back; if (!b) return;
+  const ok = await Dialog.confirm(`Go back to build ${b.commit}?`, 'Nimbus OS puts back the version from before the last update, then you restart. Your files, apps and settings stay as they are.', { ok: 'Go back', within: ctx.win });
+  if (!ok) return;
+  Notif.push({ app: 'settings', title: 'Going back…', body: 'This takes a few seconds.', silent: true });
+  try {
+    const r = await Sys.call('updateBack', {}, 900000);
+    S.set('updWentBack', r.commit);
+    Upd.local = Object.assign({}, Upd.local, { back: null, pending: { name: 'Nimbus OS ' + (r.version || ''), version: r.version, commit: r.commit, back: true } });
+    Upd.job = null; if (Upd.st) { Upd.st.pending = Upd.local.pending; Upd.st.back = null; }
+    updChanged(); ctx.rerender();
+    const now = await Dialog.show({ title: 'Restart to finish', message: `Build ${r.commit} is back in place. Restart your PC to start using it.`, within: ctx.win,
+      buttons: [{ label: 'Restart now', value: true, primary: true }, { label: 'Later', value: null }] });
+    if (now) Power.restart();
+  } catch (e) { Notif.push({ app: 'settings', title: 'Couldn’t go back', body: e.message }); }
+}
+function goBackCard(ctx) {
+  if (!IS_NATIVE) return null;
+  if (!Upd.local) setTimeout(() => Sys.call('updateStatus', {}, 30000).then((st) => { Upd.local = st; ctx.rerender(); }).catch(() => { Upd.local = { back: null }; ctx.rerender(); }), 0);
+  const b = Upd.local && Upd.local.back;
+  const desc = !Upd.local ? 'Checking…' : b ? `If this version isn’t working well, go back to build ${b.commit}${b.time ? ', which you had until ' + fmtDT(b.time * 1000, { dateStyle: 'medium' }) : ''}.` : 'This option is no longer available on this PC.';
+  return WS.card(ctx, { sid: 'goback', icon: 'arrowUndo', title: 'Go back', desc, ctl: WS.button('Go back', () => goBack(ctx), { disabled: !b || updWorking() }) });
+}
 // Apps from the Store update there (Library); virus definitions in Nimbus Security
 function storeUpdatesCard(ctx) {
   const desc = h('span', { text: 'Checking for app updates…' });
@@ -319,3 +471,92 @@ defPage('updateadvanced', { title: 'Advanced options', parent: 'update', icon: '
   WS.card(ctx, { sid: 'updMetered', icon: 'dataUsage', title: 'Download updates over metered connections', ctl: WS.settingToggle(ctx, 'updMetered', 'Download updates over metered connections') }),
   WS.card(ctx, { sid: 'updNotify', icon: 'notifications', title: 'Tell me when updates are available', ctl: WS.toggle(ctx, () => S.data.updNotify !== false, (v) => S.set('updNotify', v), 'Tell me when updates are available') }))] });
 defSettings('updateadvanced', [['autoUpdate', 'Automatic program updates', 'chrome update'], ['updMetered', 'Download updates over metered connections', 'data']]);
+
+/* Boot test only ("nimbus.test=update", os/test-boot.sh), on a USB stick that saves. The machine offers a newer
+   copy of this build from a test server. Start 1 installs it through this page and restarts. Start 2 checks
+   every file, the new package and the setup step, then goes back through Recovery and restarts. Start 3 checks
+   that the earlier version is back. os/qmp.py follows the log and takes the screenshots. */
+async function testUpdate() {
+  const log = (text) => Native.call('log', { text: 'test update: ' + text }).catch(() => {});
+  const until = async (fn, ms) => { const end = Date.now() + ms; for (;;) { const v = fn(); if (v) return v; if (Date.now() > end) return null; await sleep(500); } };
+  const page = async (name) => { log('page ' + name); await sleep(2500); };
+  const win = () => document.querySelector('.app-settings');
+  const button = (label, root) => [...(root || document).querySelectorAll('button')].find((b) => b.textContent.trim() === label && !b.disabled);
+  const restart = async (why) => { S.set('updTest', why); Store.flushLocal(); await sleep(2000); log(why + ', restarting'); await sleep(500); };
+  const files = (t) => `files ${t.checked - t.badCount}/${t.checked}${t.badCount ? ' (' + t.bad.join(', ') + ')' : ''}`;
+  // A fresh look for updates (the page may have started one of its own: wait for whichever runs)
+  const check = async () => { Upd.st = null; Upd.error = ''; await checkUpdates(); await until(() => !Upd.busy && (Upd.st || Upd.error), 150000); };
+  try {
+    await sleep(12000);
+    const t = await Native.call('updateTest', {}, 60000);
+    const build = String(t.build.commit || '').slice(0, 7);
+    const stage = S.data.updTest || '';
+    if (stage === 'installed') {
+      log(`now ${build} ${files(t)} migration=${t.migration} package=${t.hello} added=${t.added} issue=${t.issue}`);
+      WM.open('settings', { page: 'update' });
+      await check();
+      await sleep(1500);
+      log(`after: ${win()?.querySelector('.ws-hero-name')?.textContent} / ${Upd.st && Upd.st.available ? 'still offers ' + Upd.st.available.commit : 'nothing newer'}`);
+      await page('uptodate');
+      WM.open('settings', { page: 'updatehistory' });
+      await sleep(2000);
+      await page('history');
+      Upd.local = null;
+      WM.open('settings', { page: 'recovery' });
+      const go = await until(() => button('Go back', win()), 30000);
+      log(`recovery offers going back to ${Upd.local && Upd.local.back ? Upd.local.back.commit : 'nothing'}`);
+      await page('recovery');
+      if (!go) throw new Error('Recovery has no Go back button');
+      go.click();
+      const sure = await until(() => button('Go back', document.querySelector('.modal')), 10000);
+      if (!sure) throw new Error('no confirmation');
+      sure.click();
+      const again = await until(() => button('Restart now', document.querySelector('.modal')), 120000);
+      if (!again) throw new Error('going back didn’t finish' + (Notif.items[0] ? ': ' + Notif.items[0].title + ' ' + (Notif.items[0].body || '') : ''));
+      log(`went back, ${updName(updPendingInfo())} waits for a restart`);
+      await page('back-restart');
+      await restart('going back');
+      again.click();
+      return;
+    }
+    if (stage === 'going back') {
+      log(`back on ${build} ${files(t)} added=${t.added} issue=${t.issue} back=${!!(t.status && t.status.back)}`);
+      WM.open('settings', { page: 'update' });
+      await check();
+      await sleep(1500);
+      log(`offered again: ${Upd.st && Upd.st.available ? Upd.st.available.commit : 'no'}`);
+      await page('offered-again');
+      S.set('updTest', 'done');
+      log('done');
+      return;
+    }
+    // The first start: the ISO's own version
+    log(`before ${build} ${files(t)}`);
+    WM.open('settings', { page: 'update' });
+    await check();
+    const a = Upd.st && Upd.st.available;
+    if (!a) throw new Error('no update found: ' + JSON.stringify(Upd.st).slice(0, 300));
+    log(`found ${a.commit} ${a.size} bytes inplace=${Upd.st.inplace} packages=${a.packages} notes=${(a.notes || []).length}`);
+    await sleep(1500);
+    await page('available');
+    const install = button('Download & install', win());
+    if (!install) throw new Error('no Download & install button');
+    let shot = false;
+    const off = bus.on('upd-progress', () => { if (!shot && Upd.job && Upd.job.phase === 'install' && Upd.job.pct >= 5) { shot = true; log('page installing'); } });
+    const t0 = Date.now();
+    install.click();
+    await until(() => Upd.job && Upd.job.phase !== 'download' && Upd.job.phase !== 'install', 30 * 60 * 1000);
+    off();
+    if (!Upd.job || Upd.job.phase !== 'done') throw new Error('installing failed: ' + (Upd.job ? Upd.job.error : 'it never finished'));
+    const r = Upd.job.result;
+    log(`installed ${r.commit} in ${Math.round((Date.now() - t0) / 1000)} s: ${r.changed} files, packages ${(r.packages || []).join(' ') || 'none'}, warnings ${(r.warnings || []).length}`);
+    await sleep(1500);
+    await page('restart');
+    const now = button('Restart now', win());
+    if (!now) throw new Error('no Restart now button');
+    await restart('installed');
+    now.click();
+  } catch (e) {
+    log('failed: ' + e.message);
+  }
+}

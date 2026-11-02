@@ -1,0 +1,3 @@
+# The desktop may install Nimbus OS updates and go back to the version before the last one, as root
+# (Settings > Nimbus Update; the helper downloads and checks everything itself and takes no other arguments).
+nimbus ALL=(root) NOPASSWD: /usr/lib/nimbus/nimbus-update install, /usr/lib/nimbus/nimbus-update back

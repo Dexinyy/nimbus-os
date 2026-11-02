@@ -891,8 +891,9 @@ const Power = {
       { label: 'Lock', icon: 'lock', kb: 'Ctrl+Alt+L', action: () => { Flyouts.close(); this.lock(); } },
       { label: 'Sleep', icon: 'moon', action: () => { Flyouts.close(); this.sleep(); } },
       'sep',
-      { label: 'Restart', icon: 'restart', action: () => { Flyouts.close(); this.restart(); } },
-      { label: 'Shut down', icon: 'power', action: () => { Flyouts.close(); this.shutdown(); } },
+      // With an update waiting for a restart, as on Windows (settings-more.js)
+      { label: updPending() ? 'Update and restart' : 'Restart', icon: 'restart', action: () => { Flyouts.close(); this.restart(); } },
+      { label: updPending() ? 'Update and shut down' : 'Shut down', icon: 'power', action: () => { Flyouts.close(); this.shutdown(); } },
     ], 0, 0, { anchorEl: anchor, above: S.data.tbPos !== 'top', alignRight: true });
   },
   async boot() {
@@ -953,6 +954,7 @@ const Power = {
     return Dialog.confirm(`${verb} anyway?`, 'Some apps have unsaved changes. If you continue, those changes will be lost.', { ok: verb + ' anyway', danger: true });
   },
   async restart() {
+    if (!(await updGuard('Restart'))) return;
     if (!(await this.confirmClose('Restart'))) return;
     Flyouts.close(); Menu.close(); WM.taskView(false);
     const el = this.screen('boot', `<div class="boot-inner"><div class="spinner"></div><div class="boot-msg">Restarting</div></div>`);
@@ -963,6 +965,7 @@ const Power = {
     this.boot();
   },
   async shutdown() {
+    if (!(await updGuard('Shut down'))) return;
     if (!(await this.confirmClose('Shut down'))) return;
     Flyouts.close(); Menu.close(); WM.taskView(false);
     Sound.play('shutdown');

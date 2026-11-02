@@ -2,7 +2,8 @@
 Description=Nimbus desktop
 Documentation=file:///usr/share/doc/nimbus-os/README.md
 After=systemd-user-sessions.service plymouth-quit-wait.service systemd-logind.service dbus.service getty@tty1.service
-Wants=dbus.service systemd-logind.service
+After=nimbus-update-boot.service
+Wants=dbus.service systemd-logind.service nimbus-update-boot.service
 Conflicts=getty@tty1.service
 # Always bring the desktop back, however often it stops
 StartLimitIntervalSec=0

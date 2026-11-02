@@ -569,3 +569,7 @@ html.wm #dim, html.wm #nightlight { display: none; }
 .clip-acts .ibtn svg { width: 15px; height: 15px; }
 .clip-empty, .clip-off p { color: var(--text-2); padding: 8px 4px; margin: 0; line-height: 1.45; }
 .clip-off { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+
+/* An installed update waits for a restart: an orange dot on Start's power button, as Windows shows */
+#start-power { position: relative; }
+#start-power.upd::after { content: ''; position: absolute; top: 7px; right: 7px; width: 7px; height: 7px; border-radius: 50%; background: #f7630c; box-shadow: 0 0 0 1.5px var(--acrylic-solid); }

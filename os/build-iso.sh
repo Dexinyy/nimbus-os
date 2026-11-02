@@ -3,10 +3,14 @@
 #
 # Needs root on Ubuntu 24.04 (a GitHub Actions runner works) with these tools:
 #   debootstrap squashfs-tools xorriso grub-pc-bin grub-efi-amd64-bin grub-common mtools dosfstools python3
-# Output: out/nimbus-os-<version>-amd64.iso (boots on UEFI and BIOS PCs, from USB or disc)
+# Output: out/nimbus-os-<version>-amd64.iso (boots on UEFI and BIOS PCs, from USB or disc), and the update package
+#         running systems install in place: out/nimbus-os-update.json and out/nimbus-os-update-<commit>.tar.xz
 set -euo pipefail
 
 VERSION="${NIMBUS_VERSION:-0.1}"
+# Raise BASE when a change can't reach running systems as an in-place update (it needs a newer kernel, new startup
+# scripts or another Ubuntu release): Settings › Nimbus Update then offers the new ISO instead.
+BASE=1
 SUITE="noble"
 MIRROR="${UBUNTU_MIRROR:-http://archive.ubuntu.com/ubuntu}"
 SECURITY_MIRROR="${UBUNTU_SECURITY_MIRROR:-http://security.ubuntu.com/ubuntu}"
@@ -107,9 +111,13 @@ in_chroot apt-cache show "$KEXTRA" >/dev/null 2>&1 || KEXTRA=""
 echo "Kernel package: $KIMAGE ${KEXTRA:+(+ $KEXTRA)}"
 
 log "Installing the system"
-PACKAGES=(
+# What starts the live system. Only a new ISO changes these: the kernel and startup image are on the USB stick.
+BASE_PACKAGES=(
   "$KIMAGE" ${KEXTRA:+"$KEXTRA"} linux-firmware intel-microcode amd64-microcode
   casper user-setup initramfs-tools
+)
+# Everything else. An in-place update installs any of these that a running system doesn't have yet.
+PACKAGES=(
   systemd-sysv systemd-resolved systemd-timesyncd udev dbus dbus-user-session libpam-systemd polkitd kmod
   network-manager wpasupplicant wireless-regdb iw dnsmasq-base
   fdisk e2fsprogs
@@ -138,9 +146,10 @@ if [ -n "$APT_CACHE" ]; then
   mkdir -p "$APT_CACHE/apt/partial"
   mount --bind "$(cd "$APT_CACHE/apt" && pwd)" "$CHROOT/var/cache/apt/archives"
 fi
-in_chroot apt-get install -y "${PACKAGES[@]}"
+in_chroot apt-get install -y "${BASE_PACKAGES[@]}" "${PACKAGES[@]}"
 # Printing: driverless (IPP Everywhere) printers on the network and on USB, without a pile of drivers
-in_chroot apt-get install -y --no-install-recommends cups-daemon cups-client cups-filters cups-ipp-utils avahi-daemon ipp-usb libnss-mdns
+PRINTING=(cups-daemon cups-client cups-filters cups-ipp-utils avahi-daemon ipp-usb libnss-mdns)
+in_chroot apt-get install -y --no-install-recommends "${PRINTING[@]}"
 
 # bubblewrap builds every Flatpak app's sandbox, and refuses to run with file capabilities ("Unexpected capabilities
 # but not setuid"): it needs none, as user namespaces are allowed (etc/sysctl.d/60-nimbus-userns.conf)
@@ -164,6 +173,27 @@ install -m 755 "$CHROOT/tmp/nimbus-wm/nimbus-wm" "$CHROOT/usr/bin/nimbus-wm"
 rm -rf "$CHROOT/tmp/nimbus-wm"
 in_chroot apt-get purge -y --auto-remove "${WM_BUILD[@]}"
 in_chroot ldd /usr/bin/nimbus-wm | grep -q "not found" && die "nimbus-wm is missing a library"
+# The packages nimbus-wm's libraries come from: an update brings any a system lacks along with a new nimbus-wm
+mapfile -t WM_RUNTIME < <(in_chroot python3 - <<'LIBS'
+import os, re, subprocess
+out = subprocess.run(["ldd", "/usr/bin/nimbus-wm"], capture_output=True, text=True).stdout
+packages = set()
+owner = re.compile(r"^([a-z0-9][a-z0-9+.-]+(?::[a-z0-9]+)?(?:, [a-z0-9][a-z0-9+.-]+(?::[a-z0-9]+)?)*): /")
+for line in out.splitlines():
+    lib = line.split("=>")[1].split("(")[0].strip() if "=>" in line else ""
+    if not lib.startswith("/"):
+        continue
+    for path in (lib, os.path.realpath(lib), "/usr" + lib if lib.startswith("/lib") else lib):
+        r = subprocess.run(["dpkg", "-S", path], capture_output=True, text=True)
+        found = [m.group(1) for m in map(owner.match, r.stdout.splitlines()) if m]
+        if found:
+            packages.update(p.split(":")[0] for p in found[0].split(", "))
+            break
+print("\n".join(sorted(packages)))
+LIBS
+)
+[ "${#WM_RUNTIME[@]}" -gt 3 ] || die "could not tell which packages nimbus-wm's libraries come from"
+echo "nimbus-wm's libraries come from: ${WM_RUNTIME[*]}"
 
 if [ -n "$APT_CACHE" ]; then
   umount "$CHROOT/var/cache/apt/archives"
@@ -181,13 +211,14 @@ echo "Etc/UTC" > "$CHROOT/etc/timezone"
 tar -C "$HERE/overlay" --owner=0 --group=0 -cf - . | tar -C "$CHROOT" --no-overwrite-dir -xf -
 chmod 755 "$CHROOT/usr/bin/nimbus-shell" "$CHROOT/usr/bin/nimbus-session" "$CHROOT/usr/lib/nimbus/shell-debug" \
   "$CHROOT/usr/lib/nimbus/test-wifi-ap" "$CHROOT/usr/lib/nimbus/nimbus-storage" "$CHROOT/usr/lib/nimbus/nimbus-apps" \
-  "$CHROOT/usr/lib/nimbus/nimbus-open" "$CHROOT/usr/lib/nimbus/nimbus-sys"
-chmod 440 "$CHROOT/etc/sudoers.d/nimbus-storage" "$CHROOT/etc/sudoers.d/nimbus-apps" "$CHROOT/etc/sudoers.d/nimbus-sys"
+  "$CHROOT/usr/lib/nimbus/nimbus-open" "$CHROOT/usr/lib/nimbus/nimbus-sys" "$CHROOT/usr/lib/nimbus/nimbus-update"
+chmod 440 "$CHROOT"/etc/sudoers.d/nimbus-*
 in_chroot visudo -cq || die "a sudoers file is broken"
-# Which version this is, for Settings > Nimbus Update and About
+# Which version this is, for Settings > Nimbus Update and About. An in-place update rewrites it and keeps "base".
 COMMIT="${GITHUB_SHA:-$(git -C "$REPO" rev-parse HEAD 2>/dev/null || echo unknown)}"
+BUILD_DATE="$(date +%s)"
 mkdir -p "$CHROOT/usr/share/nimbus"
-printf '{"version": "%s", "commit": "%s", "date": %s}\n' "$VERSION" "$COMMIT" "$(date +%s)" > "$CHROOT/usr/share/nimbus/build-info.json"
+printf '{"version": "%s", "commit": "%s", "date": %s, "base": %s}\n' "$VERSION" "$COMMIT" "$BUILD_DATE" "$BASE" > "$CHROOT/usr/share/nimbus/build-info.json"
 
 # Google Chrome can't be copied into this image, so Nimbus installs it from Google's repository when it's
 # first opened (usr/lib/nimbus/nimbus-apps). Its packages are checked with Google's RSA 4096 signing key.
@@ -268,6 +299,24 @@ log "Building the startup image (initramfs)"
 KVER="$(ls "$CHROOT/usr/lib/modules" | sort -V | tail -n 1)"
 in_chroot update-initramfs -d -k "$KVER" >/dev/null 2>&1 || true
 in_chroot update-initramfs -c -k "$KVER"
+
+log "Applying Nimbus's one-off setup steps (os/migrations)"
+# The same steps reach systems updating in place (usr/lib/nimbus/nimbus-update), so they live in one place
+for step in "$HERE"/migrations/[0-9][0-9][0-9][0-9]-*.sh; do
+  [ -e "$step" ] || continue
+  cp "$step" "$CHROOT/tmp/nimbus-migration.sh"
+  in_chroot sh -e /tmp/nimbus-migration.sh || die "migration $(basename "$step") failed"
+  rm -f "$CHROOT/tmp/nimbus-migration.sh"
+  echo "Ran $(basename "$step")"
+done
+
+log "Packing the update for running systems"
+# Nimbus's own files, for Settings > Nimbus Update on systems started from an older ISO (os/update-bundle.py). It
+# also writes the new system's list of those files, which the next update compares against.
+rm -f "$OUT"/nimbus-os-update-*.tar.xz "$OUT/nimbus-os-update.json"
+python3 "$HERE/update-bundle.py" build "$CHROOT" "$OUT" --overlay "$HERE/overlay" --migrations "$HERE/migrations" \
+  --version "$VERSION" --commit "$COMMIT" --date "$BUILD_DATE" --suite "$SUITE" --base "$BASE" \
+  --packages "${PACKAGES[*]} ${PRINTING[*]} ${WM_RUNTIME[*]}" --notes-from "$REPO"
 
 log "Cleaning up"
 in_chroot apt-get clean

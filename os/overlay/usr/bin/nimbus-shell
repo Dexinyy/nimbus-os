@@ -33,6 +33,7 @@ import nimbus_security  # noqa: E402
 import nimbus_store  # noqa: E402
 import nimbus_sys  # noqa: E402
 import nimbus_term  # noqa: E402
+import nimbus_update  # noqa: E402
 
 gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
@@ -367,7 +368,8 @@ class WMLink:
         return False
 
 
-class Shell(nimbus_sys.SysMethods, nimbus_store.StoreMethods, nimbus_security.SecurityMethods, nimbus_controllers.ControllerMethods):
+class Shell(nimbus_sys.SysMethods, nimbus_update.UpdateMethods, nimbus_store.StoreMethods, nimbus_security.SecurityMethods,
+            nimbus_controllers.ControllerMethods):
     def __init__(self):
         os.makedirs(DATA_DIR, exist_ok=True)
         os.makedirs(CACHE_DIR, exist_ok=True)

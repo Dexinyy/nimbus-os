@@ -430,8 +430,9 @@ defPage('troubleshoot', { title: 'Troubleshoot', parent: 'system', icon: 'troubl
     WS.card(ctx, { icon: 'display', title: 'Display', desc: 'Puts your display settings back', ctl: WS.button('Run', () => runTroubleshooter(ctx, 'display')) })),
 ] : [needsNimbus()] });
 defSettings('troubleshoot', [['troubleNet', 'Internet connections troubleshooter', 'fix wifi network no internet'], ['troubleAudio', 'Audio troubleshooter', 'fix sound no audio crackling choppy']]);
-defPage('recovery', { title: 'Recovery', parent: 'system', icon: 'recovery', keywords: 'reset restore firmware uefi bios advanced startup', render: (ctx) => [
+defPage('recovery', { title: 'Recovery', parent: 'system', icon: 'recovery', keywords: 'reset restore firmware uefi bios advanced startup go back previous version undo update', render: (ctx) => [
   WS.group('Recovery options',
+    goBackCard(ctx),
     WS.card(ctx, { sid: 'reset', icon: 'reset', title: 'Reset this PC', desc: 'Erase your Nimbus files and settings and start fresh', ctl: WS.button('Reset PC', () => resetPC(ctx.win)) }),
     IS_NATIVE ? WS.card(ctx, { sid: 'firmware', icon: 'restart', title: 'Advanced startup', desc: Native.info && Native.info.uefi ? 'Restart into your PC’s firmware settings (UEFI) to change the startup order or Secure Boot' : 'Restart; the Nimbus startup menu has more options', ctl: WS.button('Restart now', async () => {
       const ok = await Dialog.confirm('Restart now?', 'Save your work first. Your PC restarts' + (Native.info.uefi ? ' into its firmware settings.' : '.'), { ok: 'Restart now', within: ctx.win });
@@ -439,7 +440,7 @@ defPage('recovery', { title: 'Recovery', parent: 'system', icon: 'recovery', key
     }) }) : null),
   WS.group('Related support', WS.card(ctx, { icon: 'troubleshoot', title: 'Fix problems without resetting your PC', go: 'troubleshoot' })),
 ] });
-defSettings('recovery', [['reset', 'Reset this PC', 'erase wipe factory fresh start'], ['firmware', 'Advanced startup', 'uefi bios firmware boot menu']]);
+defSettings('recovery', [['goback', 'Go back to the previous version', 'undo update uninstall rollback downgrade'], ['reset', 'Reset this PC', 'erase wipe factory fresh start'], ['firmware', 'Advanced startup', 'uefi bios firmware boot menu']]);
 defPage('clipboard', { title: 'Clipboard', parent: 'system', icon: 'clipboard', keywords: 'copy paste history windows v', render: (ctx) => [
   WS.group(null,
     WS.card(ctx, { sid: 'clipHistory', icon: 'clipboard', title: 'Clipboard history', desc: 'Save what you copy so you can paste it later. Press the Windows key + V to see it.', ctl: WS.settingToggle(ctx, 'clipHistory', 'Clipboard history') }),

@@ -1,0 +1,938 @@
+#!/usr/bin/python3 -I
+"""Nimbus Update's helper: updates Nimbus OS in place. Each release publishes a small update package next to its ISO
+(os/update-bundle.py makes it), so a USB stick doesn't have to be written again for every new version.
+
+  nimbus-update check     what's installed, the newest version and whether it can be installed here (JSON, one line)
+  nimbus-update status    the same without asking GitHub
+  nimbus-update install   as root: download the newest version, check it and install it. Progress is printed as
+                          JSON lines on stdout, with the result last ({"ok": true, ...} or {"ok": false, "error": ...})
+  nimbus-update back      as root: put back the version from before the last update
+  nimbus-update boot      as root, at startup before the desktop (nimbus-update-boot.service): finish an update a
+                          power cut interrupted, and tidy up
+
+An update replaces Nimbus's own files: the desktop, the window manager, the helpers and their settings files. It
+also installs any Ubuntu packages the new version needs that the system doesn't have, and runs one-off setup steps
+(os/migrations). The kernel and startup files stay as the ISO had them. When a version needs new ones, its
+description says so ("base") and Settings offers the new ISO instead. On a live system the changes are kept in the
+storage area, so updating needs saving to be on.
+
+Everything is checked before anything changes. The description comes from GitHub over HTTPS. The package must
+match its SHA-256, and every file in it must match its own. sudo rules must pass visudo, Python files must compile,
+and the window manager must find its libraries. Files are then replaced one at a time, each with a rename. The
+replaced files are kept so "back" can restore them. A journal (state.json) lets "boot" finish the job after a
+power cut.
+"""
+import fcntl
+import hashlib
+import http.client
+import json
+import os
+import re
+import shutil
+import signal
+import stat
+import subprocess
+import sys
+import tarfile
+import time
+import traceback
+import urllib.error
+import urllib.parse
+import urllib.request
+
+RELEASE = "https://github.com/Dexinyy/nimbus-os/releases/download/latest/"
+ISO_PAGE = "https://github.com/Dexinyy/nimbus-os/releases/tag/latest"
+MANIFEST = "nimbus-os-update.json"
+# Where GitHub's release downloads may lead (it redirects to its file storage)
+TRUSTED_HOSTS = ("github.com", "objects.githubusercontent.com", "release-assets.githubusercontent.com")
+FORMAT = 1
+STATE_DIR = "/var/lib/nimbus/update"
+STATE = os.path.join(STATE_DIR, "state.json")
+DONE = os.path.join(STATE_DIR, "migrations.done")
+STAGED = os.path.join(STATE_DIR, "staged")
+BACKUP = os.path.join(STATE_DIR, "backup")
+DOWNLOADS = os.path.join(STATE_DIR, "download")
+FILES_REL = "usr/share/nimbus/files.json"
+BUILD_REL = "usr/share/nimbus/build-info.json"
+ROOT = "/"  # the system being updated (os/test-update.py points it at a folder)
+LOCK = "/run/nimbus-update.lock"
+STORAGE_LABEL = "writable"  # keep in step with /usr/lib/nimbus/nimbus-storage
+# Put in place first: if a power cut stops an update halfway, these finish it at the next start
+FIRST = ("usr/lib/nimbus/nimbus-update", "etc/systemd/system/nimbus-update-boot.service", "etc/systemd/system/nimbus-session.service")
+ENV = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LANG": "C.UTF-8", "HOME": "/root"}
+GLIB_COMPILE = ("/usr/bin/glib-compile-schemas", "/usr/lib/x86_64-linux-gnu/glib-2.0/glib-compile-schemas")
+
+SAVING_OFF = "Saving is off, so an update would be gone after a restart. Turn on saving first."
+DAMAGED = "The update's description is damaged"
+HEX64 = re.compile(r"^[0-9a-f]{64}$")
+COMMIT_RE = re.compile(r"^[0-9A-Za-z]{4,64}$")
+BUNDLE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*\.tar\.xz$")
+PART_RE = re.compile(r"^[A-Za-z0-9_@+][A-Za-z0-9._@+-]*$")
+PKG_RE = re.compile(r"^[a-z0-9][a-z0-9+.-]+$")
+MIG_RE = re.compile(r"^\d{4}-[a-z0-9-]+$")
+
+
+class Failure(Exception):
+    pass
+
+
+class Cancelled(Exception):
+    pass
+
+
+# ---- output ----
+OUT = {"closed": False, "t": 0.0, "phase": None}
+# A stop request (SIGTERM, from Cancel or the desktop closing) is honoured only while nothing has changed yet
+CANCEL = {"asked": False, "allowed": True}
+
+
+def say(**data):
+    if OUT["closed"]:
+        return
+    try:
+        sys.stdout.write(json.dumps(data) + "\n")
+        sys.stdout.flush()
+    except OSError:  # the desktop stopped listening: carry on regardless
+        OUT["closed"] = True
+
+
+def progress(phase, pct, text):
+    now = time.monotonic()
+    if phase == OUT["phase"] and now - OUT["t"] < 0.25 and pct < 100:
+        return
+    OUT["t"], OUT["phase"] = now, phase
+    say(phase=phase, pct=round(max(0.0, min(100.0, pct)), 1), text=text)
+
+
+def log(msg):
+    print("nimbus-update: " + msg, file=sys.stderr, flush=True)
+
+
+def on_stop(_signum, _frame):
+    CANCEL["asked"] = True
+
+
+def check_cancel():
+    if CANCEL["asked"] and CANCEL["allowed"]:
+        raise Cancelled()
+
+
+# ---- small helpers ----
+def read(path, default=""):
+    try:
+        with open(path) as f:
+            return f.read().strip()
+    except OSError:
+        return default
+
+
+def load_json(path, default=None):
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return default
+
+
+def save_json(path, data, mode=0o644):
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(data, f, indent=1, sort_keys=True)
+        f.write("\n")
+        f.flush()
+        os.fsync(f.fileno())
+    os.chmod(tmp, mode)
+    os.replace(tmp, path)
+
+
+def real(path):
+    """Where a file of the system (a path like usr/bin/nimbus-wm) is."""
+    return os.path.join(ROOT, path)
+
+
+def own(path):
+    os.chown(path, 0, 0)
+
+
+def file_sha(path):
+    """SHA-256 of a plain file, or None (missing, a link, a folder, unreadable)."""
+    try:
+        if not stat.S_ISREG(os.lstat(path).st_mode):
+            return None
+        h = hashlib.sha256()
+        with open(path, "rb") as f:
+            for chunk in iter(lambda: f.read(1 << 20), b""):
+                h.update(chunk)
+        return h.hexdigest()
+    except OSError:
+        return None
+
+
+def last_line(text, default):
+    lines = [l.strip() for l in (text or "").splitlines() if l.strip()]
+    return (lines[-1] if lines else default)[:300]
+
+
+def cmdline():
+    return read("/proc/cmdline").split()
+
+
+def cmdline_value(key):
+    for part in cmdline():
+        if part.startswith(key + "="):
+            return part.split("=", 1)[1]
+    return ""
+
+
+def boot_id():
+    return read("/proc/sys/kernel/random/boot_id")
+
+
+def os_release(path):
+    out = {}
+    for line in read(path).splitlines():
+        if "=" in line:
+            k, v = line.split("=", 1)
+            out[k.strip()] = v.strip().strip('"')
+    return out
+
+
+def suite():
+    for path in ("/usr/lib/os-release.base", "/etc/os-release"):
+        r = os_release(path)
+        name = r.get("UBUNTU_CODENAME") or r.get("VERSION_CODENAME")
+        if name:
+            return name
+    return ""
+
+
+def live():
+    return "boot=casper" in cmdline() or os.path.isdir("/run/casper") or os.path.isdir("/cdrom/casper")
+
+
+def saving():
+    """Changes outlast a restart: an installed system, or a live one with its storage area in use (casper mounts it
+    before the system starts, out of sight; /proc/fs/ext4 still lists it)."""
+    if not live():
+        return True
+    args = cmdline()
+    if "persistent" not in args or "nopersistent" in args:
+        return False
+    try:
+        out = subprocess.run(["lsblk", "-rn", "-o", "NAME,LABEL"], capture_output=True, text=True, timeout=10, env=ENV).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return any(len(f) == 2 and f[1] == STORAGE_LABEL and os.path.isdir("/proc/fs/ext4/" + f[0])
+               for f in (line.split() for line in out.splitlines()))
+
+
+def source():
+    """Where updates come from: GitHub's latest release, or a test server named on the kernel command line
+    (os/test-boot.sh)."""
+    test = cmdline_value("nimbus.update-url")
+    if test:
+        return (test if test.endswith("/") else test + "/"), True
+    return RELEASE, False
+
+
+HELD = []
+
+
+def take_lock(wait=0):
+    """One update at a time (an install, going back, or finishing one at startup)."""
+    fd = os.open(LOCK, os.O_RDWR | os.O_CREAT, 0o600)
+    end = time.monotonic() + wait
+    while True:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            HELD.append(fd)
+            return fd
+        except BlockingIOError:
+            if time.monotonic() >= end:
+                os.close(fd)
+                raise Failure("Nimbus OS is already being updated")
+            time.sleep(1)
+
+
+def release():
+    while HELD:
+        os.close(HELD.pop())
+
+
+def need_root():
+    if os.geteuid() != 0:
+        raise Failure("This needs to run as root")
+
+
+# ---- downloads ----
+class Redirects(urllib.request.HTTPRedirectHandler):
+    def __init__(self, trusted_only):
+        super().__init__()
+        self.trusted_only = trusted_only
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        u = urllib.parse.urlsplit(newurl)
+        if self.trusted_only and (u.scheme != "https" or u.hostname not in TRUSTED_HOSTS):
+            raise Failure("GitHub sent the download somewhere unexpected (%s)" % u.hostname)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+def fetch(url, test, limit, write=None):
+    """GET url: its body (at most limit bytes), or each piece handed to write()."""
+    where = "the update server" if test else "GitHub"
+    req = urllib.request.Request(url, headers={"User-Agent": "Nimbus-Update/1", "Accept": "*/*"})
+    try:
+        resp = urllib.request.build_opener(Redirects(not test)).open(req, timeout=30)
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            raise Failure("%s isn't on %s right now. Try again in a few minutes." % (os.path.basename(urllib.parse.urlsplit(url).path), where))
+        raise Failure("%s answered with error %d" % (where, exc.code))
+    except Failure:
+        raise
+    except (urllib.error.URLError, OSError, ValueError, http.client.HTTPException) as exc:
+        raise Failure("Couldn't reach %s (%s)" % (where, getattr(exc, "reason", exc)))
+    body, size = [], 0
+    try:
+        with resp:
+            while True:
+                check_cancel()
+                chunk = resp.read(1 << 16)
+                if not chunk:
+                    break
+                size += len(chunk)
+                if size > limit:
+                    raise Failure("The download is bigger than it should be")
+                if write:
+                    write(chunk)
+                else:
+                    body.append(chunk)
+    except (OSError, http.client.HTTPException) as exc:
+        raise Failure("The download stopped (%s)" % exc)
+    return b"".join(body)
+
+
+def check_basic(m):
+    if not isinstance(m, dict):
+        raise Failure(DAMAGED)
+    for key, kind in (("name", str), ("version", str), ("commit", str), ("date", int)):
+        if not isinstance(m.get(key), kind) or isinstance(m.get(key), bool):
+            raise Failure(DAMAGED)
+    if not COMMIT_RE.match(m["commit"]):
+        raise Failure(DAMAGED)
+
+
+def valid_path(path):
+    parts = path.split("/") if isinstance(path, str) else []
+    return len(parts) >= 2 and parts[0] in ("usr", "etc") and all(PART_RE.match(p) for p in parts)
+
+
+def check_full(m):
+    """Everything an install relies on, so nothing in the description can point outside Nimbus's files."""
+    check_basic(m)
+    if m.get("format") != FORMAT:
+        raise Failure("This version updates in a newer way, so it needs the new ISO once")
+    for key, kind in (("suite", str), ("base", int), ("bundle", dict), ("files", dict), ("packages", list), ("migrations", list)):
+        if not isinstance(m.get(key), kind):
+            raise Failure(DAMAGED)
+    b = m["bundle"]
+    if not (isinstance(b.get("name"), str) and BUNDLE_RE.match(b["name"]) and isinstance(b.get("sha256"), str)
+            and HEX64.match(b["sha256"]) and type(b.get("size")) is int and 0 < b["size"] <= 512 << 20):
+        raise Failure(DAMAGED)
+    dirs = set()
+    for path, f in m["files"].items():
+        if not valid_path(path) or path in (FILES_REL, BUILD_REL):
+            raise Failure("The update names a file it may not change (%s)" % str(path)[:80])
+        if not (isinstance(f, dict) and isinstance(f.get("sha256"), str) and HEX64.match(f["sha256"])
+                and type(f.get("size")) is int and f["size"] >= 0 and type(f.get("mode")) is int and 0 <= f["mode"] <= 0o777):
+            raise Failure(DAMAGED)
+        parts = path.split("/")
+        dirs.update("/".join(parts[:i]) for i in range(1, len(parts)))
+    if dirs & set(m["files"]):
+        raise Failure(DAMAGED)
+    if not all(isinstance(p, str) and PKG_RE.match(p) for p in m["packages"]):
+        raise Failure(DAMAGED)
+    for mig in m["migrations"]:
+        if not (isinstance(mig, dict) and isinstance(mig.get("name"), str) and MIG_RE.match(mig["name"])
+                and isinstance(mig.get("sha256"), str) and HEX64.match(mig["sha256"])):
+            raise Failure(DAMAGED)
+
+
+def fetch_manifest(base, test):
+    data = fetch(base + MANIFEST, test, 8 << 20)
+    try:
+        m = json.loads(data)
+    except ValueError:
+        raise Failure(DAMAGED)
+    check_basic(m)
+    return m
+
+
+def newer(m, cur):
+    return m["commit"] != cur.get("commit") and m["date"] > int(cur.get("date") or 0)
+
+
+def incompatible(m, cur):
+    """Why this system can't take the version in place (it needs the new ISO), or ""."""
+    if m.get("format") != FORMAT:
+        return "This version updates in a newer way, so it needs the new ISO once."
+    if m.get("suite") != suite():
+        return "This version is built on a newer Ubuntu release, so it needs the new ISO."
+    if not isinstance(m.get("base"), int) or m["base"] > int(cur.get("base") or 1):
+        return "This version changes how Nimbus OS starts, so it needs the new ISO."
+    return ""
+
+
+def notes_since(m, cur):
+    """The changes since the installed version, newest first (all of the list when it isn't in it)."""
+    notes = [n for n in m.get("notes") or [] if isinstance(n, dict) and isinstance(n.get("subject"), str)]
+    have = (cur.get("commit") or "")[:7]
+    out = []
+    for n in notes:
+        if have and str(n.get("commit", "")) == have:
+            break
+        out.append({"commit": str(n.get("commit", ""))[:7], "date": n.get("date") if isinstance(n.get("date"), int) else None,
+                    "subject": n["subject"][:200]})
+    return out[:25]
+
+
+def missing_packages(names):
+    if not names:
+        return []
+    try:
+        out = subprocess.run(["dpkg-query", "-W", "-f=${Package}\t${Status}\n", *names], capture_output=True, text=True,
+                             timeout=60, env=ENV).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return list(names)
+    have = {l.split("\t")[0] for l in out.splitlines() if l.endswith(" installed")}
+    return [n for n in names if n not in have]
+
+
+# ---- what's here ----
+def status():
+    cur = load_json(real(BUILD_REL), {}) or {}
+    st = load_json(STATE, {}) or {}
+    pending = None
+    if st.get("state") == "restart" and st.get("boot") == boot_id():
+        pending = {k: st.get(k) for k in ("name", "version", "commit", "time", "back")}
+    elif st.get("state") in ("applying", "going-back"):
+        pending = {k: st.get(k) for k in ("name", "version", "commit", "time")}
+        pending["unfinished"] = True
+    back = None
+    info = load_json(os.path.join(BACKUP, "info.json"), {}) or {}
+    if info.get("complete") and isinstance(info.get("from"), dict) and not (pending and pending.get("back")):
+        f = info["from"]
+        back = {"version": f.get("version", ""), "commit": str(f.get("commit") or "")[:7], "date": f.get("date"), "time": info.get("time")}
+    return {"ok": True, "current": cur, "pending": pending, "back": back, "live": live(), "saving": saving(),
+            "iso": ISO_PAGE, "last": {k: st.get(k) for k in ("state", "time", "commit", "error") if st.get(k) is not None}}
+
+
+def cmd_status():
+    say(**status())
+
+
+def cmd_check():
+    out = status()
+    base, test = source()
+    try:
+        m = fetch_manifest(base, test)
+    except (Failure, Cancelled) as exc:
+        out.update(ok=False, error=str(exc) or "Couldn't check for updates")
+        say(**out)
+        return
+    cur = out["current"]
+    out["available"] = None
+    if newer(m, cur):
+        why = incompatible(m, cur)
+        bundle = m.get("bundle") if isinstance(m.get("bundle"), dict) else {}
+        packages = [p for p in m.get("packages") or [] if isinstance(p, str) and PKG_RE.match(p)]
+        out["available"] = {"name": m["name"], "version": m["version"], "commit": m["commit"][:7], "date": m["date"],
+                            "size": bundle.get("size") if type(bundle.get("size")) is int else 0,
+                            "packages": len(missing_packages(packages)) if not why else 0, "notes": notes_since(m, cur)}
+        out["inplace"] = not why and out["saving"]
+        out["why"] = "iso" if why else ("saving" if not out["saving"] else "")
+        out["reason"] = why or (SAVING_OFF if not out["saving"] else "")
+    say(**out)
+
+
+# ---- installing ----
+def download(base, test, b):
+    os.makedirs(DOWNLOADS, 0o700, exist_ok=True)
+    path = os.path.join(DOWNLOADS, b["name"])
+    if file_sha(path) == b["sha256"]:  # an earlier try already has it
+        progress("download", 100, "Downloaded")
+        return path
+    part = path + ".part"
+    for attempt in range(3):
+        h, got = hashlib.sha256(), [0]
+        try:
+            with open(part, "wb") as out:
+                def write(chunk):
+                    out.write(chunk)
+                    h.update(chunk)
+                    got[0] += len(chunk)
+                    progress("download", 100.0 * got[0] / b["size"], "%.1f of %.1f MB" % (got[0] / 1e6, b["size"] / 1e6))
+                fetch(base + urllib.parse.quote(b["name"]), test, b["size"], write)
+            break
+        except Failure:
+            if attempt == 2:
+                raise
+            check_cancel()
+            time.sleep(3 * (attempt + 1))
+    if got[0] != b["size"] or h.hexdigest() != b["sha256"]:
+        os.unlink(part)
+        raise Failure("The update package didn't download correctly (its checksum doesn't match). Try again.")
+    os.replace(part, path)
+    progress("download", 100, "Downloaded")
+    return path
+
+
+def staged(path):
+    return os.path.join(STAGED, "files", path)
+
+
+def stage(bundle, m):
+    """Unpack the package next to the system and check every file against the description."""
+    shutil.rmtree(STAGED, ignore_errors=True)
+    os.makedirs(os.path.join(STAGED, "files"), 0o700)
+    want = {"files/" + p: f for p, f in m["files"].items()}
+    want.update({"migrations/%s.sh" % x["name"]: {"sha256": x["sha256"], "mode": 0o755} for x in m["migrations"]})
+    seen = set()
+    try:
+        with tarfile.open(bundle, "r:xz") as tar:
+            for member in tar:
+                check_cancel()
+                if member.isdir():
+                    continue
+                spec = want.get(member.name)
+                if not member.isfile() or spec is None or member.name in seen:
+                    raise Failure("The update package holds something it shouldn't (%s)" % member.name[:80])
+                dest = os.path.join(STAGED, member.name)
+                os.makedirs(os.path.dirname(dest), 0o700, exist_ok=True)
+                h = hashlib.sha256()
+                with tar.extractfile(member) as src, open(dest, "wb") as out:
+                    for chunk in iter(lambda: src.read(1 << 20), b""):
+                        h.update(chunk)
+                        out.write(chunk)
+                if h.hexdigest() != spec["sha256"]:
+                    raise Failure("A file in the update package is damaged (%s)" % member.name[:80])
+                os.chmod(dest, spec["mode"])
+                seen.add(member.name)
+    except (tarfile.TarError, EOFError, OSError) as exc:
+        raise Failure("The update package couldn't be unpacked (%s)" % exc)
+    missing = sorted(set(want) - seen)
+    if missing:
+        raise Failure("The update package is missing %s" % missing[0])
+    save_json(os.path.join(STAGED, "manifest.json"), m, 0o600)
+
+
+def validate(m):
+    """What would stop the desktop or sudo from working, before anything is replaced."""
+    for path in m["files"]:
+        src = staged(path)
+        if path.startswith("etc/sudoers.d/"):
+            r = subprocess.run(["visudo", "-c", "-q", "-f", src], capture_output=True, text=True, timeout=60, env=ENV)
+            if r.returncode != 0:
+                raise Failure("The update's sudo rules (/%s) are broken" % path)
+        with open(src, "rb") as f:
+            head = f.read(128)
+        if path.endswith(".py") or (head.startswith(b"#!") and b"python" in head.split(b"\n", 1)[0]):
+            try:
+                with open(src, "rb") as f:
+                    compile(f.read(), "/" + path, "exec")
+            except (SyntaxError, ValueError) as exc:
+                raise Failure("/%s in the update doesn't compile (%s)" % (path, exc))
+
+
+def install_packages(names):
+    """Ubuntu packages the new version needs. Progress comes from apt's status lines (APT::Status-Fd)."""
+    env = dict(ENV, DEBIAN_FRONTEND="noninteractive", DEBCONF_NONINTERACTIVE_SEEN="true")
+    wait = ["-o", "DPkg::Lock::Timeout=600"]
+    os.makedirs(STATE_DIR, exist_ok=True)
+    logf = open(os.path.join(STATE_DIR, "apt.log"), "w")
+    try:
+        # An earlier install that was cut off would stop apt
+        subprocess.run(["dpkg", "--configure", "-a"], stdout=logf, stderr=subprocess.STDOUT, timeout=1800, env=env)
+        progress("install", 2, "Getting Ubuntu's package lists")
+        r = subprocess.run(["apt-get", "-q", "update", *wait], stdout=logf, stderr=subprocess.STDOUT, timeout=1800, env=env)
+        if r.returncode != 0:
+            raise Failure("Couldn't get Ubuntu's package lists: " + tail(logf.name))
+        rfd, wfd = os.pipe()
+        proc = subprocess.Popen(["apt-get", "-q", "-y", "install", "--no-install-recommends", *wait, "-o", "APT::Status-Fd=%d" % wfd,
+                                 "-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold", *names],
+                                stdout=logf, stderr=subprocess.STDOUT, pass_fds=(wfd,), env=env)
+        os.close(wfd)
+        with os.fdopen(rfd) as status_lines:
+            for line in status_lines:
+                parts = line.rstrip("\n").split(":", 3)
+                if len(parts) == 4 and parts[0] in ("dlstatus", "pmstatus"):
+                    try:
+                        pct = float(parts[2])
+                    except ValueError:
+                        continue
+                    first = parts[0] == "dlstatus"
+                    progress("install", 5 + (pct * 0.25 if first else 25 + pct * 0.3),
+                             ("Downloading " if first else "Installing ") + ", ".join(names[:3]) + ("…" if len(names) > 3 else ""))
+        code = proc.wait()
+    finally:
+        logf.close()
+    still = missing_packages(names)
+    if code != 0 or still:
+        raise Failure("Couldn't install %s: %s" % (", ".join(still or names), tail(os.path.join(STATE_DIR, "apt.log"))))
+
+
+def tail(path):
+    try:
+        with open(path, errors="replace") as f:
+            lines = [l.strip() for l in f.read().splitlines()[-30:] if l.strip()]
+    except OSError:
+        return "see %s" % path
+    errs = [l for l in lines if l.startswith(("E:", "dpkg: error", "W:"))]
+    return last_line("\n".join(errs or lines), "apt failed")
+
+
+def check_libraries(m):
+    if "usr/bin/nimbus-wm" not in m["files"]:
+        return
+    r = subprocess.run(["ldd", staged("usr/bin/nimbus-wm")], capture_output=True, text=True, timeout=60, env=ENV)
+    lost = [l.split("=>")[0].strip() for l in r.stdout.splitlines() if "not found" in l]
+    if r.returncode != 0 or lost:
+        raise Failure("The new window manager needs libraries this system doesn't have (%s)" % (", ".join(lost) or last_line(r.stderr, "ldd failed")))
+
+
+def make_plan(m):
+    """Which files to write, change the permissions of, remove, or leave alone (changed here, in /etc)."""
+    old = (load_json(real(FILES_REL), {}) or {}).get("files")
+    old = old if isinstance(old, dict) else None
+    plan = {"write": [], "chmod": {}, "remove": [], "kept": []}
+    for path, f in sorted(m["files"].items()):
+        target = real(path)
+        if os.path.isdir(target) and not os.path.islink(target):
+            raise Failure("/%s is a folder on this system" % path)
+        have = file_sha(target)
+        if have == f["sha256"]:
+            if stat.S_IMODE(os.lstat(target).st_mode) != f["mode"]:
+                plan["chmod"][path] = f["mode"]
+            continue
+        # Settings files someone changed by hand stay as they are (with files.json, Nimbus knows what it put there)
+        if have is not None and path.startswith("etc/") and old is not None and isinstance(old.get(path), dict) and have != old[path].get("sha256"):
+            plan["kept"].append(path)
+            continue
+        plan["write"].append(path)
+    for path, f in sorted((old or {}).items()):
+        if path in m["files"] or not isinstance(f, dict) or not valid_path(path) or path in (FILES_REL, BUILD_REL):
+            continue
+        have = file_sha(real(path))
+        if have is None:
+            continue
+        (plan["remove"] if have == f.get("sha256") else plan["kept"]).append(path)
+    plan["write"].sort(key=lambda p: (p not in FIRST, p))
+    return plan
+
+
+def make_backup(plan, cur, m):
+    """The current version of everything that will change, for "back" and for undoing a failed install."""
+    shutil.rmtree(BACKUP, ignore_errors=True)
+    os.makedirs(os.path.join(BACKUP, "files"), 0o700)
+    os.chmod(BACKUP, 0o755)
+    saved, created = [], []
+    for path in plan["write"] + plan["remove"] + [BUILD_REL, FILES_REL]:
+        target = real(path)
+        if os.path.isfile(target) and not os.path.islink(target):
+            dest = os.path.join(BACKUP, "files", path)
+            os.makedirs(os.path.dirname(dest), 0o700, exist_ok=True)
+            shutil.copy2(target, dest)
+            saved.append(path)
+        elif not os.path.lexists(target):
+            created.append(path)
+    modes = {p: stat.S_IMODE(os.lstat(real(p)).st_mode) for p in plan["chmod"]}
+    save_json(os.path.join(BACKUP, "info.json"), {"from": cur, "to": m["commit"], "saved": saved, "created": created,
+                                                  "modes": modes, "time": int(time.time()), "complete": True})
+
+
+def install_file(src, path, mode):
+    """Put one file in place: a copy next to it, then a rename over the old one."""
+    target = real(path)
+    folder = os.path.dirname(target)
+    os.makedirs(folder, 0o755, exist_ok=True)
+    tmp = os.path.join(folder, ".%s.nimbus-update" % os.path.basename(target))
+    with open(src, "rb") as fi, open(tmp, "wb") as fo:
+        shutil.copyfileobj(fi, fo, 1 << 20)
+        fo.flush()
+        os.fsync(fo.fileno())
+    own(tmp)
+    os.chmod(tmp, mode)
+    os.replace(tmp, target)
+
+
+def apply(plan, m, cur, report=None):
+    total = max(1, len(plan["write"]) + len(plan["remove"]) + len(plan["chmod"]))
+    for i, path in enumerate(plan["write"]):
+        install_file(staged(path), path, m["files"][path]["mode"])
+        if report:
+            report(i / total)
+    for path, mode in plan["chmod"].items():
+        os.chmod(real(path), mode)
+    for path in plan["remove"]:
+        try:
+            os.unlink(real(path))
+        except FileNotFoundError:
+            pass
+    save_json(real(FILES_REL), {"commit": m["commit"], "files": m["files"]})
+    iso = cur.get("iso") if isinstance(cur.get("iso"), dict) else {k: cur.get(k) for k in ("version", "commit", "date")}
+    save_json(real(BUILD_REL), {"version": m["version"], "commit": m["commit"], "date": m["date"], "base": int(cur.get("base") or 1),
+                           "iso": iso, "updated": int(time.time())})
+    os.sync()
+
+
+def restore(info):
+    """Put the saved version back (go back, or undo an install that failed halfway)."""
+    saved = sorted(info.get("saved") or [], key=lambda p: (p not in FIRST, p))
+    for path in saved:
+        if not valid_path(path):
+            continue
+        src = os.path.join(BACKUP, "files", path)
+        install_file(src, path, stat.S_IMODE(os.lstat(src).st_mode))
+    for path in info.get("created") or []:
+        if valid_path(path):
+            try:
+                os.unlink(real(path))
+            except FileNotFoundError:
+                pass
+    for path, mode in (info.get("modes") or {}).items():
+        if valid_path(path) and isinstance(mode, int) and os.path.isfile(real(path)):
+            os.chmod(real(path), mode & 0o777)
+    os.sync()
+
+
+def triggers(paths, now=True):
+    """Rebuild what's made from the files that changed. Reloads only matter now: a restart reloads anyway."""
+    def under(*prefixes):
+        return any(p.startswith(prefixes) for p in paths)
+    steps = []
+    if under("usr/share/glib-2.0/schemas/"):
+        tool = next((t for t in GLIB_COMPILE if os.path.exists(t)), None)
+        if tool:
+            steps.append([tool, "/usr/share/glib-2.0/schemas"])
+    if under("usr/share/fonts/", "etc/fonts/"):
+        steps.append(["fc-cache", "-f"])
+    if now and under("etc/systemd/", "usr/lib/systemd/"):
+        steps.append(["systemctl", "daemon-reload"])
+    if now and under("etc/udev/", "usr/lib/udev/"):
+        steps.append(["udevadm", "control", "--reload"])
+    warnings = []
+    for argv in steps:
+        try:
+            r = subprocess.run(argv, capture_output=True, text=True, timeout=300, env=ENV)
+            if r.returncode != 0:
+                warnings.append("%s: %s" % (os.path.basename(argv[0]), last_line(r.stderr or r.stdout, "failed")))
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            warnings.append("%s: %s" % (os.path.basename(argv[0]), exc))
+    return warnings
+
+
+def run_migrations(m):
+    done = set(read(DONE).split())
+    warnings = []
+    for mig in m["migrations"]:
+        name = mig["name"]
+        if name in done:
+            continue
+        script = os.path.join(STAGED, "migrations", name + ".sh")
+        try:
+            r = subprocess.run(["sh", "-e", script], capture_output=True, text=True, timeout=900, env=dict(ENV, DEBIAN_FRONTEND="noninteractive"))
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            warnings.append("%s: %s" % (name, exc))
+            continue
+        if r.returncode != 0:
+            warnings.append("%s: %s" % (name, last_line(r.stderr or r.stdout, "failed")))
+            continue
+        with open(DONE, "a") as f:
+            f.write(name + "\n")
+        log("ran %s" % name)
+    return warnings
+
+
+def write_state(state, **extra):
+    os.makedirs(STATE_DIR, 0o755, exist_ok=True)
+    os.chmod(STATE_DIR, 0o755)
+    data = {"state": state, "time": int(time.time())}
+    data.update(extra)
+    save_json(STATE, data)
+
+
+def cmd_install():
+    need_root()
+    take_lock()
+    if not saving():
+        raise Failure(SAVING_OFF)
+    base, test = source()
+    progress("download", 0, "Checking for the newest version")
+    m = fetch_manifest(base, test)
+    cur = load_json(real(BUILD_REL), {}) or {}
+    why = incompatible(m, cur)
+    if why:
+        raise Failure(why)
+    if not newer(m, cur):
+        say(ok=True, current=True, name=m["name"], version=m["version"], commit=m["commit"][:7])
+        release()
+        return
+    check_full(m)
+    os.makedirs(STATE_DIR, 0o755, exist_ok=True)
+    need = m["bundle"]["size"] + 2 * sum(f["size"] for f in m["files"].values()) + (64 << 20)
+    free = shutil.disk_usage(STATE_DIR).free
+    if free < need:
+        raise Failure("There isn't enough free space for the update: it needs about %d MB, and %d MB is free" % (need >> 20, free >> 20))
+    bundle = download(base, test, m["bundle"])
+    progress("install", 0, "Checking the update")
+    stage(bundle, m)
+    validate(m)
+    # From here on a stop request waits: apt and the files are best finished once started
+    CANCEL["allowed"] = False
+    missing = missing_packages(m["packages"])
+    if missing:
+        log("installing %s" % " ".join(missing))
+        install_packages(missing)
+    check_libraries(m)
+    plan = make_plan(m)
+    progress("install", 62, "Keeping a copy of the current version")
+    make_backup(plan, cur, m)
+    write_state("applying", commit=m["commit"], version=m["version"], name=m["name"], previous=cur.get("commit"))
+    try:
+        apply(plan, m, cur, lambda frac: progress("install", 64 + 26 * frac, "Replacing Nimbus's files"))
+    except Exception as exc:
+        log("the update failed halfway (%s): putting the earlier files back" % exc)
+        restore(load_json(os.path.join(BACKUP, "info.json"), {}))
+        shutil.rmtree(BACKUP, ignore_errors=True)
+        write_state("failed", commit=m["commit"], error=str(exc))
+        raise Failure("The update couldn't be installed (%s), so Nimbus put the earlier version back" % exc)
+    progress("install", 92, "Finishing up")
+    changed = plan["write"] + plan["remove"] + list(plan["chmod"])
+    warnings = triggers(changed) + run_migrations(m)
+    write_state("restart", boot=boot_id(), commit=m["commit"], version=m["version"], name=m["name"], previous=cur.get("commit"),
+                warnings=warnings)
+    shutil.rmtree(STAGED, ignore_errors=True)
+    shutil.rmtree(DOWNLOADS, ignore_errors=True)
+    progress("install", 100, "Installed")
+    log("installed %s (%s): %d files changed, %d kept as they were, %d packages" % (m["name"], m["commit"][:7], len(changed), len(plan["kept"]), len(missing)))
+    say(ok=True, name=m["name"], version=m["version"], commit=m["commit"][:7], date=m["date"], changed=len(changed),
+        kept=plan["kept"], packages=missing, warnings=warnings)
+    release()
+
+
+def cmd_back():
+    need_root()
+    take_lock()
+    info = load_json(os.path.join(BACKUP, "info.json"), {}) or {}
+    if not info.get("complete") or not isinstance(info.get("from"), dict):
+        raise Failure("There's no earlier version to go back to")
+    prev = info["from"]
+    CANCEL["allowed"] = False
+    write_state("going-back", commit=prev.get("commit"), version=prev.get("version"))
+    restore(info)
+    triggers((info.get("saved") or []) + (info.get("created") or []) + list(info.get("modes") or {}))
+    shutil.rmtree(BACKUP, ignore_errors=True)
+    write_state("restart", boot=boot_id(), commit=prev.get("commit"), version=prev.get("version"), name="Nimbus OS %s" % prev.get("version", ""), back=True)
+    log("went back to %s" % str(prev.get("commit"))[:7])
+    say(ok=True, back=True, version=prev.get("version", ""), commit=str(prev.get("commit") or "")[:7], date=prev.get("date"))
+    release()
+
+
+def cmd_boot():
+    """Runs before every start of the desktop: quick when there's nothing to do, and never stops the desktop."""
+    def too_long(_signum, _frame):
+        raise Failure("took too long")
+    signal.signal(signal.SIGALRM, too_long)
+    signal.alarm(150)
+    try:
+        if os.geteuid() != 0:
+            return
+        st = load_json(STATE, {}) or {}
+        state = st.get("state")
+        if state in ("applying", "going-back"):
+            take_lock(wait=60)
+            st = load_json(STATE, {}) or {}
+            state = st.get("state")
+        info = load_json(os.path.join(BACKUP, "info.json"), {}) or {}
+        if state == "applying":
+            log("an update to %s was interrupted: finishing it" % str(st.get("commit"))[:7])
+            try:
+                m = load_json(os.path.join(STAGED, "manifest.json"))
+                if not isinstance(m, dict) or m.get("commit") != st.get("commit"):
+                    raise Failure("its files are gone")
+                check_full(m)
+                for path, f in m["files"].items():
+                    if file_sha(staged(path)) != f["sha256"]:
+                        raise Failure("its copy of /%s is damaged" % path)
+                plan = make_plan(m)
+                cur = info.get("from") if isinstance(info.get("from"), dict) else (load_json(real(BUILD_REL), {}) or {})
+                apply(plan, m, cur)
+                warnings = triggers(plan["write"] + plan["remove"] + list(plan["chmod"]), now=False) + run_migrations(m)
+                # Started with half the files: a restart puts everything in step
+                write_state("restart", boot=boot_id(), commit=m["commit"], version=m["version"], name=m["name"], previous=cur.get("commit"), warnings=warnings)
+                shutil.rmtree(STAGED, ignore_errors=True)
+                log("finished the update to %s" % m["commit"][:7])
+            except Exception as exc:
+                log("couldn't finish it (%s)" % exc)
+                if info.get("complete"):
+                    restore(info)
+                    triggers((info.get("saved") or []) + (info.get("created") or []), now=False)
+                    prev = info.get("from") or {}
+                    write_state("restart", boot=boot_id(), commit=prev.get("commit"), version=prev.get("version"), back=True, error=str(exc))
+                    log("put the earlier version back")
+                else:
+                    write_state("failed", error=str(exc))
+        elif state == "going-back" and info.get("complete"):
+            log("going back to the earlier version was interrupted: finishing it")
+            restore(info)
+            triggers((info.get("saved") or []) + (info.get("created") or []), now=False)
+            shutil.rmtree(BACKUP, ignore_errors=True)
+            prev = info.get("from") or {}
+            write_state("restart", boot=boot_id(), commit=prev.get("commit"), version=prev.get("version"), back=True)
+        elif state == "restart" and st.get("boot") != boot_id():
+            st.update(state="done", finished=int(time.time()))
+            save_json(STATE, st)
+            shutil.rmtree(STAGED, ignore_errors=True)
+        # Downloads an install left behind
+        if state not in ("applying", "going-back") and os.path.isdir(DOWNLOADS):
+            for name in os.listdir(DOWNLOADS):
+                path = os.path.join(DOWNLOADS, name)
+                if time.time() - os.path.getmtime(path) > 2 * 86400:
+                    os.unlink(path)
+    except Exception as exc:
+        log("startup check failed: %s" % exc)
+    finally:
+        signal.alarm(0)
+        release()
+
+
+def main():
+    commands = {"check": cmd_check, "status": cmd_status, "install": cmd_install, "back": cmd_back, "boot": cmd_boot}
+    cmd = sys.argv[1] if len(sys.argv) == 2 else ""
+    if cmd not in commands:
+        print(__doc__, file=sys.stderr)
+        sys.exit(2)
+    os.umask(0o022)
+    for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+        signal.signal(sig, on_stop)
+    try:
+        commands[cmd]()
+    except Cancelled:
+        release()
+        shutil.rmtree(STAGED, ignore_errors=True)
+        say(ok=False, cancelled=True, error="The update was cancelled")
+        sys.exit(1)
+    except Failure as exc:
+        release()
+        if cmd == "install" and (load_json(STATE, {}) or {}).get("state") != "applying":
+            shutil.rmtree(STAGED, ignore_errors=True)
+        log(str(exc))
+        say(ok=False, error=str(exc))
+        sys.exit(1)
+    except Exception as exc:
+        traceback.print_exc()
+        say(ok=False, error="The update helper failed (%s)" % exc)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

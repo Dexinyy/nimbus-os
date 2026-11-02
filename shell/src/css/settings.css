@@ -299,6 +299,15 @@ select.ws-input { padding-right: 8px; }
 .ws-upd-ic { width: 64px; height: 64px; display: grid; place-items: center; border-radius: 50%; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent-text); flex: none; }
 .ws-upd-ic .fi { width: 32px; height: 32px; }
 .ws-hero.upd .ws-btn { margin-left: auto; }
+.ws-hero.upd.busy .ws-upd-ic .fi { animation: spin 2.4s linear infinite; }
+/* An update's state on the right of its line ("Pending download", "Downloading – 45%"), with its progress bar */
+.upd-state { color: var(--text-2); font-size: var(--fs-md); white-space: nowrap; }
+.upd-state.err { color: var(--danger); }
+.upd-prog { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; min-width: 160px; }
+.upd-prog .ws-meter.small { width: 160px; }
+.upd-prog .ws-hl { font-size: var(--fs-sm); }
+.upd-notes { margin: 4px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; max-height: 50vh; overflow: auto; }
+.upd-notes li { line-height: 20px; }
 .ws-hero.acct .ws-avatar, .ws-yourinfo .ws-avatar { width: 96px; height: 96px; font-size: 34px; }
 .ws-yourinfo { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 0 24px; }
 .ws-battery { display: flex; align-items: center; gap: 16px; padding: 4px 0 20px; }

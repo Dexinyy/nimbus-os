@@ -1,0 +1,12 @@
+[Unit]
+Description=Finish a Nimbus OS update that was interrupted
+Documentation=file:///usr/share/doc/nimbus-os/README.md
+# Pulled in by nimbus-session.service, so the desktop starts once this is done (quick when there's nothing to do)
+Before=nimbus-session.service
+ConditionPathExists=/var/lib/nimbus/update/state.json
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/lib/nimbus/nimbus-update boot
+TimeoutStartSec=200

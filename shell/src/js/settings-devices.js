@@ -150,7 +150,7 @@ defPage('controllers', { title: 'Game controllers', parent: 'devices', icon: 'co
     for (const t of ['lt', 'rt']) { const f = svg.querySelector(`[data-a="${t}"] .gp-fill`); if (f) f.setAttribute('width', String(Math.round(62 * Math.max(a[t] || 0, b[t] ? 1 : 0)))); }
   };
   const paint = async () => {
-    if (IS_NATIVE) { try { pads = await Native.call('controllers'); } catch { pads = []; } }
+    if (IS_NATIVE) { try { pads = (await Native.call('controllers')) || []; } catch { pads = []; } }
     const key = JSON.stringify(pads) + testing;
     if (key === sig) return;
     sig = key;

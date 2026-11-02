@@ -1,12 +1,12 @@
 """The computer behind Nimbus's Settings: sound (PipeWire), displays and input (through nimbus-wm), Bluetooth (BlueZ),
-power, the clock, storage, printers (CUPS), networks (NetworkManager), updates, screenshots and the clipboard.
+power, the clock, storage, printers (CUPS), networks (NetworkManager), screenshots and the clipboard. Updates are in
+nimbus_update.py.
 
 SysMethods is mixed into nimbus-shell's Shell: each m_<name> answers the page's Native.call('<name>'), on a worker
 thread unless the launcher lists it as a main-thread call. Changes the page should hear about go out with
 self.emit(<name>, data) and arrive on the page's bus as 'native:<name>'.
 Anything that needs root goes through /usr/lib/nimbus/nimbus-sys, which sudo allows for this user only."""
 import base64
-import calendar
 import glob
 import json
 import os
@@ -23,7 +23,6 @@ from gi.repository import Gio, GLib
 
 HELPER = "/usr/lib/nimbus/nimbus-sys"
 APPS_HELPER = "/usr/lib/nimbus/nimbus-apps"
-REPO = "Dexinyy/nimbus-os"
 CONFIG_DIR = os.path.join(GLib.get_user_config_dir(), "nimbus")
 DATA_DIR = os.path.join(GLib.get_user_data_dir(), "nimbus")
 BUILD_INFO = "/usr/share/nimbus/build-info.json"
@@ -92,12 +91,6 @@ def save_json(path, data):
     with open(tmp, "w") as f:
         json.dump(data, f)
     os.replace(tmp, path)
-
-
-def http_json(url, timeout=15):
-    req = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json", "User-Agent": "nimbus-os"})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return json.loads(r.read().decode())
 
 
 # ================================================================ sound (PipeWire, through its PulseAudio side)
@@ -1176,45 +1169,6 @@ class SysMethods:
             gs("org.gnome.system.proxy", "autoconfig-url", p["pac"] if p["pacOn"] else "")
         else:
             gs("org.gnome.system.proxy", "mode", "none")
-        return True
-
-    # ---------------------------------------------------------------- updates
-    def m_updateCheck(self, _args):
-        cur = load_json(BUILD_INFO, {})
-        result = {"current": cur, "nimbusNew": False, "latest": None, "chrome": None}
-        try:
-            rel = http_json("https://api.github.com/repos/%s/releases/tags/latest" % REPO)
-            ref = http_json("https://api.github.com/repos/%s/git/ref/tags/latest" % REPO)
-            sha = (ref.get("object") or {}).get("sha", "")
-            published = rel.get("published_at") or ""
-            when = calendar.timegm(time.strptime(published, "%Y-%m-%dT%H:%M:%SZ")) if published else 0
-            result["latest"] = {"name": rel.get("name") or "", "commit": sha[:7], "date": when * 1000, "url": rel.get("html_url") or "https://github.com/%s/releases" % REPO}
-            result["nimbusNew"] = bool(sha and cur.get("commit") and not sha.startswith(cur["commit"]) and when > int(cur.get("date") or 0) + 600)
-        except Exception as exc:
-            result["error"] = "Couldn't reach GitHub: %s" % exc
-        if os.path.exists("/usr/bin/google-chrome-stable"):
-            try:
-                out = run(["sudo", "-n", APPS_HELPER, "check", "chrome"], timeout=120)
-                last = json.loads(out.strip().splitlines()[-1])
-                result["chrome"] = {"installed": True, "version": last.get("installed", ""), "candidate": last.get("candidate", ""),
-                                    "update": bool(last.get("candidate") and last.get("candidate") != last.get("installed"))}
-            except Exception as exc:
-                result["chrome"] = {"installed": True, "error": str(exc)}
-        if result.get("error") and not result["chrome"]:
-            raise SysError(result["error"])
-        return result
-
-    def record_update(self, name, ok, detail=""):
-        path = os.path.join(DATA_DIR, "updates.json")
-        hist = load_json(path, [])
-        hist.insert(0, {"name": name, "ok": ok, "time": int(time.time()), "detail": detail})
-        save_json(path, hist[:50])
-
-    def m_updateHistory(self, _args):
-        return load_json(os.path.join(DATA_DIR, "updates.json"), [])
-
-    def m_updatePrefs(self, args):
-        save_json(os.path.join(CONFIG_DIR, "updates.json"), {k: args.get(k) for k in ("auto", "metered", "paused")})
         return True
 
     # ---------------------------------------------------------------- screenshots, clipboard

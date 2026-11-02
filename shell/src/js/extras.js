@@ -170,13 +170,15 @@ bus.on('native:idle', (e) => {
 /* ---- Updates: what the launcher may do by itself, and a daily look for new versions ---- */
 function updatePrefs() { if (IS_NATIVE) Sys.call('updatePrefs', { auto: S.data.autoUpdate !== false, metered: !!S.data.updMetered, paused: S.data.updPause || 0 }).catch(() => {}); }
 async function dailyUpdateCheck() {
-  if (!IS_NATIVE || S.data.updNotify === false || (S.data.updPause && S.data.updPause > Date.now())) return;
+  if (!IS_NATIVE || S.data.updNotify === false || (S.data.updPause && S.data.updPause > Date.now()) || updWorking() || updPending()) return;
   if (S.data.updChecked && Date.now() - S.data.updChecked < 20 * 3600e3) return;
   if (Net.status && Net.status.connectivity === 'none') return;
   try {
     Upd.st = await Sys.call('updateCheck', {}, 120000); S.set('updChecked', Date.now());
     const s = Upd.st;
-    if (s.nimbusNew || (s.chrome && s.chrome.update)) Notif.push({ app: 'settings', title: 'Updates are available', body: [s.nimbusNew ? 'A new version of Nimbus OS' : '', s.chrome && s.chrome.update ? 'Google Chrome ' + s.chrome.candidate : ''].filter(Boolean).join(' and '), action: () => WM.open('settings', { page: 'update' }) });
+    updChanged();
+    const nimbus = s.available ? `Nimbus OS build ${s.available.commit}` + (s.inplace ? ' is ready to download and install' : '') : '';
+    if (s.nimbusNew || (s.chrome && s.chrome.update)) Notif.push({ app: 'settings', title: 'Updates are available', body: [nimbus, s.chrome && s.chrome.update ? 'Google Chrome ' + s.chrome.candidate : ''].filter(Boolean).join(' and '), action: () => WM.open('settings', { page: 'update' }) });
   } catch {}
 }
 

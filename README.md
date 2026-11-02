@@ -29,6 +29,17 @@ Nothing gets installed and your drive isn't touched. Until you set up saving, ev
 - **From a USB stick**, Nimbus saves your files, settings, Wi-Fi passwords and installed programs by itself, in the stick's free space. Nothing else on the stick changes.
 - **In a virtual machine or from a DVD**, add an empty disk (in VirtualBox: a new hard disk, 8 GB is plenty), then click **Set up saving** in the Welcome window or in **Settings › System**. Nimbus only offers disks that are completely empty, and asks once more before using one. Restart once, and from then on your work is kept.
 
+### Updating
+
+With saving on, you don't need to write a new ISO to update. When a new version comes out, **Settings › Nimbus Update** shows it. Click **Download & install**, then **Restart now**.
+
+- The download is only Nimbus's own files, about 1 MB. Any Ubuntu packages the new version needs come along with it.
+- Your files, settings and installed apps stay as they are.
+- If the new version gives you trouble, **Settings › System › Recovery › Go back** puts the previous one back.
+- Rare versions that change the kernel or how Nimbus starts still need the new ISO. The update page says so when that happens.
+- Without saving, an update would be gone at the next restart, so the page offers to set up saving or to download the ISO instead.
+- Nimbus OS builds from before in-place updates (their update page only offers **Download**) need the new ISO one last time.
+
 ## What works in 0.1
 
 - Starts on UEFI and older BIOS PCs, from USB or disc
@@ -53,7 +64,8 @@ Nothing gets installed and your drive isn't touched. Until you set up saving, ev
   - **Printers**: find and add printers on your network or USB (driverless), test page, default printer
   - **Time**: set automatically or by hand, time zone, 24-hour clock, regional formats
   - **Personalization**: themes, background (picture, solid color, slideshow), accent color, dark mode, lock screen, Start layout and folders, taskbar (alignment, search box, auto-hide), fonts you can install
-  - Also: PC name, storage use and cleanup, a lock-screen PIN, startup apps, the default browser, camera and microphone access, screenshots with **Print screen**, clipboard history with **Win+V**, and checking for new versions of Nimbus and Chrome
+  - **Nimbus Update**: new versions of Nimbus install in place, with download and install progress and a restart to finish, as on Windows (see [Updating](#updating)). Recovery can go back to the previous version. Chrome's updates are here too.
+  - Also: PC name, storage use and cleanup, a lock-screen PIN, startup apps, the default browser, camera and microphone access, screenshots with **Print screen** and clipboard history with **Win+V**
   - **Privacy & security › Nimbus Security** shows each protection area's status and opens the Security app
   - Left out on purpose: the Microsoft account
 - Keyboard: **Windows key** opens Start, **Alt+Tab** switches windows, **Alt+F4** closes a window or offers to shut down. Win+E opens Files, Win+I opens Settings, Win+D shows the desktop, Win+L locks, and Win+arrow keys snap the active window.
@@ -86,12 +98,13 @@ Nothing gets installed and your drive isn't touched. Until you set up saving, ev
 | `wm/nimbus-wm.c` | The window manager, a Wayland compositor built on wlroots. It draws the desktop page at the bottom and programs' windows above it; the page tells it which of its parts (its own windows, the taskbar, menus, title bars it draws for X11 programs) belong above each program window. It starts Xwayland for X11 programs when the first one opens. |
 | `os/overlay/usr/bin/nimbus-shell` | Shows the desktop with WebKitGTK and gives it a few system abilities: power, hardware info, time zone, starting and installing programs. It passes messages between the page and the window manager. |
 | `os/overlay/usr/bin/nimbus-session` and `nimbus-session.service` | Start the window manager and the desktop at boot (falling back to the cage compositor if it can't start). |
-| `os/build-iso.sh` | Builds the bootable ISO from Ubuntu 24.04 packages. |
-| `os/overlay/usr/lib/nimbus/` | `nimbus_term.py` (the terminal's screen), `nimbus_net.py` (Wi-Fi through NetworkManager), `nimbus_sys.py` (what Settings controls: PipeWire, BlueZ, displays and input through the window manager, power, the clock, CUPS, NetworkManager, updates), `nimbus-sys` (the few settings that need root), `nimbus-storage` (sets up saving, run as root), `nimbus-apps` (installs and updates Chrome from Google's signed repository, run as root), `nimbus-open` (opens web links), `nimbus_store.py` (the Store: Flathub through flatpak, and Lutris), `nimbus_security.py` (ClamAV scans, real-time protection, quarantine, the firewall through `nimbus-sys`, device security), `nimbus_controllers.py` (game controllers: list, batteries, live test, rumble). `/usr/lib/udev/rules.d/70-nimbus-controllers.rules` lets Steam and games reach controllers. |
-| `os/test-boot.sh`, `os/qmp.py` | Boot the ISO in virtual machines and check it: UEFI and BIOS start, Start and Terminal, Alt+Tab, joining a simulated Wi-Fi network, saving across restarts, installing and using Chrome, Settings changing the volume and the resolution, Nimbus Security finding a test virus (in real time and in a scan) and the firewall, a virtual DualSense in Settings, the Store installing Discord from Flathub and opening it, and Shut down. |
+| `os/build-iso.sh` | Builds the bootable ISO from Ubuntu 24.04 packages, and the update package for running systems. |
+| `os/update-bundle.py`, `os/migrations/` | Pack Nimbus's own files into the update package published next to each ISO, with a description listing each file's checksum and the Ubuntu packages it needs. `os/migrations/` holds the one-off setup steps that changes like enabling a service need on systems set up before them. |
+| `os/overlay/usr/lib/nimbus/` | `nimbus_term.py` (the terminal's screen), `nimbus_net.py` (Wi-Fi through NetworkManager), `nimbus_sys.py` (what Settings controls: PipeWire, BlueZ, displays and input through the window manager, power, the clock, CUPS, NetworkManager), `nimbus-sys` (the few settings that need root), `nimbus-storage` (sets up saving, run as root), `nimbus-apps` (installs and updates Chrome from Google's signed repository, run as root), `nimbus-open` (opens web links), `nimbus-update` and `nimbus_update.py` (Nimbus Update: check, download, verify and install new versions in place, finish an update a power cut interrupted, go back to the previous version), `nimbus_store.py` (the Store: Flathub through flatpak, and Lutris), `nimbus_security.py` (ClamAV scans, real-time protection, quarantine, the firewall through `nimbus-sys`, device security), `nimbus_controllers.py` (game controllers: list, batteries, live test, rumble). `/usr/lib/udev/rules.d/70-nimbus-controllers.rules` lets Steam and games reach controllers. |
+| `os/test-boot.sh`, `os/qmp.py` | Boot the ISO in virtual machines and check it: UEFI and BIOS start, Start and Terminal, Alt+Tab, joining a simulated Wi-Fi network, saving across restarts, installing and using Chrome, Settings changing the volume and the resolution, Nimbus Security finding a test virus (in real time and in a scan) and the firewall, a virtual DualSense in Settings, the Store installing Discord from Flathub and opening it, Nimbus Update installing a newer build from Settings and going back from Recovery (across restarts), and Shut down. |
 | `wm/test-headless.sh` | A quick check of the window manager with the desktop and Chrome, without a virtual machine. |
-| `os/test-*.py`, `shell/test/` | Tests for the terminal, network and storage helpers, and for the desktop's terminal, Wi-Fi, saving, program-window code and every Settings page (`node shell/test/settings.js`). |
-| `.github/workflows/build.yml` | Builds and tests on every push to `main`. It publishes the ISO as the **latest** release and saves test screenshots to the `ci-results` branch. |
+| `os/test-*.py`, `shell/test/` | Tests for the terminal, network, storage and update helpers (`os/test-update.py` updates a made-up system, including a power cut halfway), and for the desktop's terminal, Wi-Fi, saving, program-window code, Nimbus Update and every Settings page (`node shell/test/settings.js`). |
+| `.github/workflows/build.yml` | Builds and tests on every push to `main`. It publishes the ISO and the update package as the **latest** release and saves test screenshots to the `ci-results` branch. |
 
 ## Troubleshooting
 

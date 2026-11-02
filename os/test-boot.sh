@@ -10,7 +10,11 @@
 #   8. Settings: sound, display resolution, input, power, printing and storage through the real services
 #   9. Security: real-time protection, scans and quarantine (a test signature), the firewall, a virtual controller
 #  10. Store: Flathub's catalog, then Discord installed and opened as a window
+#  11. Nimbus Update: from a USB image that saves, a newer build installed in place from Settings, a restart into
+#      it, then back to the first build from Recovery and another restart
 # usage: os/test-boot.sh ISO [OUTDIR]     results: OUTDIR/*.png, *-serial.log, summary.md
+#        NIMBUS_ONLY="name ..." runs only those machines (uefi bios usb-bios usb-uefi logs wifi usb disk settings chrome
+#        security store update)
 set -uo pipefail
 
 ISO="$(readlink -f "${1:?usage: test-boot.sh ISO [OUTDIR]}")"
@@ -31,6 +35,8 @@ FAILED=0
 
 run_vm() { # name scenario [extra qemu arguments]   (MEM=megabytes to change the memory)
   local name="$1" scenario="$2"; shift 2
+  # NIMBUS_ONLY="update store" runs just those machines (quicker while working on one part)
+  if [ -n "${NIMBUS_ONLY:-}" ] && [[ " $NIMBUS_ONLY " != *" $name "* ]]; then echo "== $name: skipped"; return 0; fi
   local sock="/tmp/nimbus-$name.qmp"
   rm -f "$sock"
   echo "== $name ($scenario)"
@@ -107,6 +113,25 @@ run_vm security security -cdrom "$ISO" -kernel /tmp/nimbus-vmlinuz -initrd /tmp/
 # memory on a live system, so this machine gets more of it.
 MEM=6144 run_vm store store -cdrom "$ISO" -kernel /tmp/nimbus-vmlinuz -initrd /tmp/nimbus-initrd \
   -append "boot=casper noprompt nimbus.debug nimbus.test=store $SERIAL"
+
+# Nimbus Update: the build's own update package, made newer (os/update-bundle.py test) and offered by a server on this
+# machine, which the VM reaches as 10.0.2.2. It also needs a package from Ubuntu's servers ("hello").
+UPDATE_JSON="$(dirname "$ISO")/nimbus-os-update.json"
+if [ -f "$UPDATE_JSON" ]; then
+  rm -rf /tmp/nimbus-update-server
+  python3 "$HERE/update-bundle.py" test "$UPDATE_JSON" /tmp/nimbus-update-server
+  python3 -m http.server 8642 --bind 127.0.0.1 --directory /tmp/nimbus-update-server >"$OUTDIR/update-server.log" 2>&1 &
+  server=$!
+  usb_image /tmp/nimbus-usb-update.img
+  run_vm update update -drive if=none,id=stick,file=/tmp/nimbus-usb-update.img,format=raw -device usb-storage,drive=stick \
+    -kernel /tmp/nimbus-vmlinuz -initrd /tmp/nimbus-initrd \
+    -append "boot=casper noprompt persistent nimbus.debug nimbus.test=update nimbus.update-url=http://10.0.2.2:8642/ $SERIAL"
+  kill "$server" 2>/dev/null
+  rm -f /tmp/nimbus-usb-update.img
+else
+  printf '\n### update\n- ❌ No update package next to the ISO (%s)\n' "$UPDATE_JSON" >> "$OUTDIR/summary.md"
+  FAILED=1
+fi
 
 cat "$OUTDIR/summary.md"
 exit "$FAILED"
