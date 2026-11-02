@@ -14,7 +14,7 @@ Download `nimbus-os-0.1-amd64.iso` from the [latest release](../../releases/tag/
 2. Click **New**. Name it Nimbus OS, pick the ISO file, set the type to **Linux** and the version to **Ubuntu (64-bit)**, and tick **Skip Unattended Installation**.
 3. Give it **4096 MB** of memory and 2 processors. It doesn't need a hard disk.
 4. In **Settings → Display**, choose the **VMSVGA** graphics controller.
-5. Click **Start**.
+5. Click **Start**. The desktop appears in about 30 seconds.
 
 ### On a real PC
 
@@ -26,6 +26,8 @@ Nothing gets installed and your drive isn't touched. When you shut down, the liv
 
 If the screen stays black, pick **Start Nimbus OS with basic graphics** in the boot menu.
 
+Every build is started in virtual machines (UEFI and BIOS) before it's published. The test opens Start, Terminal and Settings, switches windows with Alt+Tab and shuts down from the keyboard. The screenshots are on the [`ci-results`](../../tree/ci-results) branch.
+
 ## What works in 0.1
 
 - Starts on UEFI and older BIOS PCs, from USB or disc
@@ -34,13 +36,14 @@ If the screen stays black, pick **Start Nimbus OS with basic graphics** in the b
 - **Shut down, Restart and Sleep** control the real computer
 - **Settings → About** shows your real hardware, and you can set the **time zone**
 - Keyboard: **Windows key** opens Start, **Alt+Tab** switches windows, **Alt+F4** closes a window or offers to shut down. Win+E opens Files, Win+I opens Settings, Win+D shows the desktop, Win+L locks, and Win+arrow keys snap the active window.
-- Wired internet connects automatically
+- Wired internet connects automatically, and the clock sets itself
+- A text console for the curious: **Ctrl+Alt+F2**, user `nimbus`, no password. **Ctrl+Alt+F1** goes back to the desktop.
 
 ## Not yet
 
 - Installing to a drive, so nothing you do is kept after shutdown
 - Wi-Fi, Bluetooth, sound volume, display settings
-- Running other programs such as a web browser or Steam
+- Running other programs such as a web browser or Steam. The Terminal app is Nimbus's own; a real Linux shell in a window comes with milestone 2.
 - Opening files from your own drives
 - Secure Boot
 
@@ -62,6 +65,10 @@ If the screen stays black, pick **Start Nimbus OS with basic graphics** in the b
 | `os/build-iso.sh` | Builds the bootable ISO from Ubuntu 24.04 packages. |
 | `os/test-boot.sh`, `os/qmp.py` | Boot the ISO in virtual machines (UEFI and BIOS), take screenshots, try the desktop, and check that Shut down powers off. |
 | `.github/workflows/build.yml` | Builds and tests on every push to `main`. It publishes the ISO as the **latest** release and saves test screenshots to the `ci-results` branch. |
+
+## Troubleshooting
+
+Add `nimbus.debug` to the kernel command line (press **e** on the boot menu entry) to log the desktop's keyboard, focus and Wayland messages. Read them on a text console with `journalctl -b -u nimbus-session`.
 
 ## Build it yourself
 
