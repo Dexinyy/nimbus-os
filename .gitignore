@@ -4,3 +4,4 @@
 /shell/test/shots/
 node_modules/
 __pycache__/
+cache/

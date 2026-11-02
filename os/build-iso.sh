@@ -17,6 +17,7 @@ OUT="${OUT:-$REPO/out}"
 CHROOT="$WORK/chroot"
 ISODIR="$WORK/iso"
 ISO="$OUT/nimbus-os-$VERSION-amd64.iso"
+APT_CACHE="${APT_CACHE:-}"   # optional folder that keeps downloaded packages between builds
 
 log() { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
 die() { printf '\033[1;31mError: %s\033[0m\n' "$*" >&2; exit 1; }
@@ -27,7 +28,7 @@ for tool in debootstrap mksquashfs grub-mkrescue xorriso mformat python3; do
 done
 
 unmount_all() {
-  for m in dev/pts dev proc sys run; do
+  for m in var/cache/apt/archives dev/pts dev proc sys run; do
     if mountpoint -q "$CHROOT/$m" 2>/dev/null; then umount -lf "$CHROOT/$m" || true; fi
   done
 }
@@ -108,7 +109,17 @@ PACKAGES=(
   fontconfig fonts-dejavu-core
   gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-alsa
 )
+if [ -n "$APT_CACHE" ]; then
+  mkdir -p "$APT_CACHE/apt/partial"
+  mount --bind "$(cd "$APT_CACHE/apt" && pwd)" "$CHROOT/var/cache/apt/archives"
+fi
 in_chroot apt-get install -y "${PACKAGES[@]}"
+if [ -n "$APT_CACHE" ]; then
+  umount "$CHROOT/var/cache/apt/archives"
+  rm -rf "$APT_CACHE/apt/partial" "$APT_CACHE/apt/lock"
+  chmod -R a+rX "$APT_CACHE"
+  echo "Package cache: $(du -sh "$APT_CACHE" | cut -f1)"
+fi
 
 log "Configuring Nimbus OS"
 in_chroot locale-gen en_US.UTF-8
@@ -176,7 +187,7 @@ cp "$HERE/grub.cfg" "$ISODIR/boot/grub/grub.cfg"
 
 log "Making the bootable ISO"
 rm -f "$ISO"
-grub-mkrescue -o "$ISO" "$ISODIR" -- -V NIMBUS_OS
+grub-mkrescue -o "$ISO" "$ISODIR" -- -volid NIMBUS_OS
 (cd "$OUT" && sha256sum "$(basename "$ISO")" > "$(basename "$ISO").sha256")
 ls -lh "$ISO"
 log "Done: $ISO"

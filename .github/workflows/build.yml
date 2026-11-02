@@ -41,13 +41,28 @@ jobs:
           sudo udevadm trigger --name-match=kvm || true
           ls -l /dev/kvm || echo "No KVM on this runner: tests will be slow"
 
+      - name: Reuse Ubuntu packages downloaded by earlier builds
+        uses: actions/cache/restore@v4
+        with:
+          path: cache
+          key: ubuntu-packages-${{ github.run_id }}
+          restore-keys: ubuntu-packages-
+
       - name: Build the ISO
         run: |
           set -o pipefail
           mkdir -p out/ci
           # The runner's own nearby Ubuntu mirror; the finished image points at the public servers.
           sudo NIMBUS_VERSION=0.1 UBUNTU_MIRROR=http://azure.archive.ubuntu.com/ubuntu \
-            UBUNTU_SECURITY_MIRROR=http://azure.archive.ubuntu.com/ubuntu ./build.sh 2>&1 | tee out/ci/build.log
+            UBUNTU_SECURITY_MIRROR=http://azure.archive.ubuntu.com/ubuntu APT_CACHE="$PWD/cache" \
+            ./build.sh 2>&1 | tee out/ci/build.log
+
+      - name: Keep the downloaded packages for the next build
+        if: always() && hashFiles('cache/apt/*.deb') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: cache
+          key: ubuntu-packages-${{ github.run_id }}
 
       - name: Boot-test the ISO
         run: |
