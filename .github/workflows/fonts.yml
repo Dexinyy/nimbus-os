@@ -20,9 +20,9 @@ jobs:
         run: |
           set -eo pipefail
           git clone -q --depth 1 https://github.com/microsoft/Selawik /tmp/selawik
-          python3 -m venv /tmp/venv && /tmp/venv/bin/pip install -q fontmake ttfautohint-py
+          python3 -m venv /tmp/venv && /tmp/venv/bin/pip install -q fontmake
           cd /tmp/selawik/"Source files"/Glyphs
-          /tmp/venv/bin/fontmake -g selawik.glyphs -o ttf -i --output-dir /tmp/out 2>&1 | tail -5
+          /tmp/venv/bin/fontmake -g selawik.glyphs -o ttf -i --no-autohint --output-dir /tmp/out 2>&1 | tail -5
           ls -la /tmp/out
           test "$(ls /tmp/out/*.ttf | wc -l)" -ge 4
       - name: Save to the selawik-fonts branch
