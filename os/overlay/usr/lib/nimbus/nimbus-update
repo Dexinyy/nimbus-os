@@ -844,8 +844,7 @@ def cmd_boot():
     signal.signal(signal.SIGALRM, too_long)
     signal.alarm(150)
     try:
-        if os.geteuid() != 0:
-            return
+        need_root()
         st = load_json(STATE, {}) or {}
         state = st.get("state")
         if state in ("applying", "going-back"):
