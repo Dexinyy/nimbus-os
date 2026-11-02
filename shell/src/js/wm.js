@@ -108,6 +108,7 @@ const WM = (() => {
       on(evt, fn) { const off = bus.on(evt, fn); w.cleanup.push(off); return off; },
       every(ms, fn) { const t = setInterval(fn, ms); w.cleanup.push(() => clearInterval(t)); return t; },
       titlebar(node) { w.extra.append(node); },
+      titlebarLead(node) { w.tb.insertBefore(node, w.tb.firstChild); },
       isActive: () => activeId === w.id,
       focus: () => focus(w),
       resizeTo(ww, hh) {

@@ -48,11 +48,11 @@ const clickButton = (page, label) => page.evaluate((label) => { const b = [...do
   let page = await boot(browser, { candidates: offers });
   const welcomeLink = await page.evaluate(() => [...document.querySelectorAll('.wl-foot .linkbtn')].map((b) => b.textContent));
   check('Welcome offers to set up saving in a live session', welcomeLink.includes('Set up saving'), welcomeLink.join(','));
-  await page.evaluate(() => { const w = __n.WM.list().find((x) => x.appId === 'welcome'); if (w) __n.WM.close(w, true); __n.WM.open('settings', { page: 'system' }); });
+  await page.evaluate(() => { const w = __n.WM.list().find((x) => x.appId === 'welcome'); if (w) __n.WM.close(w, true); __n.WM.open('settings', { page: 'saving' }); });
   await sleep(700);
-  const row = await page.evaluate(() => document.querySelector('[data-sid="saving"] .srow-t')?.textContent);
+  const row = await page.evaluate(() => document.querySelector('[data-sid="saving"] .ws-t')?.textContent);
   check('Settings › System says the work isn’t saved yet', row === 'Your work isn’t saved yet', row);
-  await page.click('[data-sid="saving"] .btn');
+  await page.click('[data-sid="saving"] .ws-btn');
   await sleep(600);
   const opts = await page.evaluate(() => [...document.querySelectorAll('.stg-opt b')].map((b) => b.textContent));
   check('the dialog offers the empty disks by name', opts.length === 2 && opts[0] === 'Empty disk: VBOX HARDDISK' && opts[1] === 'Empty disk: Spare SSD', opts.join(' | '));
@@ -66,7 +66,7 @@ const clickButton = (page, label) => page.evaluate((label) => { const b = [...do
   await sleep(400);
   check('cancelling sets up nothing', (await page.evaluate(() => window.__state.setups.length)) === 0);
 
-  await page.click('[data-sid="saving"] .btn');
+  await page.click('[data-sid="saving"] .ws-btn');
   await sleep(600);
   await clickButton(page, 'Set up saving');
   await sleep(500);
@@ -89,9 +89,9 @@ const clickButton = (page, label) => page.evaluate((label) => { const b = [...do
   await page.close();
 
   page = await boot(browser, { persistent: true, candidates: [] });
-  await page.evaluate(() => { const w = __n.WM.list().find((x) => x.appId === 'welcome'); if (w) __n.WM.close(w, true); __n.WM.open('settings', { page: 'system' }); });
+  await page.evaluate(() => { const w = __n.WM.list().find((x) => x.appId === 'welcome'); if (w) __n.WM.close(w, true); __n.WM.open('settings', { page: 'saving' }); });
   await sleep(700);
-  const on = await page.evaluate(() => document.querySelector('[data-sid="saving"] .srow-t')?.textContent);
+  const on = await page.evaluate(() => document.querySelector('[data-sid="saving"] .ws-t')?.textContent);
   const label = await page.evaluate(() => __n.Store.shortLabel());
   check('with saving on, Settings and the status label say so', on === 'Saving is on' && label === 'Saved', `${on} / ${label}`);
   check('no page errors (2)', page.errors.length === 0, page.errors.join(' | '));

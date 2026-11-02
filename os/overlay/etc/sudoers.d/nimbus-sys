@@ -1,0 +1,2 @@
+# The desktop may change a few system settings as root (see the helper for exactly which)
+nimbus ALL=(root) NOPASSWD: /usr/lib/nimbus/nimbus-sys

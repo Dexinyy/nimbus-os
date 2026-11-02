@@ -64,7 +64,8 @@ const NativeWin = {
   /* ---- events from the window manager ---- */
   event(ev) {
     switch (ev.ev) {
-      case 'hello': case 'output': this.lastArea = ''; this.lastLayout = ''; this.lastOverlay = ''; this.area(WM.area()); this.overlay(); this.schedule(); break;
+      case 'hello': this.lastArea = ''; this.lastLayout = ''; this.lastOverlay = ''; this.area(WM.area()); this.overlay(); this.schedule(); Sys.wmReady(); break;
+      case 'output': this.lastArea = ''; this.lastLayout = ''; this.lastOverlay = ''; this.area(WM.area()); this.overlay(); this.schedule(); Sys.display.refresh(); break;
       case 'new': WM.openNative(ev, Apps.forWindow(ev.app)); if (!ev.min) this.kbd = ev.id; this.schedule(); break; // new windows get the keyboard
       case 'gone': WM.nativeGone(ev.id); break;
       case 'title': WM.nativeTitle(ev.id, ev.title); break;
@@ -90,7 +91,9 @@ const NativeWin = {
   },
   // Nimbus's shortcuts, passed on by the window manager while a program has the keyboard
   key(k) {
+    if (/^(volume-|brightness-|mic-mute)/.test(k)) { hardwareKey(k); return; } // these work on the lock screen too
     if (document.getElementById('screens').childElementCount) return;
+    if (hardwareKey(k)) return;
     if (k === 'super') { if (!Menu.isOpen) Flyouts.toggle('start'); return; }
     if (k.startsWith('super+')) {
       const name = k.slice(6);
@@ -132,7 +135,7 @@ const NativeWin = {
       const fullTop = act && act.native && act.full && !act.min && natives[natives.length - 1] === act;
       const tb = document.getElementById('taskbar');
       if ((!fullTop || Flyouts.cur) && vis(tb)) top.push(rect(tb));
-      for (const id of ['start', 'qs', 'nc']) { const el = document.getElementById(id); if (!el.hidden) top.push(rect(el)); }
+      for (const id of ['start', 'qs', 'nc', 'clip', 'osd']) { const el = document.getElementById(id); if (el && !el.hidden) top.push(rect(el)); }
       for (const el of document.querySelectorAll('#os > .menu, body > .menu, #os .switcher, #os .snapfly, #os .modal, #toasts > .toast')) if (vis(el)) top.push(rect(el));
       const tip = document.getElementById('tip'); if (tip.classList.contains('show')) top.push(rect(tip));
     }
@@ -250,6 +253,7 @@ function mountInstaller(root, api, args) {
       await Apps.refresh();
       busy = false; off();
       status.textContent = 'Chrome is installed. Opening it…'; bar.firstChild.style.width = '100%';
+      S.set('appAdded', Object.assign({}, S.data.appAdded, { [id]: Date.now() }));
       Notif.push({ app: id, title: 'Google Chrome is installed', body: 'It’s your web browser. Find it on the taskbar and in Start.', silent: true });
       await Apps.launch(id, { url });
       setTimeout(() => api.close(true), 900);

@@ -1,0 +1,126 @@
+#!/usr/bin/python3 -I
+"""The few system settings that need root, for the Nimbus desktop (run through sudo, see /etc/sudoers.d/nimbus-sys).
+Every argument is checked here: this program trusts nothing it is given.
+
+  nimbus-sys hostname NAME          rename this PC (and keep /etc/hosts in step)
+  nimbus-sys time-sync              ask the time servers again
+  nimbus-sys clean-apt              delete downloaded program packages; prints the bytes freed
+  nimbus-sys camera on|off          let programs use cameras, or not
+  nimbus-sys bluetooth-unblock      undo a software switch-off of Bluetooth, restart its service if needed
+  nimbus-sys restart-resolved       restart name lookups (the network troubleshooter)
+  nimbus-sys printer-find           list printers on the network and on USB: URI<TAB>description per line
+  nimbus-sys printer-add NAME URI   add a driverless (IPP Everywhere) printer
+  nimbus-sys printer-remove NAME
+  nimbus-sys printer-default NAME
+"""
+import os
+import re
+import subprocess
+import sys
+import time
+
+CAMERA_RULE = "/etc/udev/rules.d/70-nimbus-camera-off.rules"
+
+
+def die(msg, code=1):
+    print(msg, file=sys.stderr)
+    sys.exit(code)
+
+
+def run(argv, timeout=60, check=True):
+    r = subprocess.run(argv, capture_output=True, text=True, timeout=timeout, env={"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL": "C.UTF-8"})
+    if check and r.returncode != 0:
+        die((r.stderr or r.stdout or "%s failed" % argv[0]).strip().splitlines()[-1])
+    return r.stdout
+
+
+def printer(name):
+    if not re.match(r"^[A-Za-z0-9_.-]{1,127}$", name or ""):
+        die("bad printer name")
+    return name
+
+
+def du(path):
+    total = 0
+    for root, _dirs, files in os.walk(path):
+        for f in files:
+            try:
+                total += os.lstat(os.path.join(root, f)).st_blocks * 512
+            except OSError:
+                pass
+    return total
+
+
+def main(args):
+    if not args:
+        die(__doc__)
+    cmd = args[0]
+    if cmd == "hostname" and len(args) == 2:
+        name = args[1]
+        if not re.match(r"^[A-Za-z0-9][A-Za-z0-9-]{0,62}$", name):
+            die("bad name")
+        run(["hostnamectl", "set-hostname", name])
+        with open("/etc/hosts") as f:
+            hosts = f.read()
+        line = "127.0.1.1\t%s" % name
+        hosts = re.sub(r"^127\.0\.1\.1\s.*$", line, hosts, flags=re.M) if re.search(r"^127\.0\.1\.1\s", hosts, re.M) else hosts.rstrip("\n") + "\n" + line + "\n"
+        with open("/etc/hosts.nimbus", "w") as f:
+            f.write(hosts)
+        os.replace("/etc/hosts.nimbus", "/etc/hosts")
+    elif cmd == "time-sync":
+        run(["systemctl", "restart", "systemd-timesyncd"])
+    elif cmd == "clean-apt":
+        before = du("/var/cache/apt/archives")
+        run(["apt-get", "clean"], timeout=120)
+        print(max(0, before - du("/var/cache/apt/archives")))
+    elif cmd == "camera" and len(args) == 2 and args[1] in ("on", "off"):
+        if args[1] == "off":
+            with open(CAMERA_RULE, "w") as f:
+                f.write('# Settings > Privacy & security > Camera: off\nSUBSYSTEM=="video4linux", MODE="0000"\n')
+            for dev in os.listdir("/dev"):
+                if dev.startswith("video"):
+                    os.chmod("/dev/" + dev, 0)
+        elif os.path.exists(CAMERA_RULE):
+            os.unlink(CAMERA_RULE)
+        run(["udevadm", "control", "--reload"], check=False)
+        run(["udevadm", "trigger", "--subsystem-match=video4linux"], check=False)
+    elif cmd == "bluetooth-unblock":
+        run(["rfkill", "unblock", "bluetooth"], check=False)
+        if subprocess.run(["systemctl", "is-active", "--quiet", "bluetooth"]).returncode != 0:
+            run(["systemctl", "restart", "bluetooth"])
+            time.sleep(1)
+    elif cmd == "restart-resolved":
+        run(["systemctl", "restart", "systemd-resolved"])
+    elif cmd == "printer-find":
+        seen = set()
+        # driverless printers on the network (and USB ones that ipp-usb shares)
+        for line in run(["lpinfo", "--include-schemes", "dnssd,ipp,ipps,usb", "-l", "-v"], timeout=45, check=False).split("Device: ")[1:]:
+            uri = (re.search(r"uri = (\S+)", line) or [None, None])[1]
+            info = (re.search(r"info = (.+)", line) or [None, ""])[1].strip()
+            make = (re.search(r"make-and-model = (.+)", line) or [None, ""])[1].strip()
+            if not uri or uri in seen or uri in ("ipp", "ipps", "usb", "dnssd") or "://" not in uri:
+                continue
+            seen.add(uri)
+            print("%s\t%s" % (uri, (info if info and info != "Unknown" else make) or uri))
+    elif cmd == "printer-add" and len(args) == 3:
+        name, uri = printer(args[1]), args[2]
+        if not re.match(r"^(ipps?|https?|socket|lpd|dnssd|usb)://[^\s'\"]+$", uri):
+            die("bad printer address")
+        model = "everywhere" if not uri.startswith(("socket", "lpd")) else "drv:///sample.drv/generic.ppd"
+        r = subprocess.run(["lpadmin", "-p", name, "-E", "-v", uri, "-m", model], capture_output=True, text=True, timeout=90)
+        if r.returncode != 0:
+            die((r.stderr or "This printer can't be added without a driver").strip().splitlines()[-1])
+        if not re.search(r"system default destination", run(["lpstat", "-d"], check=False)):
+            run(["lpadmin", "-d", name], check=False)
+    elif cmd == "printer-remove" and len(args) == 2:
+        run(["lpadmin", "-x", printer(args[1])])
+    elif cmd == "printer-default" and len(args) == 2:
+        run(["lpadmin", "-d", printer(args[1])])
+    else:
+        die("unknown command")
+
+
+if __name__ == "__main__":
+    if os.geteuid() != 0:
+        die("nimbus-sys needs to run as root")
+    main(sys.argv[1:])

@@ -82,7 +82,7 @@ const fakeRuntime = (seed) => `
     await p1.screenshot({ path: path.join(OUT, '20-assistant.png') });
   });
   await step('d1-download', async () => {
-    await p1.evaluate(() => { const { WM } = window.__n; WM.open('settings', { page: 'accounts' }); });
+    await p1.evaluate(() => { const { WM } = window.__n; WM.open('settings', { page: 'backup' }); });
     await p1.waitForTimeout(200);
     await p1.click('.app-settings button:has-text("Download a backup")');
     await p1.waitForTimeout(200);

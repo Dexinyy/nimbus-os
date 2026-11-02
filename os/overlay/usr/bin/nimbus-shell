@@ -28,6 +28,7 @@ import gi
 
 sys.path.insert(0, os.environ.get("NIMBUS_LIB_DIR", "/usr/lib/nimbus"))
 import nimbus_net  # noqa: E402
+import nimbus_sys  # noqa: E402
 import nimbus_term  # noqa: E402
 
 gi.require_version("Gdk", "3.0")
@@ -36,6 +37,12 @@ gi.require_version("WebKit2", "4.1")
 from gi.repository import Gdk, GLib, Gtk, WebKit2  # noqa: E402
 
 VERSION = "0.1"
+BUILD = {}
+try:
+    with open("/usr/share/nimbus/build-info.json") as _f:
+        BUILD = json.load(_f)
+except (OSError, ValueError):
+    pass
 STORAGE_LABEL = "writable"  # keep in step with /usr/lib/nimbus/nimbus-storage
 # Calls that are quick and touch state shared with the main loop run on the main thread.
 MAIN_THREAD = {"termOpen", "termInput", "termResize", "termClose", "log", "wm", "wmReady"}
@@ -194,6 +201,12 @@ def info():
         "open": cmdline_value("nimbus.open"),  # app[:page] to open at startup
         "test": os.environ.get("NIMBUS_TEST") or cmdline_value("nimbus.test"),  # boot tests (os/test-boot.sh)
         "wm": bool(os.environ.get("NIMBUS_WM_FD")),  # programs' windows show on the desktop
+        "arch": platform_machine(),
+        "uefi": os.path.isdir("/sys/firmware/efi"),
+        "built": BUILD.get("date"),
+        "build": (BUILD.get("commit") or "")[:7],
+        "machineId": read("/etc/machine-id")[:12],
+        "touch": any("ID_INPUT_TOUCHSCREEN=1" in read(p) for p in glob.glob("/run/udev/data/c13:*")),
     }
 
 
@@ -201,7 +214,23 @@ def program_env():
     """The environment programs started from the desktop get."""
     env = {k: v for k, v in os.environ.items() if k not in PRIVATE_ENV}
     env.setdefault("XDG_SESSION_TYPE", "wayland")
+    cursor = nimbus_sys.load_json(os.path.join(nimbus_sys.CONFIG_DIR, "cursor.json"), {})
+    if cursor.get("theme"):  # Settings > Accessibility > Mouse pointer
+        env["XCURSOR_THEME"], env["XCURSOR_SIZE"] = cursor["theme"], str(cursor.get("size") or 24)
     return env
+
+
+def proxy_flags():
+    """Settings > Network & internet > Proxy, for Chrome"""
+    p = nimbus_sys.load_json(os.path.join(nimbus_sys.CONFIG_DIR, "proxy.json"), {})
+    if p.get("manual") and p.get("host") and str(p.get("port", "")).isdigit():
+        bypass = [x.strip() for x in re.split(r"[;,\s]+", p.get("bypass") or "") if x.strip()] + (["<local>"] if p.get("local") else [])
+        return ["--proxy-server=%s:%s" % (p["host"], p["port"])] + (["--proxy-bypass-list=" + ";".join(bypass)] if bypass else [])
+    if p.get("pacOn") and p.get("pac"):
+        return ["--proxy-pac-url=" + p["pac"]]
+    if p.get("auto"):
+        return ["--proxy-auto-detect"]
+    return []
 
 
 def spawn(argv):
@@ -332,7 +361,7 @@ class WMLink:
         return False
 
 
-class Shell:
+class Shell(nimbus_sys.SysMethods):
     def __init__(self):
         os.makedirs(DATA_DIR, exist_ok=True)
         os.makedirs(CACHE_DIR, exist_ok=True)
@@ -397,6 +426,7 @@ class Shell:
         self.page_ready = False
         self.focused = None
         self.wm = WMLink(int(os.environ["NIMBUS_WM_FD"]), self.on_wm_event) if os.environ.get("NIMBUS_WM_FD") else None
+        self.sys_init()
         self.listen_for_links()
         if self.wm and os.access(CHROME, os.X_OK):
             GLib.timeout_add_seconds(90, self.update_chrome)
@@ -466,6 +496,16 @@ class Shell:
     # ---- programs' windows (nimbus-wm) ----
     def on_wm_event(self, event):
         kind, wid = event.get("ev"), event.get("id")
+        if kind == "outputs":
+            self.on_outputs(event)
+            return
+        if kind == "inputs":
+            self.on_inputs(event)
+            return
+        if kind == "idle":
+            if self.page_ready:
+                self.emit("idle", event)
+            return
         if kind == "new":
             self.windows[wid] = dict(event)
         elif kind == "gone":
@@ -509,6 +549,23 @@ class Shell:
             self.wm.send("area " + " ".join(num(args.get(k)) for k in ("x", "y", "w", "h")))
         elif cmd == "overlay":
             self.wm.send("overlay %s %s" % (num(args.get("dim")), num(args.get("night"))))
+        elif cmd == "input":
+            keys = ("speed", "accel", "left", "scroll", "natural", "tap", "tap2", "twofinger", "tnatural", "dwt", "tspeed", "touchpad")
+            self.wm.send("input " + " ".join(num(args.get(k)) for k in keys))
+        elif cmd == "keymap":
+            layout, variant = str(args.get("layout") or "us"), str(args.get("variant") or "")
+            if not re.match(r"^[a-z]{2,8}$", layout) or not re.match(r"^[A-Za-z0-9_-]{0,32}$", variant):
+                raise ValueError("Unknown keyboard layout")
+            self.wm.send("keymap %s %s %s %s" % (layout, variant or "-", num(args.get("delay") or 500), num(args.get("rate") or 30)))
+        elif cmd == "cursor":
+            theme = "DMZ-Black" if args.get("theme") == "black" else "DMZ-White"
+            if not os.path.isdir("/usr/share/icons/" + theme):
+                theme = "default"
+            self.wm.send("cursor %s %s" % (theme, num(args.get("size") or 24)))
+        elif cmd == "idle":
+            self.wm.send("idle %s %s" % (num(args.get("screen")), num(args.get("sleep"))))
+        elif cmd == "paste":
+            self.wm.send("paste")
         else:
             raise ValueError("Unknown window manager command")
         return True
@@ -528,7 +585,7 @@ class Shell:
             raise ValueError("Unknown program")
         if not os.access(CHROME, os.X_OK):
             raise RuntimeError("Google Chrome isn't installed")
-        argv = [CHROME, "--ozone-platform=wayland", "--no-default-browser-check", "--password-store=basic"]
+        argv = [CHROME, "--ozone-platform=wayland", "--no-default-browser-check", "--password-store=basic", "--enable-features=TouchpadOverscrollHistoryNavigation"] + proxy_flags()
         if args.get("test"):
             argv.append("--no-first-run")
         url = str(args.get("url") or "")
@@ -540,6 +597,7 @@ class Shell:
         if args.get("app") != "chrome":
             raise ValueError("Unknown program")
         result = self.run_apps_helper("install", "chrome")
+        self.record_update("Google Chrome %s" % result.get("version", ""), True, "installed")
         # Chrome is the browser for web links, and knows it
         subprocess.run(["xdg-settings", "set", "default-web-browser", "google-chrome.desktop"],
                        env=program_env(), capture_output=True, timeout=30)
@@ -568,14 +626,37 @@ class Shell:
         """Once a while after startup, bring Chrome up to date (Chrome on Linux leaves that to the system)."""
         def run():
             try:
+                prefs = nimbus_sys.load_json(os.path.join(nimbus_sys.CONFIG_DIR, "updates.json"), {})
+                if prefs.get("auto") is False or (prefs.get("paused") or 0) > time.time() * 1000:
+                    return  # Settings > Nimbus Update: paused, or programs don't update by themselves
                 if nimbus_net.available() and nimbus_net.status().get("connectivity") == "none":
                     return
+                if not prefs.get("metered") and "yes" in nimbus_sys.run(["nmcli", "-t", "-f", "GENERAL.METERED", "general"], check=False).lower():
+                    return
                 result = self.run_apps_helper("update", "chrome", quiet=True)
+                if result.get("updated"):
+                    self.record_update("Google Chrome %s" % result.get("version", ""), True)
                 print("nimbus-shell: Chrome update:", result.get("text", "done"))
             except Exception as exc:
                 print("nimbus-shell: Chrome update:", exc, file=sys.stderr)
         threading.Thread(target=run, daemon=True).start()
         return False
+
+    def m_programUpdate(self, args):
+        if args.get("app") != "chrome":
+            raise ValueError("Unknown program")
+        try:
+            result = self.run_apps_helper("update", "chrome", quiet=True)
+        except Exception as exc:
+            self.record_update("Google Chrome", False, str(exc))
+            raise
+        self.record_update("Google Chrome %s" % result.get("version", ""), True)
+        return result
+
+    def m_programRemove(self, args):
+        if args.get("app") != "chrome":
+            raise ValueError("Unknown program")
+        return self.run_apps_helper("remove", "chrome", quiet=True)
 
     def m_openUrl(self, args):
         """Open a web link: in Chrome, or the page offers to install it first."""
@@ -632,7 +713,7 @@ class Shell:
         return nimbus_net.networks(rescan=bool(args.get("rescan")))
 
     def m_wifiConnect(self, args):
-        return nimbus_net.connect(args.get("ssid", ""), args.get("password") or None)
+        return nimbus_net.connect(args.get("ssid", ""), args.get("password") or None, bool(args.get("hidden")))
 
     def m_wifiDisconnect(self, _args):
         return nimbus_net.disconnect()

@@ -22,7 +22,7 @@ function appListed(id) { return appAvailable(id) && !APPS[id].hidden; }
 
 /* ========== Shell-wide helpers and appearance ========== */
 const Shell = {
-  tbReserve() { return 48 + (S.data.tbFloat ? 16 : 0); },
+  tbReserve() { return S.data.tbAutoHide ? 0 : 48 + (S.data.tbFloat ? 16 : 0); },
   closeFlyouts() { Flyouts.close(); },
   reloadAll() {
     applyAll();
@@ -38,7 +38,26 @@ function effectiveTheme() {
   if (v === 'dark' || v === 'light') return v;
   return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
-function applyTheme() { document.documentElement.setAttribute('data-os-theme', effectiveTheme()); applyAccent(); }
+function applyTheme() { document.documentElement.setAttribute('data-os-theme', effectiveTheme()); applyAccent(); applyLooks(); }
+// Accent on the taskbar and title bars, contrast themes, scroll bars, and the accent taken from the wallpaper
+function applyLooks() {
+  const root = document.documentElement;
+  root.toggleAttribute('data-accent-bar', !!S.data.accentBar && effectiveTheme() === 'dark');
+  root.toggleAttribute('data-accent-title', !!S.data.accentTitle);
+  root.toggleAttribute('data-scrollbars', !!S.data.alwaysScrollbars);
+  if (S.data.contrast && S.data.contrast !== 'none') root.setAttribute('data-contrast', S.data.contrast); else root.removeAttribute('data-contrast');
+}
+function autoAccent() {
+  if (!S.data.accentAuto) return;
+  const t = getComputedStyle(document.documentElement).getPropertyValue('--wall-tint').trim();
+  if (!/^#[0-9a-f]{6}$/i.test(t)) return;
+  // the wallpaper's own color, made strong enough to read as an accent
+  const [r, g, b] = hexToRgb(t); const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let c = t;
+  if (max - min < 40) c = mixHex(t, '#0078d4', 0.55);
+  if (luminance(c) > 0.45) c = mixHex(c, '#000000', 0.3); else if (luminance(c) < 0.06) c = mixHex(c, '#ffffff', 0.35);
+  if (c.toLowerCase() !== String(S.data.accent).toLowerCase()) { S.data.accent = c; applyAccent(); bus.emit('settings', ['accent']); }
+}
 function applyAccent() {
   let a = S.data.accent; if (!/^#[0-9a-f]{6}$/i.test(a)) a = DEFAULTS.accent;
   const dark = document.documentElement.getAttribute('data-os-theme') === 'dark';
@@ -58,8 +77,9 @@ function applyEffects() {
   if (!S.data.transparency || S.data.energySaver || noBlur) root.setAttribute('data-solid', ''); else root.removeAttribute('data-solid');
   if (S.data.reduceMotion || S.data.energySaver) root.setAttribute('data-reduce-motion', ''); else root.removeAttribute('data-reduce-motion');
 }
-function applyTextSize() { document.documentElement.style.fontSize = clamp(S.data.textSize || 14, 12, 18) + 'px'; }
-function applyBrightness() { document.getElementById('dim').style.opacity = String(((100 - clamp(S.data.brightness, 30, 100)) / 100) * 0.8); NativeWin.overlay(); }
+function applyTextSize() { document.documentElement.style.fontSize = clamp(S.data.textSize || 14, 12, 32) + 'px'; }
+// A screen with its own backlight is dimmed for real (sys.js); others get a dark layer over everything
+function applyBrightness() { const real = typeof Sys !== 'undefined' && Sys.display.st.backlight; document.getElementById('dim').style.opacity = real ? '0' : String(((100 - clamp(S.data.brightness, 30, 100)) / 100) * 0.8); NativeWin.overlay(); }
 function applyNight() {
   const a = S.data.nightLight ? 0.1 + (clamp(S.data.nightStrength, 0, 100) / 100) * 0.45 : 0;
   document.getElementById('nightlight').style.background = `rgba(255, 138, 40, ${a.toFixed(3)})`;
@@ -70,23 +90,53 @@ function applyTaskbar() {
   os.dataset.tbPos = S.data.tbPos === 'top' ? 'top' : 'bottom';
   os.dataset.tbAlign = S.data.tbAlign === 'left' ? 'left' : 'center';
   if (S.data.tbFloat) os.setAttribute('data-tb-float', ''); else os.removeAttribute('data-tb-float');
+  os.toggleAttribute('data-tb-autohide', !!S.data.tbAutoHide);
   os.style.setProperty('--tb-reserve', Shell.tbReserve() + 'px');
-  $('#tb-search').hidden = !S.data.tbSearch;
+  // Search: an icon, an icon and a label, or a search box, as in Windows
+  const sm = S.data.tbSearch === true ? 'icon' : S.data.tbSearch || 'hide';
+  os.dataset.tbSearch = sm;
+  const sb = $('#tb-search'); sb.hidden = sm === 'hide';
+  sb.innerHTML = sm === 'icon' ? ui('search') : `${ui('search')}<span>Search</span>`;
   $('#tb-tv').hidden = !S.data.tbTaskView;
+  $('#tb-assist').hidden = S.data.tbAssist === false;
+  $('#tb-clock .cl').hidden = S.data.tbClock === false;
+  $('#tb-desk').hidden = S.data.tbDeskCorner === false;
   Flyouts.close();
   WM.relayout();
   Desktop.render();
 }
 function applyOsName() { document.title = osTitle(); }
 function applyAll() { applyTheme(); applyEffects(); applyTextSize(); applyBrightness(); applyNight(); applyTaskbar(); applyWallpaper(); applyOsName(); }
+// The taskbar hides itself until the pointer reaches the screen edge
+const TbHide = {
+  t: 0,
+  init() {
+    const os = document.getElementById('os'), tb = document.getElementById('taskbar');
+    const show = () => { clearTimeout(this.t); tb.classList.add('peek'); };
+    const hide = () => { clearTimeout(this.t); this.t = setTimeout(() => { if (!Flyouts.cur && !Menu.isOpen && !tb.matches(':hover')) { tb.classList.remove('peek'); NativeWin.schedule(); } }, 700); };
+    os.addEventListener('pointermove', (e) => {
+      if (!S.data.tbAutoHide) return;
+      const r = os.getBoundingClientRect(); const top = S.data.tbPos === 'top';
+      if (top ? e.clientY <= r.top + 3 : e.clientY >= r.bottom - 3) { show(); NativeWin.schedule(); }
+    });
+    tb.addEventListener('pointerenter', show);
+    tb.addEventListener('pointerleave', hide);
+    bus.on('flyout', (name) => { if (name) show(); else hide(); });
+  },
+};
 Object.assign(APPLY, {
   theme: applyTheme, accent: applyAccent, wallpaper: applyWallpaper,
   transparency: applyEffects, energySaver: applyEffects, reduceMotion: applyEffects,
   textSize: () => { applyTextSize(); Desktop.render(); }, brightness: applyBrightness, nightLight: applyNight, nightStrength: applyNight,
   tbAlign: applyTaskbar, tbPos: applyTaskbar, tbFloat: applyTaskbar, tbSearch: applyTaskbar, tbTaskView: applyTaskbar,
-  pinned: () => Taskbar.render(), clockSeconds: () => Taskbar.clock(), clock24: () => Taskbar.clock(),
-  dnd: () => Taskbar.clock(), sounds: () => Taskbar.tray(), volume: () => Taskbar.tray(),
+  pinned: () => Taskbar.render(), clockSeconds: () => Taskbar.clock(), clock24: () => Taskbar.clock(), locale: () => Taskbar.clock(),
+  dnd: () => Taskbar.clock(), sounds: () => Taskbar.tray(), volume: () => Taskbar.tray(), muted: () => Taskbar.tray(),
   osName: applyOsName, showDesktopIcons: () => Desktop.render(),
+  tbAssist: applyTaskbar, tbAutoHide: applyTaskbar, tbClock: applyTaskbar, tbDeskCorner: applyTaskbar, tbBadges: () => Taskbar.badge(),
+  accentBar: applyLooks, accentTitle: applyLooks, alwaysScrollbars: applyLooks, contrast: applyLooks, accentAuto: autoAccent,
+  wallMode: applyWallpaper, wallFit: applyWallpaper, wallColor: applyWallpaper, slideSource: applyWallpaper, slideEvery: applyWallpaper, slideShuffle: applyWallpaper,
+  startLayout: () => Start.render(), startRecent: () => Start.render(), startFolders: () => Start.render(), startMostUsed: () => Start.render(), startAdded: () => Start.render(),
+  keepRecent: () => { if (S.data.keepRecent === false) S.data.recent = []; },
 });
 if (window.matchMedia) matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => { if (S.data.theme === 'auto') applyTheme(); });
 new MutationObserver(() => { if (S.data.theme === 'auto') applyTheme(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
@@ -98,7 +148,7 @@ function fmtTime(withSeconds, noPeriod) {
   const o = { hour: 'numeric', minute: '2-digit' };
   if (withSeconds) o.second = '2-digit';
   if (S.data.clock24 === true || S.data.clock24 === false) o.hour12 = !S.data.clock24;
-  const f = new Intl.DateTimeFormat(undefined, o);
+  let f; try { f = new Intl.DateTimeFormat(S.data.locale || undefined, o); } catch { f = new Intl.DateTimeFormat(undefined, o); }
   if (!noPeriod) return f.format(new Date());
   return f.formatToParts(new Date()).filter((p) => p.type !== 'dayPeriod').map((p) => p.value).join('').trim();
 }
@@ -238,7 +288,7 @@ const Desktop = {
       'sep',
       { label: 'Next wallpaper', icon: 'image', action: nextWallpaper },
       { label: 'Personalize', icon: 'palette', action: () => WM.open('settings', { page: 'personalization' }) },
-      { label: 'Display settings', icon: 'desktop', action: () => WM.open('settings', { page: 'system' }) },
+      { label: 'Display settings', icon: 'desktop', action: () => WM.open('settings', { page: 'display' }) },
       { label: 'Open in Terminal', icon: 'terminal', action: () => WM.open('terminal', { cwd: 'desktop' }) },
     ], e.clientX, e.clientY);
   },
@@ -363,7 +413,7 @@ const Flyouts = {
   cur: null,
   position(name) {
     const el = document.getElementById(name); const os = document.getElementById('os');
-    const W = os.clientWidth, H = os.clientHeight; const top = S.data.tbPos === 'top'; const r = Shell.tbReserve();
+    const W = os.clientWidth, H = os.clientHeight; const top = S.data.tbPos === 'top'; const r = S.data.tbAutoHide ? 48 + (S.data.tbFloat ? 16 : 0) : Shell.tbReserve();
     const gap = S.data.tbFloat ? 4 : 10;
     el.style.top = ''; el.style.bottom = ''; el.style.left = ''; el.style.right = '';
     if (top) el.style.top = r + gap + 'px'; else el.style.bottom = r + gap + 'px';
@@ -384,8 +434,9 @@ const Flyouts = {
     this.cur = name;
     this.position(name);
     el.hidden = false;
-    ({ start: Start, qs: QS, nc: NC })[name].open(opts);
+    ({ start: Start, qs: QS, nc: NC, clip: ClipFly })[name].open(opts);
     $$(`[data-fly="${name}"]`).forEach((b) => b.classList.add('open-fly'));
+    bus.emit('flyout', name);
     requestAnimationFrame(() => requestAnimationFrame(() => { if (this.cur === name) el.classList.add('open'); }));
   },
   close() {
@@ -395,6 +446,7 @@ const Flyouts = {
     if (name === 'qs' && QS.list) { QS.list.destroy(); QS.list = null; }
     el.classList.remove('open');
     $$(`[data-fly="${name}"]`).forEach((b) => b.classList.remove('open-fly'));
+    bus.emit('flyout', null);
     setTimeout(() => { if (this.cur !== name) el.hidden = true; }, 230);
   },
   toggle(name, opts) { if (this.cur === name) this.close(); else this.open(name, opts); },
@@ -412,11 +464,16 @@ const Start = {
     const el = document.getElementById('start');
     el.innerHTML = `<div class="start-top"><label class="searchbox">${ui('search')}<input id="start-q" type="search" autocomplete="off" spellcheck="false" placeholder="Search apps, files and settings" aria-label="Search apps, files and settings"></label></div>
       <div class="start-body" id="start-body"></div>
-      <div class="start-foot"><button class="userbtn" id="start-user" aria-label="Account settings"><span class="avatar"></span><span class="uname"></span></button><button class="ibtn" id="start-power" aria-label="Power" data-tip="Power">${ui('power')}</button></div>`;
+      <div class="start-foot"><button class="userbtn" id="start-user" aria-label="Account settings"><span class="avatar"></span><span class="uname"></span></button><span class="grow"></span><span id="start-folders"></span><button class="ibtn" id="start-power" aria-label="Power" data-tip="Power">${ui('power')}</button></div>`;
     const q = $('#start-q');
     q.addEventListener('input', () => { this.q = q.value; this.sel = 0; this.render(); });
     q.addEventListener('keydown', (e) => this.key(e));
     $('#start-user').addEventListener('click', () => { Flyouts.close(); WM.open('settings', { page: 'accounts' }); });
+    $('#start-folders').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-folder]'); if (!b) return; Flyouts.close();
+      const f = b.dataset.folder;
+      if (f === 'settings') WM.open('settings'); else if (f === 'files' || f === 'home') WM.open('files'); else WM.open('files', { folder: f });
+    });
     $('#start-power').addEventListener('click', (e) => Power.menu(e.currentTarget));
     bus.on('settings', (keys) => { if (Flyouts.cur === 'start' && keys.some((k) => ['userName', 'startPins', 'recent'].includes(k))) this.render(); });
     bus.on('caps', () => { if (Flyouts.cur === 'start') this.render(); });
@@ -430,6 +487,9 @@ const Start = {
   render() {
     $('#start-user .avatar').innerHTML = avatarHTML();
     $('#start-user .uname').textContent = userName() || 'Set your name';
+    const FOLDER_IC = { settings: 'settings', files: 'folder', documents: 'document', downloads: 'download', music: 'music', pictures: 'background', videos: 'video', home: 'personCircle' };
+    const FOLDER_NAME = { settings: 'Settings', files: 'Files', documents: 'Documents', downloads: 'Downloads', music: 'Music', pictures: 'Pictures', videos: 'Videos', home: 'Personal folder' };
+    $('#start-folders').innerHTML = (S.data.startFolders || []).filter((f) => FOLDER_NAME[f] && (f === 'settings' || f === 'files' || f === 'home' || FS.get(f))).map((f) => `<button class="ibtn" data-folder="${f}" aria-label="${FOLDER_NAME[f]}" data-tip="${FOLDER_NAME[f]}">${fi(FOLDER_IC[f])}</button>`).join('');
     if (this.q.trim()) this.renderResults();
     else if (this.view === 'all') this.renderAll();
     else this.renderHome();
@@ -437,7 +497,7 @@ const Start = {
   appButton(id, cls) {
     const a = APPS[id];
     const b = h('button', { class: cls, 'data-app': id, html: `<span class="ic">${appIcon(a.icon)}</span><span>${esc(a.name)}</span>` });
-    b.addEventListener('click', () => { Flyouts.close(); WM.open(id); });
+    b.addEventListener('click', () => { Flyouts.close(); S.data.appUse = Object.assign({}, S.data.appUse, { [id]: ((S.data.appUse || {})[id] || 0) + 1 }); Store.saveSettings(); WM.open(id); });
     b.addEventListener('contextmenu', (e) => { e.preventDefault(); Menu.show(appMenuItems(id, 'start'), e.clientX, e.clientY); });
     return b;
   },
@@ -447,10 +507,13 @@ const Start = {
     const all = h('button', { class: 'sec-btn', html: `All apps ${ui('chevR')}` }); all.onclick = () => { this.view = 'all'; this.render(); };
     head.append(all);
     const pins = h('div', { class: 'pins' });
-    for (const id of S.data.startPins.filter(appListed)) pins.append(this.appButton(id, 'pin'));
+    const lay = S.data.startLayout || 'default';
+    const pinMax = lay === 'pins' ? 24 : lay === 'recs' ? 12 : 18, recMax = lay === 'pins' ? 2 : lay === 'recs' ? 10 : 6;
+    for (const id of S.data.startPins.filter(appListed).slice(0, pinMax)) pins.append(this.appButton(id, 'pin'));
     body.append(head, pins);
-    body.append(h('div', { class: 'sec-head' }, h('h3', { text: 'Recent' })));
-    const rec = (S.data.recent || []).map((id) => FS.get(id)).filter((n) => n && !FS.inTrash(n.id)).slice(0, 6);
+    if (S.data.startRecent === false) return;
+    body.append(h('div', { class: 'sec-head' }, h('h3', { text: 'Recommended' })));
+    const rec = (S.data.recent || []).map((id) => FS.get(id)).filter((n) => n && !FS.inTrash(n.id)).slice(0, recMax);
     if (!rec.length) body.append(h('div', { class: 'empty-hint', text: 'Files you open will show up here.' }));
     else {
       const grid = h('div', { class: 'recent' });
@@ -469,6 +532,9 @@ const Start = {
     const back = h('button', { class: 'sec-btn', html: `${ui('chevL')} Back` }); back.onclick = () => { this.view = 'home'; this.render(); };
     head.append(back);
     const list = h('div', { class: 'alist' });
+    const extra = (title, ids) => { if (!ids.length) return; list.append(h('div', { class: 'letter wide', text: title })); for (const id of ids) list.append(this.appButton(id, 'aitem')); };
+    if (S.data.startAdded !== false) extra('Recently added', Object.entries(S.data.appAdded || {}).filter(([id, t]) => appListed(id) && Date.now() - t < 7 * 86400e3).map(([id]) => id).slice(0, 3));
+    if (S.data.startMostUsed) extra('Most used', Object.entries(S.data.appUse || {}).filter(([id]) => appListed(id)).sort((a, b) => b[1] - a[1]).map(([id]) => id).slice(0, 4));
     let letter = '';
     for (const id of Object.keys(APPS).filter(appListed).sort((a, b) => APPS[a].name.localeCompare(APPS[b].name))) {
       const L = APPS[id].name[0].toUpperCase();
@@ -550,11 +616,16 @@ const Search = {
       const s = this.score(a.name, a.keywords, ql);
       if (s) out.push({ group: 'Apps', score: s + 6, title: a.name, sub: 'App', icon: a.icon, run: () => WM.open(id) });
     }
-    if (typeof SETTINGS_INDEX !== 'undefined') for (const st of SETTINGS_INDEX) {
-      const s = this.score(st.name, st.keywords, ql);
-      if (s) out.push({ group: 'Settings', score: s, title: st.name, sub: 'Settings › ' + st.pageName, uiIcon: st.icon || 'settings', run: () => WM.open('settings', { page: st.page, focus: st.id }) });
-    }
-    for (const id in FS.nodes) {
+    const seenSt = new Set();
+    const addSetting = (title, keywords, page, sid) => {
+      const p = SPAGES[page]; if (!p || p.hidden?.() || seenSt.has(title)) return;
+      const s = this.score(title, keywords, ql);
+      if (!s) return; seenSt.add(title);
+      out.push({ group: 'Settings', score: s, title, sub: 'Settings › ' + pageTrail(page).map((x) => x.title).join(' › '), uiIcon: 'settings', run: () => WM.open('settings', { page, focus: sid }) });
+    };
+    for (const st of SINDEX) addSetting(st.title, st.keywords, st.page, st.sid);
+    for (const p of Object.values(SPAGES)) addSetting(p.title, p.keywords || '', p.id, null);
+    if (S.data.searchFiles !== false) for (const id in FS.nodes) {
       const n = FS.nodes[id]; if (id === 'root' || FS.inTrash(id)) continue;
       const s = this.score(n.name, '', ql);
       if (s) out.push({ group: n.type === 'folder' ? 'Folders' : 'Files', score: s - 3 + (S.data.recent.includes(id) ? 4 : 0), title: n.name, sub: n.type === 'folder' ? FS.pathOf(id) : FS.pathOf(n.parent), node: n, run: () => openNode(id) });
@@ -631,7 +702,7 @@ const QS = {
       h('h3', { text: 'Wi-Fi' }), h('span', { class: 'grow' }), sw);
     this.list = netList();
     const foot = h('div', { class: 'qs-foot' },
-      h('button', { class: 'linkbtn', text: 'More Wi-Fi settings', onclick: () => { Flyouts.close(); WM.open('settings', { page: 'network' }); } }),
+      h('button', { class: 'linkbtn', text: 'More Wi-Fi settings', onclick: () => { Flyouts.close(); WM.open('settings', { page: 'wifi' }); } }),
       h('span', { class: 'grow' }),
       h('button', { class: 'ibtn', 'aria-label': 'Look for networks again', 'data-tip': 'Look for networks again', html: ui('refresh'), onclick: () => Net.scan(true) }));
     el.append(head, h('div', { class: 'qs-nets' }, this.list.el), foot);
@@ -687,7 +758,7 @@ const NC = {
       h('button', { class: 'ibtn', 'aria-label': 'Next month', html: ui('chevD'), onclick: () => { this.month = new Date(m.getFullYear(), m.getMonth() + 1, 1); this.render(); } }));
     head.append(nav);
     const grid = h('div', { class: 'cal-grid', role: 'grid', 'aria-label': fmtDT(m, { month: 'long', year: 'numeric' }) });
-    const fdw = (() => { try { const l = new Intl.Locale(navigator.language); const wi = l.getWeekInfo?.() || l.weekInfo; return wi ? wi.firstDay % 7 : 0; } catch { return 0; } })();
+    const fdw = firstDayOfWeek();
     for (let i = 0; i < 7; i++) grid.append(h('div', { class: 'dow', text: fmtDT(new Date(2023, 0, 1 + ((fdw + i) % 7)), { weekday: 'narrow' }) }));
     const start = new Date(m); start.setDate(1 - ((m.getDay() - fdw + 7) % 7));
     for (let i = 0; i < 42; i++) {
@@ -724,7 +795,6 @@ const Taskbar = {
   bat: null,
   init() {
     $('#tb-start').innerHTML = appIcon('logo');
-    $('#tb-search').innerHTML = ui('search');
     $('#tb-tv').innerHTML = ui('taskview');
     $('#tb-assist').innerHTML = appIcon('assistant');
     $('#tb-start').addEventListener('click', () => Flyouts.toggle('start'));
@@ -793,14 +863,14 @@ const Taskbar = {
     $('#tb-clock').setAttribute('aria-label', `${fmtDT(Date.now(), { dateStyle: 'full' })}, ${fmtTime(false)}. Notifications and calendar.`);
   },
   tray() {
-    const net = Net.label(); const vol = S.data.sounds && S.data.volume > 0;
+    const net = Net.label(); const vol = !S.data.muted && S.data.volume > 0 && (IS_NATIVE || S.data.sounds);
     let htm = Net.icon() + ui(vol ? 'volume' : 'mute');
     if (this.bat) htm += batteryIcon(this.bat.level, this.bat.charging);
     const t = $('#tb-tray'); if (!t) return; t.innerHTML = htm;
     t.setAttribute('aria-label', `Quick settings. ${net}. Sounds ${vol ? S.data.volume + '%' : 'off'}.${this.bat ? ' Battery ' + Math.round(this.bat.level * 100) + '%.' : ''}`);
     t.setAttribute('data-tip', `${net} · ${vol ? 'Volume ' + S.data.volume + '%' : 'Sounds off'}${this.bat ? ' · Battery ' + Math.round(this.bat.level * 100) + '%' : ''}`);
   },
-  badge() { const b = $('#tb-badge'); const n = Notif.unread; b.hidden = !n || Flyouts.cur === 'nc'; b.textContent = n > 9 ? '9+' : String(n); },
+  badge() { const b = $('#tb-badge'); const n = Notif.unread; b.hidden = !n || Flyouts.cur === 'nc' || S.data.tbBadges === false; b.textContent = n > 9 ? '9+' : String(n); },
   focusChip() {
     const f = Clock.focus; const chip = $('#tb-focus');
     const show = f.running || (f.left < f.dur && f.left > 0);
@@ -830,17 +900,29 @@ const Power = {
   lock() {
     if (document.querySelector('.screen.lock')) return;
     Flyouts.close(); Menu.close(); WM.hideSnapFly();
-    const el = this.screen('lock', `<div class="lock-clock"><div class="lock-time"></div><div class="lock-date"></div></div><div class="lock-user"><div class="avatar">${avatarHTML()}</div><div class="nm">${esc(userName() || osTitle())}</div><div class="lock-hint">${ui('lock')}<span>Click or press any key to unlock</span></div></div>`);
-    el.style.backgroundImage = `url("${currentWallURL}")`;
+    const pin = !!S.data.lockPin;
+    const el = this.screen('lock', `<div class="lock-clock"><div class="lock-time"></div><div class="lock-date"></div></div><div class="lock-user"><div class="avatar">${avatarHTML()}</div><div class="nm">${esc(userName() || osTitle())}</div>${pin ? `<form class="lock-pin" hidden><input type="password" inputmode="numeric" autocomplete="off" placeholder="PIN" aria-label="PIN" maxlength="12"><button class="lock-go" aria-label="Sign in">${ui('chevR')}</button><div class="lock-err" role="alert"></div></form>` : ''}<div class="lock-hint">${ui('lock')}<span>${pin ? 'Click or press any key, then type your PIN' : 'Click or press any key to unlock'}</span></div></div>`);
+    el.style.backgroundImage = `url("${S.data.lockWall ? renderWall(S.data.lockWall, wallSize().w, wallSize().h) : currentWallURL}")`;
     el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'Lock screen'); el.tabIndex = 0;
     const tick = () => { el.querySelector('.lock-time').textContent = fmtTime(false, true); el.querySelector('.lock-date').textContent = fmtDT(Date.now(), { weekday: 'long', month: 'long', day: 'numeric' }); };
     tick(); const t = setInterval(tick, 1000);
+    const done = () => { Sound.unlock(); Sound.play('unlock'); el.classList.add('unlocking'); clearInterval(t); setTimeout(() => el.remove(), 520); };
     const unlock = (e) => {
       if (el.classList.contains('unlocking')) return;
       if (e && e.type === 'keydown' && ['Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) return;
-      Sound.unlock(); Sound.play('unlock');
-      el.classList.add('unlocking'); clearInterval(t);
-      setTimeout(() => el.remove(), 520);
+      if (!pin) { done(); return; }
+      // With a PIN: the first press shows the sign-in box
+      const form = el.querySelector('.lock-pin');
+      if (!form.hidden) return;
+      form.hidden = false; el.classList.add('signin'); el.querySelector('.lock-hint').hidden = true;
+      const inp = form.querySelector('input'), err = form.querySelector('.lock-err');
+      setTimeout(() => inp.focus(), 30);
+      form.addEventListener('submit', async (ev) => {
+        ev.preventDefault();
+        if (await checkPin(inp.value)) done();
+        else { err.textContent = 'The PIN is incorrect. Try again.'; inp.value = ''; inp.focus(); Sound.play('error'); }
+      });
+      inp.addEventListener('keydown', (ev) => ev.stopPropagation());
     };
     el.addEventListener('pointerdown', unlock); el.addEventListener('keydown', unlock);
     requestAnimationFrame(() => el.focus());
@@ -849,7 +931,7 @@ const Power = {
     Flyouts.close(); Menu.close();
     const el = this.screen('sleep', '');
     el.tabIndex = 0; el.setAttribute('aria-label', 'Sleeping. Click or press a key to wake.');
-    const wake = () => { el.remove(); this.lock(); };
+    const wake = () => { el.remove(); if (S.data.lockOnWake !== false || S.data.lockPin) this.lock(); };
     setTimeout(() => { el.addEventListener('pointerdown', wake, { once: true }); el.addEventListener('keydown', wake, { once: true }); el.focus(); }, 400);
     if (IS_NATIVE) { Store.flushLocal(); setTimeout(() => Native.call('power', { action: 'suspend' }).catch(() => {}), 700); }
   },

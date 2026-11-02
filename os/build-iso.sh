@@ -120,6 +120,10 @@ PACKAGES=(
   adwaita-icon-theme hicolor-icon-theme gsettings-desktop-schemas dconf-gsettings-backend shared-mime-info
   fontconfig fonts-dejavu-core
   gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-alsa
+  # Sound through PipeWire (steadier than ALSA alone, above all in virtual machines), with Bluetooth audio
+  pipewire pipewire-pulse pipewire-alsa wireplumber rtkit libspa-0.2-bluetooth gstreamer1.0-pipewire gstreamer1.0-pulseaudio pulseaudio-utils
+  # What Settings controls: Bluetooth, power modes, screenshots and the clipboard, pointer styles
+  bluez power-profiles-daemon grim wl-clipboard dmz-cursor-theme
   # What Google Chrome needs beyond the above, so installing it later only downloads Chrome itself
   fonts-liberation libcups2t64 libnss3 libvulkan1 xdg-utils
 )
@@ -128,6 +132,8 @@ if [ -n "$APT_CACHE" ]; then
   mount --bind "$(cd "$APT_CACHE/apt" && pwd)" "$CHROOT/var/cache/apt/archives"
 fi
 in_chroot apt-get install -y "${PACKAGES[@]}"
+# Printing: driverless (IPP Everywhere) printers on the network and on USB, without a pile of drivers
+in_chroot apt-get install -y --no-install-recommends cups-daemon cups-client cups-filters cups-ipp-utils avahi-daemon ipp-usb libnss-mdns
 
 log "Building the window manager (nimbus-wm)"
 WM_BUILD=(build-essential pkg-config libwlroots-dev wayland-protocols libwayland-bin)
@@ -156,8 +162,13 @@ echo "Etc/UTC" > "$CHROOT/etc/timezone"
 tar -C "$HERE/overlay" --owner=0 --group=0 -cf - . | tar -C "$CHROOT" --no-overwrite-dir -xf -
 chmod 755 "$CHROOT/usr/bin/nimbus-shell" "$CHROOT/usr/bin/nimbus-session" "$CHROOT/usr/lib/nimbus/shell-debug" \
   "$CHROOT/usr/lib/nimbus/test-wifi-ap" "$CHROOT/usr/lib/nimbus/nimbus-storage" "$CHROOT/usr/lib/nimbus/nimbus-apps" \
-  "$CHROOT/usr/lib/nimbus/nimbus-open"
-chmod 440 "$CHROOT/etc/sudoers.d/nimbus-storage" "$CHROOT/etc/sudoers.d/nimbus-apps"
+  "$CHROOT/usr/lib/nimbus/nimbus-open" "$CHROOT/usr/lib/nimbus/nimbus-sys"
+chmod 440 "$CHROOT/etc/sudoers.d/nimbus-storage" "$CHROOT/etc/sudoers.d/nimbus-apps" "$CHROOT/etc/sudoers.d/nimbus-sys"
+in_chroot visudo -cq || die "a sudoers file is broken"
+# Which version this is, for Settings > Nimbus Update and About
+COMMIT="${GITHUB_SHA:-$(git -C "$REPO" rev-parse HEAD 2>/dev/null || echo unknown)}"
+mkdir -p "$CHROOT/usr/share/nimbus"
+printf '{"version": "%s", "commit": "%s", "date": %s}\n' "$VERSION" "$COMMIT" "$(date +%s)" > "$CHROOT/usr/share/nimbus/build-info.json"
 
 # Google Chrome can't be copied into this image, so Nimbus installs it from Google's repository when it's
 # first opened (usr/lib/nimbus/nimbus-apps). Its packages are checked with Google's RSA 4096 signing key.
@@ -198,7 +209,9 @@ printf '127.0.0.1 localhost\n127.0.1.1 nimbus\n::1 localhost ip6-localhost ip6-l
 
 in_chroot systemctl set-default graphical.target
 in_chroot systemctl enable nimbus-session.service NetworkManager.service systemd-resolved.service systemd-timesyncd.service \
-  nimbus-test-wifi.service
+  nimbus-test-wifi.service bluetooth.service power-profiles-daemon.service cups.socket avahi-daemon.service
+# PipeWire and WirePlumber start with each person's session
+in_chroot systemctl --global enable pipewire.socket pipewire-pulse.socket wireplumber.service
 in_chroot systemctl disable systemd-networkd.service systemd-networkd.socket >/dev/null 2>&1 || true
 in_chroot systemctl mask systemd-networkd-wait-online.service NetworkManager-wait-online.service
 # The ISO has no checksum list to verify, so this check would only report a failure at startup.

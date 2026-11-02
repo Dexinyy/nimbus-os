@@ -21,6 +21,16 @@
  *                                   RW RH: its size when dragged out of a maximized or snapped state
  *     area X Y W H      the part of the screen windows may use (the screen minus the taskbar)
  *     overlay DIM NIGHT brightness and night light tints over everything, 0-1000
+ *     output NAME W H MHZ SCALE TRANSFORM   a display's mode, scale (x1000) and rotation; "output-reset"
+ *                       puts the first display back to its preferred mode at 100%
+ *     input SPEED ACCEL LEFT LINES NATURAL TAP TAP2 TWOFINGER TNATURAL DWT TSPEED TOUCHPAD
+ *                       mice and touchpads (speeds -1000..1000, LINES per wheel notch, the rest 0/1)
+ *     keymap LAYOUT VARIANT DELAY RATE   keyboard layout ("-": no variant) and key repeat
+ *     cursor THEME SIZE the pointer's look
+ *     idle SCREEN SLEEP seconds without input before the screen turns off and before sleeping (0: never)
+ *     paste             press Ctrl+V in the window that has the keyboard (clipboard history)
+ * The compositor also sends "outputs" (the displays and their modes), "inputs" (keyboards and pointers)
+ * and "idle" (what: off, on, sleep) events.
  * If the desktop exits with status 0 the compositor exits; otherwise it is started again, and it is
  * told about the windows that are already open.
  *
@@ -54,6 +64,8 @@
 #include <wlr/types/wlr_cursor_shape_v1.h>
 #include <wlr/types/wlr_data_control_v1.h>
 #include <wlr/types/wlr_data_device.h>
+#include <wlr/types/wlr_fractional_scale_v1.h>
+#include <wlr/types/wlr_idle_inhibit_v1.h>
 #include <wlr/types/wlr_input_device.h>
 #include <wlr/types/wlr_keyboard.h>
 #include <wlr/types/wlr_output.h>
@@ -130,7 +142,20 @@ struct keyboard {
 	struct wl_list link;
 	struct server *server;
 	struct wlr_keyboard *wlr_keyboard;
+	bool virtual_kb;                   /* brings its own keymap (tests) */
 	struct wl_listener modifiers, key, destroy;
+};
+
+struct pointer {                       /* a mouse or touchpad, for its settings */
+	struct wl_list link;
+	struct server *server;
+	struct wlr_input_device *device;
+	struct wl_listener destroy;
+};
+
+struct inhibitor {                     /* a program keeping the screen on (a video playing) */
+	struct server *server;
+	struct wl_listener destroy;
 };
 
 struct output {
@@ -210,6 +235,21 @@ struct server {
 	struct timespec last_spawn;
 	bool quitting, test_mode;
 
+	/* settings the desktop sends (Settings app) */
+	struct {
+		bool set, accel, left, natural, tap, tap2, twofinger, tnatural, dwt, touchpad;
+		double speed, tspeed, lines;
+	} in;
+	struct wl_list pointers;
+	char kb_layout[16], kb_variant[40];
+	int kb_delay, kb_rate;
+	int idle_screen, idle_sleep;       /* seconds; 0: never */
+	uint32_t last_input;               /* msec */
+	bool screen_off, sleep_sent;
+	int inhibitors;
+	struct wl_event_source *idle_timer;
+	struct wl_listener new_inhibitor;
+
 	struct wl_listener new_output, new_input, new_xdg_surface, new_decoration, request_activate;
 	struct wl_listener cursor_motion, cursor_motion_absolute, cursor_button, cursor_axis, cursor_frame;
 	struct wl_listener request_cursor, request_set_shape, request_set_selection, request_set_primary_selection;
@@ -220,6 +260,7 @@ struct server {
 static char shell_copy_marker;
 
 static void process_motion(struct server *s, uint32_t time);
+static void note_input(struct server *s);
 static void update_copies(struct server *s, struct view *v, bool force);
 static void update_top_copies(struct server *s, bool force);
 static void view_report(struct view *v);
@@ -424,6 +465,128 @@ static void send_screen(struct server *s, const char *ev) {
 	jb_int(&j, "w", s->screen.width);
 	jb_int(&j, "h", s->screen.height);
 	jb_int(&j, "version", 1);
+	jb_send(s, &j);
+}
+
+/* JSON lists of objects: each item's fields go between jb_item_begin and jb_item_end */
+static void jb_list_begin(struct jbuf *j, const char *k) {
+	jb_key(j, k);
+	jb_raw(j, "[");
+}
+
+static void jb_list_end(struct jbuf *j) {
+	jb_raw(j, "]");
+	j->first = false;
+}
+
+static void jb_item_begin(struct jbuf *j, bool *any) {
+	if (*any)
+		jb_raw(j, ",");
+	*any = true;
+	jb_raw(j, "{");
+	j->first = true;
+}
+
+static void jb_num(struct jbuf *j, const char *k, double v) {
+	char t[40];
+	snprintf(t, sizeof t, "%.3f", v);
+	jb_key(j, k);
+	jb_raw(j, t);
+}
+
+static bool device_is_touchpad(struct wlr_input_device *d) {
+	if (!wlr_input_device_is_libinput(d))
+		return false;
+	struct libinput_device *li = wlr_libinput_get_device_handle(d);
+	return li && libinput_device_config_tap_get_finger_count(li) > 0;
+}
+
+/* The displays, their modes, scale and rotation (Settings > System > Display). */
+static void send_outputs(struct server *s) {
+	if (s->ipc_fd < 0)
+		return;
+	struct jbuf j;
+	char t[96];
+	jb_begin(&j, "outputs");
+	jb_list_begin(&j, "list");
+	bool any = false;
+	struct output *o;
+	wl_list_for_each(o, &s->outputs, link) {
+		struct wlr_output *wo = o->wlr_output;
+		struct wlr_box box;
+		wlr_output_layout_get_box(s->output_layout, wo, &box);
+		jb_item_begin(&j, &any);
+		jb_str(&j, "name", wo->name);
+		jb_str(&j, "desc", wo->description);
+		jb_str(&j, "make", wo->make);
+		jb_str(&j, "model", wo->model);
+		jb_int(&j, "width", wo->width);
+		jb_int(&j, "height", wo->height);
+		jb_int(&j, "refresh", wo->refresh);
+		jb_num(&j, "scale", wo->scale);
+		jb_int(&j, "transform", wo->transform);
+		jb_int(&j, "x", box.x);
+		jb_int(&j, "y", box.y);
+		snprintf(t, sizeof t, "[%d,%d]", wo->phys_width, wo->phys_height);
+		jb_key(&j, "phys");
+		jb_raw(&j, t);
+		jb_key(&j, "modes");
+		jb_raw(&j, "[");
+		bool first = true;
+		int count = 0;
+		struct wlr_output_mode *m;
+		wl_list_for_each(m, &wo->modes, link) {
+			if (count++ >= 60)
+				break;
+			snprintf(t, sizeof t, "%s[%d,%d,%d,%d]", first ? "" : ",", m->width, m->height, m->refresh, m->preferred ? 1 : 0);
+			jb_raw(&j, t);
+			first = false;
+		}
+		if (first) { /* virtual displays have no list of modes */
+			snprintf(t, sizeof t, "[%d,%d,%d,1]", wo->width, wo->height, wo->refresh);
+			jb_raw(&j, t);
+		}
+		jb_raw(&j, "]");
+		jb_raw(&j, "}");
+	}
+	jb_list_end(&j);
+	jb_send(s, &j);
+}
+
+/* Keyboards and pointers (Settings > Bluetooth & devices). */
+static void send_inputs(struct server *s) {
+	if (s->ipc_fd < 0)
+		return;
+	struct jbuf j;
+	jb_begin(&j, "inputs");
+	jb_list_begin(&j, "keyboards");
+	bool any = false;
+	struct keyboard *k;
+	wl_list_for_each(k, &s->keyboards, link) {
+		if (k->virtual_kb)
+			continue;
+		jb_item_begin(&j, &any);
+		jb_str(&j, "name", k->wlr_keyboard->base.name);
+		jb_raw(&j, "}");
+	}
+	jb_list_end(&j);
+	jb_list_begin(&j, "pointers");
+	any = false;
+	struct pointer *p;
+	wl_list_for_each(p, &s->pointers, link) {
+		jb_item_begin(&j, &any);
+		jb_str(&j, "name", p->device->name);
+		jb_int(&j, "touchpad", device_is_touchpad(p->device));
+		jb_raw(&j, "}");
+	}
+	jb_list_end(&j);
+	jb_send(s, &j);
+}
+
+static void send_idle(struct server *s, const char *what) {
+	struct jbuf j;
+	jb_begin(&j, "idle");
+	jb_str(&j, "what", what);
 	jb_send(s, &j);
 }
 
@@ -1292,6 +1455,7 @@ static void process_motion(struct server *s, uint32_t time) {
 static void handle_cursor_motion(struct wl_listener *l, void *data) {
 	struct server *s = wl_container_of(l, s, cursor_motion);
 	struct wlr_pointer_motion_event *e = data;
+	note_input(s);
 	wlr_cursor_move(s->cursor, &e->pointer->base, e->delta_x, e->delta_y);
 	process_motion(s, e->time_msec);
 }
@@ -1299,6 +1463,7 @@ static void handle_cursor_motion(struct wl_listener *l, void *data) {
 static void handle_cursor_motion_absolute(struct wl_listener *l, void *data) {
 	struct server *s = wl_container_of(l, s, cursor_motion_absolute);
 	struct wlr_pointer_motion_absolute_event *e = data;
+	note_input(s);
 	wlr_cursor_warp_absolute(s->cursor, &e->pointer->base, e->x, e->y);
 	process_motion(s, e->time_msec);
 }
@@ -1306,6 +1471,7 @@ static void handle_cursor_motion_absolute(struct wl_listener *l, void *data) {
 static void handle_cursor_button(struct wl_listener *l, void *data) {
 	struct server *s = wl_container_of(l, s, cursor_button);
 	struct wlr_pointer_button_event *e = data;
+	note_input(s);
 	if (e->state == WLR_BUTTON_RELEASED) {
 		wlr_seat_pointer_notify_button(s->seat, e->time_msec, e->button, e->state);
 		if (s->cursor_mode != CURSOR_PASSTHROUGH && s->seat->pointer_state.button_count == 0)
@@ -1343,7 +1509,15 @@ static void handle_cursor_button(struct wl_listener *l, void *data) {
 static void handle_cursor_axis(struct wl_listener *l, void *data) {
 	struct server *s = wl_container_of(l, s, cursor_axis);
 	struct wlr_pointer_axis_event *e = data;
-	wlr_seat_pointer_notify_axis(s->seat, e->time_msec, e->orientation, e->delta, e->delta_discrete, e->source);
+	note_input(s);
+	double delta = e->delta;
+	int32_t discrete = e->delta_discrete;
+	if (e->source == WLR_AXIS_SOURCE_WHEEL && s->in.set && s->in.lines > 0 && s->in.lines != 3) {
+		double f = s->in.lines / 3.0; /* "lines to scroll at a time", 3 being the usual */
+		delta *= f;
+		discrete = (int32_t)lround(discrete * f);
+	}
+	wlr_seat_pointer_notify_axis(s->seat, e->time_msec, e->orientation, delta, discrete, e->source);
 }
 
 static void handle_cursor_frame(struct wl_listener *l, void *data) {
@@ -1443,6 +1617,25 @@ static bool handle_global_key(struct server *s, uint32_t keycode, xkb_keysym_t s
 		}
 		return true;
 	}
+	/* volume, brightness and Print screen belong to the desktop wherever the keyboard is */
+	if (s->ipc_fd >= 0) {
+		const char *media = NULL;
+		switch (sym) {
+		case XKB_KEY_XF86AudioRaiseVolume: media = "volume-up"; break;
+		case XKB_KEY_XF86AudioLowerVolume: media = "volume-down"; break;
+		case XKB_KEY_XF86AudioMute: media = "volume-mute"; break;
+		case XKB_KEY_XF86AudioMicMute: media = "mic-mute"; break;
+		case XKB_KEY_XF86MonBrightnessUp: media = "brightness-up"; break;
+		case XKB_KEY_XF86MonBrightnessDown: media = "brightness-down"; break;
+		case XKB_KEY_Print: media = "print"; break;
+		default: break;
+		}
+		if (media) {
+			swallowed_add(s, keycode);
+			send_key(s, media);
+			return true;
+		}
+	}
 	if (!s->active || s->ipc_fd < 0)
 		return false;
 	if (is_super(sym)) {
@@ -1458,7 +1651,7 @@ static bool handle_global_key(struct server *s, uint32_t keycode, xkb_keysym_t s
 		s->super_alone = false;
 		if (xkb_keysym_get_name(xkb_keysym_to_lower(sym), name, sizeof name) <= 0)
 			return false;
-		snprintf(key, sizeof key, "super+%s", name);
+		snprintf(key, sizeof key, shift ? "super+shift+%s" : "super+%s", name);
 		swallowed_add(s, keycode);
 		send_key(s, key);
 		return true;
@@ -1500,6 +1693,7 @@ static void keyboard_handle_key(struct wl_listener *l, void *data) {
 	struct keyboard *k = wl_container_of(l, k, key);
 	struct server *s = k->server;
 	struct wlr_keyboard_key_event *e = data;
+	note_input(s);
 	uint32_t keycode = e->keycode + 8;
 	const xkb_keysym_t *syms = NULL;
 	int n = k->wlr_keyboard->xkb_state ? xkb_state_key_get_syms(k->wlr_keyboard->xkb_state, keycode, &syms) : 0;
@@ -1520,11 +1714,34 @@ static void keyboard_handle_key(struct wl_listener *l, void *data) {
 
 static void keyboard_handle_destroy(struct wl_listener *l, void *data) {
 	struct keyboard *k = wl_container_of(l, k, destroy);
+	struct server *s = k->server;
 	unlisten(&k->modifiers);
 	unlisten(&k->key);
 	unlisten(&k->destroy);
 	wl_list_remove(&k->link);
 	free(k);
+	send_inputs(s);
+}
+
+/* The keyboard layout and key repeat from Settings > Time & language > Typing */
+static bool keyboard_apply(struct server *s, struct wlr_keyboard *kb) {
+	struct xkb_rule_names names = { 0 };
+	names.layout = s->kb_layout[0] ? s->kb_layout : NULL;
+	names.variant = s->kb_variant[0] ? s->kb_variant : NULL;
+	struct xkb_context *ctx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
+	if (!ctx)
+		return false;
+	struct xkb_keymap *keymap = xkb_keymap_new_from_names(ctx, &names, XKB_KEYMAP_COMPILE_NO_FLAGS);
+	bool ok = keymap != NULL;
+	if (!keymap) /* a layout this system doesn't have: the default one */
+		keymap = xkb_keymap_new_from_names(ctx, NULL, XKB_KEYMAP_COMPILE_NO_FLAGS);
+	if (keymap) {
+		wlr_keyboard_set_keymap(kb, keymap);
+		xkb_keymap_unref(keymap);
+	}
+	xkb_context_unref(ctx);
+	wlr_keyboard_set_repeat_info(kb, s->kb_rate > 0 ? s->kb_rate : 25, s->kb_delay > 0 ? s->kb_delay : 600);
+	return ok;
 }
 
 static void add_keyboard(struct server *s, struct wlr_keyboard *kb, bool set_keymap) {
@@ -1533,21 +1750,15 @@ static void add_keyboard(struct server *s, struct wlr_keyboard *kb, bool set_key
 		return;
 	k->server = s;
 	k->wlr_keyboard = kb;
-	if (set_keymap) {
-		struct xkb_context *ctx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
-		struct xkb_keymap *keymap = xkb_keymap_new_from_names(ctx, NULL, XKB_KEYMAP_COMPILE_NO_FLAGS);
-		if (keymap) {
-			wlr_keyboard_set_keymap(kb, keymap);
-			xkb_keymap_unref(keymap);
-		}
-		xkb_context_unref(ctx);
-		wlr_keyboard_set_repeat_info(kb, 25, 600);
-	}
+	k->virtual_kb = !set_keymap;
+	if (set_keymap)
+		keyboard_apply(s, kb);
 	hook(&kb->events.modifiers, &k->modifiers, keyboard_handle_modifiers);
 	hook(&kb->events.key, &k->key, keyboard_handle_key);
 	hook(&kb->base.events.destroy, &k->destroy, keyboard_handle_destroy);
 	wlr_seat_set_keyboard(s->seat, kb);
 	wl_list_insert(&s->keyboards, &k->link);
+	send_inputs(s);
 }
 
 static void update_capabilities(struct server *s) {
@@ -1557,17 +1768,55 @@ static void update_capabilities(struct server *s) {
 	wlr_seat_set_capabilities(s->seat, caps);
 }
 
-/* Touchpads: tap to click and natural scrolling, as on Windows. */
-static void configure_pointer(struct wlr_input_device *device) {
+/* Mice and touchpads, as Settings > Bluetooth & devices sets them. Before the desktop says anything,
+   touchpads tap to click and scroll naturally, as on Windows. */
+static void configure_pointer(struct server *s, struct wlr_input_device *device) {
 	if (!wlr_input_device_is_libinput(device))
 		return;
 	struct libinput_device *li = wlr_libinput_get_device_handle(device);
-	if (!li || libinput_device_config_tap_get_finger_count(li) == 0)
+	if (!li)
 		return;
-	libinput_device_config_tap_set_enabled(li, LIBINPUT_CONFIG_TAP_ENABLED);
-	libinput_device_config_tap_set_drag_enabled(li, LIBINPUT_CONFIG_DRAG_ENABLED);
+	bool touchpad = libinput_device_config_tap_get_finger_count(li) > 0;
+	if (!s->in.set) {
+		if (touchpad) {
+			libinput_device_config_tap_set_enabled(li, LIBINPUT_CONFIG_TAP_ENABLED);
+			libinput_device_config_tap_set_drag_enabled(li, LIBINPUT_CONFIG_DRAG_ENABLED);
+			if (libinput_device_config_scroll_has_natural_scroll(li))
+				libinput_device_config_scroll_set_natural_scroll_enabled(li, 1);
+		}
+		return;
+	}
+	if (libinput_device_config_accel_is_available(li)) {
+		libinput_device_config_accel_set_speed(li, touchpad ? s->in.tspeed : s->in.speed);
+		if (!touchpad)
+			libinput_device_config_accel_set_profile(li, s->in.accel ? LIBINPUT_CONFIG_ACCEL_PROFILE_ADAPTIVE : LIBINPUT_CONFIG_ACCEL_PROFILE_FLAT);
+	}
+	if (libinput_device_config_left_handed_is_available(li))
+		libinput_device_config_left_handed_set(li, s->in.left);
 	if (libinput_device_config_scroll_has_natural_scroll(li))
-		libinput_device_config_scroll_set_natural_scroll_enabled(li, 1);
+		libinput_device_config_scroll_set_natural_scroll_enabled(li, touchpad ? s->in.tnatural : s->in.natural);
+	if (!touchpad)
+		return;
+	libinput_device_config_tap_set_enabled(li, s->in.tap ? LIBINPUT_CONFIG_TAP_ENABLED : LIBINPUT_CONFIG_TAP_DISABLED);
+	libinput_device_config_tap_set_drag_enabled(li, LIBINPUT_CONFIG_DRAG_ENABLED);
+	libinput_device_config_tap_set_button_map(li, LIBINPUT_CONFIG_TAP_MAP_LRM);
+	if (libinput_device_config_dwt_is_available(li))
+		libinput_device_config_dwt_set_enabled(li, s->in.dwt ? LIBINPUT_CONFIG_DWT_ENABLED : LIBINPUT_CONFIG_DWT_DISABLED);
+	uint32_t methods = libinput_device_config_scroll_get_methods(li);
+	if (s->in.twofinger && (methods & LIBINPUT_CONFIG_SCROLL_2FG))
+		libinput_device_config_scroll_set_method(li, LIBINPUT_CONFIG_SCROLL_2FG);
+	else if (!s->in.twofinger && (methods & LIBINPUT_CONFIG_SCROLL_EDGE))
+		libinput_device_config_scroll_set_method(li, LIBINPUT_CONFIG_SCROLL_EDGE);
+	libinput_device_config_send_events_set_mode(li, s->in.touchpad ? LIBINPUT_CONFIG_SEND_EVENTS_ENABLED : LIBINPUT_CONFIG_SEND_EVENTS_DISABLED);
+}
+
+static void pointer_handle_destroy(struct wl_listener *l, void *data) {
+	struct pointer *p = wl_container_of(l, p, destroy);
+	struct server *s = p->server;
+	unlisten(&p->destroy);
+	wl_list_remove(&p->link);
+	free(p);
+	send_inputs(s);
 }
 
 static void handle_new_input(struct wl_listener *l, void *data) {
@@ -1577,10 +1826,19 @@ static void handle_new_input(struct wl_listener *l, void *data) {
 	case WLR_INPUT_DEVICE_KEYBOARD:
 		add_keyboard(s, wlr_keyboard_from_input_device(device), true);
 		break;
-	case WLR_INPUT_DEVICE_POINTER:
-		configure_pointer(device);
+	case WLR_INPUT_DEVICE_POINTER: {
+		configure_pointer(s, device);
 		wlr_cursor_attach_input_device(s->cursor, device);
+		struct pointer *p = calloc(1, sizeof *p);
+		if (p) {
+			p->server = s;
+			p->device = device;
+			hook(&device->events.destroy, &p->destroy, pointer_handle_destroy);
+			wl_list_insert(s->pointers.prev, &p->link);
+			send_inputs(s);
+		}
 		break;
+	}
 	default:
 		break;
 	}
@@ -1651,6 +1909,7 @@ static void output_handle_request_state(struct wl_listener *l, void *data) {
 	const struct wlr_output_event_request_state *e = data;
 	wlr_output_commit_state(o->wlr_output, e->state);
 	update_screen(o->server);
+	send_outputs(o->server);
 }
 
 static void output_handle_destroy(struct wl_listener *l, void *data) {
@@ -1662,6 +1921,7 @@ static void output_handle_destroy(struct wl_listener *l, void *data) {
 	wl_list_remove(&o->link);
 	free(o);
 	update_screen(s);
+	send_outputs(s);
 }
 
 static void handle_new_output(struct wl_listener *l, void *data) {
@@ -1690,6 +1950,127 @@ static void handle_new_output(struct wl_listener *l, void *data) {
 	o->scene_output = wlr_scene_output_create(s->scene, wo);
 	wlr_scene_output_layout_add_output(s->scene_layout, lo, o->scene_output);
 	update_screen(s);
+	send_outputs(s);
+}
+
+/* A display's mode, scale and rotation (Settings > System > Display). */
+static void output_configure(struct server *s, struct wlr_output *wo, int w, int h, int mhz, double scale, int transform) {
+	struct wlr_output_state st;
+	wlr_output_state_init(&st);
+	wlr_output_state_set_enabled(&st, true);
+	struct wlr_output_mode *m, *best = NULL;
+	wl_list_for_each(m, &wo->modes, link) {
+		if (m->width != w || m->height != h)
+			continue;
+		if (!best || abs(m->refresh - mhz) < abs(best->refresh - mhz))
+			best = m;
+	}
+	if (best)
+		wlr_output_state_set_mode(&st, best);
+	else if (wl_list_empty(&wo->modes))
+		wlr_output_state_set_custom_mode(&st, w, h, mhz);
+	if (scale >= 0.5 && scale <= 4)
+		wlr_output_state_set_scale(&st, (float)scale);
+	if (transform >= 0 && transform <= 7)
+		wlr_output_state_set_transform(&st, (enum wl_output_transform)transform);
+	if (!wlr_output_test_state(wo, &st))
+		wlr_log(WLR_ERROR, "%s can't do %dx%d@%d scale %.2f", wo->name, w, h, mhz, scale);
+	else if (!wlr_output_commit_state(wo, &st))
+		wlr_log(WLR_ERROR, "%s didn't take %dx%d@%d", wo->name, w, h, mhz);
+	else
+		wlr_log(WLR_INFO, "%s now %dx%d@%d scale %.2f transform %d", wo->name, wo->width, wo->height, wo->refresh, wo->scale, wo->transform);
+	wlr_output_state_finish(&st);
+	update_screen(s);
+	send_outputs(s);
+}
+
+/* ---------- screen timeout and sleep ---------- */
+
+static void screen_power(struct server *s, bool on) {
+	s->screen_off = !on;
+	struct output *o;
+	wl_list_for_each(o, &s->outputs, link) {
+		struct wlr_output_state st;
+		wlr_output_state_init(&st);
+		wlr_output_state_set_enabled(&st, on);
+		if (on && o->wlr_output->current_mode)
+			wlr_output_state_set_mode(&st, o->wlr_output->current_mode);
+		if (!wlr_output_commit_state(o->wlr_output, &st))
+			wlr_log(WLR_ERROR, "could not turn %s %s", o->wlr_output->name, on ? "on" : "off");
+		wlr_output_state_finish(&st);
+	}
+	wlr_log(WLR_INFO, "screen %s", on ? "on" : "off");
+	if (s->ipc_fd >= 0)
+		send_idle(s, on ? "on" : "off");
+}
+
+static void note_input(struct server *s) {
+	s->last_input = now_msec();
+	s->sleep_sent = false;
+	if (s->screen_off)
+		screen_power(s, true);
+}
+
+static int handle_idle_timer(void *data) {
+	struct server *s = data;
+	uint32_t now = now_msec();
+	if (s->inhibitors > 0) /* a video playing, say */
+		s->last_input = now;
+	uint32_t idle = now - s->last_input;
+	if (s->idle_screen > 0 && !s->screen_off && idle >= (uint32_t)s->idle_screen * 1000)
+		screen_power(s, false);
+	if (s->idle_sleep > 0 && !s->sleep_sent && idle >= (uint32_t)s->idle_sleep * 1000 && s->ipc_fd >= 0) {
+		s->sleep_sent = true;
+		send_idle(s, "sleep");
+	}
+	wl_event_source_timer_update(s->idle_timer, 5000);
+	return 0;
+}
+
+static void inhibitor_handle_destroy(struct wl_listener *l, void *data) {
+	struct inhibitor *in = wl_container_of(l, in, destroy);
+	in->server->inhibitors--;
+	in->server->last_input = now_msec();
+	unlisten(&in->destroy);
+	free(in);
+}
+
+static void handle_new_inhibitor(struct wl_listener *l, void *data) {
+	struct server *s = wl_container_of(l, s, new_inhibitor);
+	struct wlr_idle_inhibitor_v1 *inh = data;
+	struct inhibitor *in = calloc(1, sizeof *in);
+	if (!in)
+		return;
+	in->server = s;
+	s->inhibitors++;
+	hook(&inh->events.destroy, &in->destroy, inhibitor_handle_destroy);
+}
+
+/* Clipboard history: Ctrl+V in the window that has the keyboard */
+static void press_paste(struct server *s) {
+	struct wlr_keyboard *kb = wlr_seat_get_keyboard(s->seat);
+	if (!kb || !kb->keymap || !s->seat->keyboard_state.focused_surface)
+		return;
+	uint32_t code = 47; /* KEY_V */
+	xkb_keycode_t min = xkb_keymap_min_keycode(kb->keymap), max = xkb_keymap_max_keycode(kb->keymap);
+	for (xkb_keycode_t kc = min; kc <= max; kc++) {
+		const xkb_keysym_t *syms;
+		int n = xkb_keymap_key_get_syms_by_level(kb->keymap, kc, 0, 0, &syms);
+		if (n > 0 && syms[0] == XKB_KEY_v) {
+			code = kc - 8;
+			break;
+		}
+	}
+	xkb_mod_index_t ctrl = xkb_keymap_mod_get_index(kb->keymap, XKB_MOD_NAME_CTRL);
+	if (ctrl == XKB_MOD_INVALID)
+		return;
+	struct wlr_keyboard_modifiers mods = kb->modifiers;
+	mods.depressed |= 1u << ctrl;
+	uint32_t t = now_msec();
+	wlr_seat_keyboard_notify_modifiers(s->seat, &mods);
+	wlr_seat_keyboard_notify_key(s->seat, t, code, WL_KEYBOARD_KEY_STATE_PRESSED);
+	wlr_seat_keyboard_notify_key(s->seat, t + 1, code, WL_KEYBOARD_KEY_STATE_RELEASED);
+	wlr_seat_keyboard_notify_modifiers(s->seat, &kb->modifiers);
 }
 
 /* ---------- commands from the desktop ---------- */
@@ -1710,6 +2091,23 @@ static long tok_int(struct tok *t) {
 	}
 	t->p = end;
 	return v;
+}
+
+static bool tok_word(struct tok *t, char *out, size_t n) {
+	if (!t->ok)
+		return false;
+	while (*t->p == ' ')
+		t->p++;
+	size_t i = 0;
+	while (*t->p && *t->p != ' ') {
+		if (i + 1 < n)
+			out[i++] = *t->p;
+		t->p++;
+	}
+	out[i] = 0;
+	if (!i)
+		t->ok = false;
+	return t->ok;
 }
 
 /* A rectangle with rounded corners, made of thin bands that stay inside the curve. */
@@ -1887,6 +2285,81 @@ static void ipc_command(struct server *s, char *line) {
 		float nightc[4] = { 1.0f * b, 138.0f / 255.0f * b, 40.0f / 255.0f * b, b }; /* premultiplied */
 		wlr_scene_rect_set_color(s->night_rect, nightc);
 		wlr_scene_node_set_enabled(&s->night_rect->node, b > 0);
+	} else if (!strcmp(line, "output")) {
+		char name[64];
+		tok_word(&t, name, sizeof name);
+		long w = tok_int(&t), h = tok_int(&t), mhz = tok_int(&t), scale = tok_int(&t), transform = tok_int(&t);
+		if (!t.ok || w <= 0 || h <= 0)
+			return;
+		struct output *o;
+		wl_list_for_each(o, &s->outputs, link)
+			if (!strcmp(o->wlr_output->name, name))
+				output_configure(s, o->wlr_output, (int)w, (int)h, (int)mhz, scale / 1000.0, (int)transform);
+	} else if (!strcmp(line, "output-reset")) {
+		if (wl_list_empty(&s->outputs))
+			return;
+		struct output *o = wl_container_of(s->outputs.next, o, link);
+		struct wlr_output_mode *m = wlr_output_preferred_mode(o->wlr_output);
+		output_configure(s, o->wlr_output, m ? m->width : o->wlr_output->width, m ? m->height : o->wlr_output->height,
+			m ? m->refresh : o->wlr_output->refresh, 1.0, WL_OUTPUT_TRANSFORM_NORMAL);
+	} else if (!strcmp(line, "input")) {
+		long v[12];
+		for (int i = 0; i < 12; i++)
+			v[i] = tok_int(&t);
+		if (!t.ok)
+			return;
+		s->in.speed = MAX(-1000, MIN(v[0], 1000)) / 1000.0;
+		s->in.accel = v[1];
+		s->in.left = v[2];
+		s->in.lines = MAX(1, MIN(v[3], 20));
+		s->in.natural = v[4];
+		s->in.tap = v[5];
+		s->in.tap2 = v[6];
+		s->in.twofinger = v[7];
+		s->in.tnatural = v[8];
+		s->in.dwt = v[9];
+		s->in.tspeed = MAX(-1000, MIN(v[10], 1000)) / 1000.0;
+		s->in.touchpad = v[11];
+		s->in.set = true;
+		struct pointer *p;
+		wl_list_for_each(p, &s->pointers, link)
+			configure_pointer(s, p->device);
+	} else if (!strcmp(line, "keymap")) {
+		char layout[16], variant[40];
+		tok_word(&t, layout, sizeof layout);
+		tok_word(&t, variant, sizeof variant);
+		long delay = tok_int(&t), rate = tok_int(&t);
+		if (!t.ok)
+			return;
+		snprintf(s->kb_layout, sizeof s->kb_layout, "%s", layout);
+		snprintf(s->kb_variant, sizeof s->kb_variant, "%s", strcmp(variant, "-") ? variant : "");
+		s->kb_delay = (int)MAX(100, MIN(delay, 2000));
+		s->kb_rate = (int)MAX(1, MIN(rate, 100));
+		struct keyboard *k;
+		wl_list_for_each(k, &s->keyboards, link)
+			if (!k->virtual_kb && !keyboard_apply(s, k->wlr_keyboard))
+				wlr_log(WLR_ERROR, "no keyboard layout %s(%s)", s->kb_layout, s->kb_variant);
+	} else if (!strcmp(line, "cursor")) {
+		char theme[64];
+		tok_word(&t, theme, sizeof theme);
+		long size = tok_int(&t);
+		if (!t.ok)
+			return;
+		struct wlr_xcursor_manager *mgr = wlr_xcursor_manager_create(strcmp(theme, "default") ? theme : NULL, (uint32_t)MAX(16, MIN(size, 256)));
+		if (!mgr)
+			return;
+		wlr_xcursor_manager_destroy(s->cursor_mgr);
+		s->cursor_mgr = mgr;
+		wlr_cursor_set_xcursor(s->cursor, s->cursor_mgr, "default");
+	} else if (!strcmp(line, "idle")) {
+		long screen = tok_int(&t), sleep = tok_int(&t);
+		if (!t.ok)
+			return;
+		s->idle_screen = (int)MAX(0, screen);
+		s->idle_sleep = (int)MAX(0, sleep);
+		s->last_input = now_msec();
+	} else if (!strcmp(line, "paste")) {
+		press_paste(s);
 	} else {
 		wlr_log(WLR_ERROR, "unknown command from the desktop: %s", line);
 	}
@@ -1956,6 +2429,8 @@ static void ipc_open(struct server *s, int fd) {
 	s->ipc_fd = fd;
 	s->ipc_source = wl_event_loop_add_fd(s->loop, fd, WL_EVENT_READABLE, handle_ipc, s);
 	send_screen(s, "hello");
+	send_outputs(s);
+	send_inputs(s);
 	/* a desktop started again hears about the windows that are already open, bottom to top */
 	struct wlr_scene_node *node;
 	wl_list_for_each(node, &s->app_layer->children, link) {
@@ -2099,13 +2574,17 @@ int main(int argc, char *argv[]) {
 	wl_list_init(&s->views);
 	wl_list_init(&s->outputs);
 	wl_list_init(&s->keyboards);
+	wl_list_init(&s->pointers);
+	s->kb_delay = 600;
+	s->kb_rate = 25;
+	s->in.lines = 3;
 	wl_list_init(&s->shell_client_destroy.link);
 	wl_list_init(&s->shell_commit.link);
 	pixman_region32_init(&s->top_region);
 	pixman_region32_init(&s->top_copied);
 	pixman_region32_init(&s->layout.top);
-	if (!getenv("XCURSOR_THEME"))
-		setenv("XCURSOR_THEME", "Adwaita", 1);
+	if (!getenv("XCURSOR_THEME")) /* white pointers like Windows', when the theme is there */
+		setenv("XCURSOR_THEME", access("/usr/share/icons/DMZ-White/cursors", F_OK) == 0 ? "DMZ-White" : "Adwaita", 1);
 	if (!getenv("XCURSOR_SIZE"))
 		setenv("XCURSOR_SIZE", "24", 1);
 
@@ -2135,6 +2614,9 @@ int main(int argc, char *argv[]) {
 	wlr_viewporter_create(s->display);
 	wlr_single_pixel_buffer_manager_v1_create(s->display);
 	wlr_screencopy_manager_v1_create(s->display);
+	wlr_fractional_scale_manager_v1_create(s->display, 1);
+	struct wlr_idle_inhibit_manager_v1 *inhibit = wlr_idle_inhibit_v1_create(s->display);
+	hook(&inhibit->events.new_inhibitor, &s->new_inhibitor, handle_new_inhibitor);
 
 	s->output_layout = wlr_output_layout_create();
 	wlr_xdg_output_manager_v1_create(s->display, s->output_layout);
@@ -2166,7 +2648,7 @@ int main(int argc, char *argv[]) {
 
 	s->cursor = wlr_cursor_create();
 	wlr_cursor_attach_output_layout(s->cursor, s->output_layout);
-	s->cursor_mgr = wlr_xcursor_manager_create(NULL, 24);
+	s->cursor_mgr = wlr_xcursor_manager_create(getenv("XCURSOR_THEME"), 24);
 	hook(&s->cursor->events.motion, &s->cursor_motion, handle_cursor_motion);
 	hook(&s->cursor->events.motion_absolute, &s->cursor_motion_absolute, handle_cursor_motion_absolute);
 	hook(&s->cursor->events.button, &s->cursor_button, handle_cursor_button);
@@ -2192,6 +2674,9 @@ int main(int argc, char *argv[]) {
 	update_capabilities(s);
 
 	s->layout_timer = wl_event_loop_add_timer(s->loop, handle_layout_timeout, s);
+	s->idle_timer = wl_event_loop_add_timer(s->loop, handle_idle_timer, s);
+	s->last_input = now_msec();
+	wl_event_source_timer_update(s->idle_timer, 5000);
 	s->sigchld = wl_event_loop_add_signal(s->loop, SIGCHLD, handle_sigchld, s);
 	s->sigterm = wl_event_loop_add_signal(s->loop, SIGTERM, handle_quit_signal, s);
 	s->sigint = wl_event_loop_add_signal(s->loop, SIGINT, handle_quit_signal, s);
@@ -2220,6 +2705,7 @@ int main(int argc, char *argv[]) {
 	ipc_close(s);
 	wl_display_destroy_clients(s->display);
 	wl_event_source_remove(s->layout_timer);
+	wl_event_source_remove(s->idle_timer);
 	wl_event_source_remove(s->sigchld);
 	wl_event_source_remove(s->sigterm);
 	wl_event_source_remove(s->sigint);

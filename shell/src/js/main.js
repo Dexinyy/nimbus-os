@@ -66,8 +66,9 @@ function boot() {
     Store.setHadLocal(false);
   }
   if (IS_NATIVE) document.documentElement.classList.add('native');
-  Start.build(); Taskbar.init(); Desktop.init();
+  Start.build(); Taskbar.init(); Desktop.init(); TbHide.init();
   applyAll();
+  Sys.init(); extrasInit();
   Desktop.render(); Taskbar.render(); Taskbar.focusChip();
   if (IS_NATIVE) {
     // This page is the desktop of a real computer: show the startup screen and read the hardware.
@@ -83,6 +84,7 @@ function boot() {
       if (info.test === 'storage') testStorage();
       // Under the window manager real programs open as windows on this desktop (nwin.js)
       NativeWin.init();
+      Sys.wmReady();
       if (NativeWin.on) {
         Native.call('wmReady').catch(() => {}); // windows that are already open (after the desktop restarts)
         Apps.refresh();
@@ -95,10 +97,12 @@ function boot() {
         Taskbar.render(); Start.render();
       }
       if (info.test === 'chrome') testChrome();
+      if (info.test === 'settings') testSettings();
     });
     Net.refresh();
   } else if (S.data.lockOnStart) Power.lock();
   if (!S.data.setupDone) WM.open('welcome');
+  else startupApps();
   Store.ready();
 
   bus.on('store-adopted', () => {

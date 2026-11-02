@@ -7,6 +7,7 @@
 #   5. Saving from a USB image: casper saves in its free space; a setting survives a restart
 #   6. Saving from a DVD with an empty disk: Nimbus sets the disk up; a setting survives a restart
 #   7. Chrome: installed from Google, opened as a window; Start, Settings and Alt+Tab over it, typing, closing
+#   8. Settings: sound, display resolution, input, power, printing and storage through the real services
 # usage: os/test-boot.sh ISO [OUTDIR]     results: OUTDIR/*.png, *-serial.log, summary.md
 set -uo pipefail
 
@@ -87,6 +88,10 @@ truncate -s 2G /tmp/nimbus-empty.img
 run_vm disk storage -cdrom "$ISO" -drive file=/tmp/nimbus-empty.img,format=raw,if=virtio \
   -kernel /tmp/nimbus-vmlinuz -initrd /tmp/nimbus-initrd \
   -append "boot=casper noprompt persistent nimbus.debug nimbus.test=storage nimbus.open=settings:system $SERIAL"
+
+# Settings: sound through PipeWire (the machine has an HD Audio card), resolutions through the window manager, ...
+run_vm settings settings -cdrom "$ISO" -kernel /tmp/nimbus-vmlinuz -initrd /tmp/nimbus-initrd \
+  -append "boot=casper noprompt nimbus.debug nimbus.test=settings $SERIAL"
 
 # Google Chrome: Nimbus installs it from Google (the machine reaches the internet through QEMU) and shows it as a window
 run_vm chrome chrome -cdrom "$ISO" -kernel /tmp/nimbus-vmlinuz -initrd /tmp/nimbus-initrd \

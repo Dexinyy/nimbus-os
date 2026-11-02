@@ -154,7 +154,7 @@ def networks(rescan=False):
     return sorted(best.values(), key=lambda n: (not n["active"], -n["signal"], n["ssid"].lower()))
 
 
-def connect(ssid, password=None):
+def connect(ssid, password=None, hidden=False):
     ssid = str(ssid)
     if not ssid:
         raise NetError("Choose a network first.")
@@ -170,6 +170,8 @@ def connect(ssid, password=None):
     args = ["--wait", "45", "device", "wifi", "connect", ssid]
     if password is not None:
         args += ["password", password]
+    if hidden:
+        args += ["hidden", "yes"]
     try:
         nmcli(*args, timeout=60, ssid=ssid)
     except NetError:

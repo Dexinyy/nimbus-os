@@ -56,9 +56,11 @@ window.webkit = { messageHandlers: { nimbus: { postMessage(json) {
   await step('about', async () => {
     await page.keyboard.down('Meta'); await page.keyboard.press('i'); await page.keyboard.up('Meta');
     await page.waitForTimeout(300);
-    await page.click('.app-settings .st-nav button:has-text("About")');
+    await page.click('.app-settings .ws-nav:has-text("System")');
     await page.waitForTimeout(200);
-    const t = await page.textContent('.app-settings .specs');
+    await page.click('.app-settings .ws-card:has-text("Device specifications, rename PC")');
+    await page.waitForTimeout(300);
+    const t = await page.textContent('.app-settings .ws-content');
     if (!/Framework Laptop 13/.test(t) || !/6\.14/.test(t) || !/32\.0 GB/.test(t)) errors.push('About specs: ' + t.slice(0, 300));
     await page.screenshot({ path: path.join(OUT, 'n3-about.png') });
   });

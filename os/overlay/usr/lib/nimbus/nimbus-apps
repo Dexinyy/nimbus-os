@@ -9,11 +9,12 @@ and it is only added when Chrome is installed.
 Runs as root through sudo (/etc/sudoers.d/nimbus-apps). Prints one JSON object per line: progress
 ({"app", "progress": 0-100, "text"}), then {"ok": true, ...} or {"ok": false, "error": "..."}.
 
-usage: nimbus-apps install|update|remove chrome
+usage: nimbus-apps install|update|remove|check chrome
 """
 import fcntl
 import json
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -148,6 +149,18 @@ def update():
         text=("updated from %s to %s" % (before, after)) if after != before else "up to date (%s)" % after)
 
 
+def check():
+    """Is there a newer Chrome? (Settings > Nimbus Update)"""
+    before = installed_version()
+    if not before:
+        raise Failed("Chrome isn't installed.")
+    add_repository()
+    refresh_google(0, 90)
+    r = subprocess.run(["apt-cache", "policy", PACKAGE], capture_output=True, text=True, env=ENV)
+    cand = (re.findall(r"Candidate:\s*(\S+)", r.stdout) or [""])[0]
+    say(ok=True, installed=before, candidate=cand if cand != "(none)" else before)
+
+
 def remove():
     if installed_version():
         status, out = apt(["remove", "-y", PACKAGE], 0, 100)
@@ -160,8 +173,8 @@ def remove():
 
 
 def main():
-    if len(sys.argv) != 3 or sys.argv[1] not in ("install", "update", "remove") or sys.argv[2] != "chrome":
-        say(ok=False, error="usage: nimbus-apps install|update|remove chrome")
+    if len(sys.argv) != 3 or sys.argv[1] not in ("install", "update", "remove", "check") or sys.argv[2] != "chrome":
+        say(ok=False, error="usage: nimbus-apps install|update|remove|check chrome")
         return 2
     if os.geteuid() != 0:
         say(ok=False, error="nimbus-apps needs to run as root")
@@ -169,7 +182,7 @@ def main():
     with open(LOCK, "w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)  # one at a time
         try:
-            {"install": install, "update": update, "remove": remove}[sys.argv[1]]()
+            {"install": install, "update": update, "remove": remove, "check": check}[sys.argv[1]]()
         except Failed as exc:
             say(ok=False, error=str(exc))
             return 1

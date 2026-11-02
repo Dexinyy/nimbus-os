@@ -63,7 +63,7 @@ function fmtBytes(n) {
   if (n < 1099511627776) return (n / 1073741824).toFixed(1) + ' GB';
   return (n / 1099511627776).toFixed(2) + ' TB';
 }
-const fmtDT = (ts, o) => new Intl.DateTimeFormat(undefined, o).format(new Date(ts));
+const fmtDT = (ts, o) => { try { return new Intl.DateTimeFormat(S.data.locale || undefined, o).format(new Date(ts)); } catch { return new Intl.DateTimeFormat(undefined, o).format(new Date(ts)); } };
 const fmtDate = (ts) => fmtDT(ts, { dateStyle: 'medium', timeStyle: 'short' });
 function relTime(ts) {
   const d = (Date.now() - ts) / 1000;
@@ -287,15 +287,26 @@ function appIcon(name) {
 
 /* ========== Settings ========== */
 const DEFAULTS = {
-  osName: 'Nimbus', userName: '', deviceName: 'My PC',
-  theme: 'auto', accent: '#4a74f5', wallpaper: 'ridgeline',
-  transparency: true, energySaver: false, reduceMotion: false, textSize: 14,
-  tbAlign: 'center', tbPos: 'bottom', tbFloat: true, tbSearch: true, tbTaskView: true,
+  osName: 'Nimbus', userName: '', deviceName: 'My PC', avatar: '',
+  theme: 'auto', accent: '#0078d4', accentAuto: false, recentAccents: [], accentBar: false, accentTitle: false, wallpaper: 'ridgeline',
+  wallMode: 'picture', wallFit: 'fill', wallColor: '#0063b1', slideSource: 'builtin', slideEvery: 30, slideShuffle: false, lockWall: '', myThemes: [],
+  transparency: true, energySaver: false, reduceMotion: false, textSize: 14, alwaysScrollbars: false, contrast: 'none',
+  tbAlign: 'center', tbPos: 'bottom', tbFloat: false, tbSearch: 'icon', tbTaskView: true, tbAssist: true, tbAutoHide: false, tbBadges: true, tbDeskCorner: true, tbClock: true,
   pinned: ['chrome', 'files', 'notes', 'terminal', 'paint', 'settings'],
   startPins: ['chrome', 'files', 'notes', 'calculator', 'settings', 'terminal', 'paint', 'photos', 'clock', 'mines', 'taskmgr', 'assistant', 'welcome'],
-  brightness: 100, nightLight: false, nightStrength: 45,
-  volume: 60, sounds: true, dnd: false,
-  clockSeconds: false, clock24: null, lockOnStart: false, showDesktopIcons: true, chromePinned: false,
+  startLayout: 'default', startAdded: true, startMostUsed: false, startRecent: true, startFolders: ['settings', 'files'], appUse: {}, appAdded: {},
+  brightness: 100, nightLight: false, nightStrength: 45, nightSchedule: false, nightFrom: '21:00', nightTo: '07:00',
+  volume: 60, muted: false, sounds: true, dnd: false, dndAuto: false, dndFrom: '22:00', dndTo: '07:00', dndFull: true,
+  notifs: true, notifOff: {}, notifSound: true, notifLock: true, notifTime: 7, flashNotify: false,
+  clockSeconds: false, clock24: null, locale: '', weekStart: null, lockOnStart: false, lockOnWake: true, lockPin: null, showDesktopIcons: true, chromePinned: false,
+  powerPlugged: { screen: 600, sleep: 0 }, powerBattery: { screen: 300, sleep: 900 }, saverAt: 20,
+  snapOn: true, snapHover: true, snapTop: true, shake: false, clipHistory: false, storageSense: false, senseWhen: 'low', senseBinDays: 30,
+  pointerSpeed: 10, pointerAccel: true, pointerLeft: false, scrollLines: 3, mouseNatural: false, cursorSize: 24, cursorTheme: 'white',
+  touchpadOn: true, touchpadTap: true, touchpadTap2: true, touchpadTwoFinger: true, touchpadNatural: true, touchpadDwt: true, touchpadSpeed: 10,
+  kbLayout: 'us', kbVariant: '', kbDelay: 500, kbRate: 30, printScreen: true, shotClip: true, gameMode: true,
+  camAccess: true, micAccess: true, keepRecent: true, searchFiles: true, assoc: {}, startupApps: [], proxy: null,
+  hotspotName: '', hotspotPassword: '', hotspotBand: 'any', printerAuto: true, display: null, settingsRecent: [],
+  autoUpdate: true, updMetered: false, updNotify: true, updPause: 0, updChecked: 0, focusMins: 30, focusTimer: true,
   iconPos: {}, recent: [], filesView: 'grid', minesBest: {},
   worldClocks: ['America/Los_Angeles', 'Europe/London', 'Asia/Tokyo'],
   focusDnd: true, assistantMode: 'quick', setupDone: false, updatedAt: 0,
@@ -328,7 +339,7 @@ const osTitle = () => { const n = (S.data.osName || 'Nimbus').trim() || 'Nimbus'
 const osName = () => (S.data.osName || 'Nimbus').trim() || 'Nimbus';
 const userName = () => (S.data.userName || '').trim();
 const initials = () => { const n = userName(); return n ? n.split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase() : ''; };
-function avatarHTML() { const i = initials(); return i ? esc(i) : ui('person'); }
+function avatarHTML() { if (/^data:image\//.test(S.data.avatar || '')) return `<img src="${esc(S.data.avatar)}" alt="">`; const i = initials(); return i ? esc(i) : ui('person'); }
 
 /* ========== System sounds (Web Audio, no files) ========== */
 const Sound = (() => {
@@ -363,9 +374,12 @@ const Sound = (() => {
   return {
     unlock() { ensure(); },
     play(name) {
-      if (!S.data.sounds || S.data.volume <= 0) return;
+      if (!S.data.sounds) return;
+      // On a computer the sound system's own volume applies (PipeWire); in a browser, Nimbus's volume
+      const real = IS_NATIVE && typeof Sys !== 'undefined' && Sys.sound.st.available;
+      if (real ? S.data.muted : S.data.volume <= 0) return;
       if (!ensure() || !master) return;
-      try { master.gain.value = (S.data.volume / 100) * 0.9; LIB[name]?.(ctx.currentTime + 0.01); } catch {}
+      try { master.gain.value = real ? 0.55 : (S.data.volume / 100) * 0.9; LIB[name]?.(ctx.currentTime + 0.01); } catch {}
     },
   };
 })();

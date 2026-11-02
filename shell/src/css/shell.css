@@ -479,3 +479,77 @@ html.wm #dim, html.wm #nightlight { display: none; }
 .net-empty { padding: 14px 10px; color: var(--text-2); font-size: var(--fs-sm); }
 .netlist.scanning .net-empty { animation: net-pulse 1.4s ease-in-out infinite; }
 @keyframes net-pulse { 50% { opacity: .45; } }
+
+/* ---------- Windows 11 touches ---------- */
+.avatar { overflow: hidden; }
+.avatar img { width: 100%; height: 100%; object-fit: cover; }
+.lock-time { font-weight: 600; letter-spacing: -.01em; }
+.lock-date { font-weight: 600; }
+.lock.signin::before { background: rgba(0, 0, 0, .28); -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px); }
+.lock.signin .lock-clock { display: none; }
+.lock.signin .lock-user { bottom: auto; top: 30%; }
+.lock.signin .lock-user .avatar { width: 160px; height: 160px; font-size: 56px; }
+.lock-pin { position: relative; display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 8px; }
+.lock-pin input { width: 280px; height: 34px; padding: 0 40px 0 12px; border-radius: 4px; border: 1px solid rgba(255, 255, 255, .45); border-bottom: 2px solid #fff; background: rgba(0, 0, 0, .35); color: #fff; font-size: var(--fs-md); }
+.lock-pin input::placeholder { color: rgba(255, 255, 255, .75); }
+.lock-go { position: absolute; right: 4px; top: 3px; width: 28px; height: 28px; border-radius: 3px; display: grid; place-items: center; color: #fff; }
+.lock-go:hover { background: rgba(255, 255, 255, .15); }
+.lock-go svg { width: 16px; height: 16px; }
+.lock-err { min-height: 18px; font-size: var(--fs-sm); text-shadow: 0 1px 4px rgba(0, 0, 0, .6); }
+#start-folders { display: flex; gap: 2px; }
+#start-folders .ibtn { width: 36px; height: 36px; }
+#start-folders .fi { width: 18px; height: 18px; }
+.alist .letter.wide { color: var(--text); font-size: var(--fs-md); padding-top: 12px; }
+
+/* Taskbar search: icon, icon and label, or a search box */
+#os[data-tb-search="label"] #tb-search, #os[data-tb-search="box"] #tb-search { width: auto; padding: 0 14px 0 10px; display: flex; gap: 8px; color: var(--text-2); }
+#os[data-tb-search="box"] #tb-search { width: 210px; height: 32px; margin: 0 4px; border-radius: 16px; border: 1px solid var(--line); background: color-mix(in srgb, var(--card) 70%, transparent); justify-content: flex-start; }
+#os[data-tb-search="box"] #tb-search:hover { background: color-mix(in srgb, var(--card) 90%, transparent); }
+#os[data-tb-search] #tb-search > span { font-size: var(--fs-md); white-space: nowrap; }
+#os[data-tb-search] #tb-search > svg { width: 18px; height: 18px; }
+/* Automatically hide the taskbar */
+#taskbar { transition: transform .22s cubic-bezier(.2, .8, .2, 1); }
+#os[data-tb-autohide] #taskbar:not(.peek) { transform: translateY(calc(100% - 2px)); }
+#os[data-tb-autohide][data-tb-float] #taskbar:not(.peek) { transform: translateY(calc(100% + 6px)); }
+#os[data-tb-autohide][data-tb-pos="top"] #taskbar:not(.peek) { transform: translateY(calc(-100% + 2px)); }
+#os[data-tb-autohide][data-tb-pos="top"][data-tb-float] #taskbar:not(.peek) { transform: translateY(calc(-100% - 6px)); }
+/* Accent color on Start and taskbar (dark mode), and on title bars */
+[data-accent-bar] #taskbar, [data-accent-bar] #start, [data-accent-bar] #qs, [data-accent-bar] #nc, [data-accent-bar] #clip { background: color-mix(in srgb, var(--accent) 55%, #1a1a1a 45%); }
+[data-accent-bar][data-solid] #taskbar, [data-accent-bar][data-solid] #start { background: color-mix(in srgb, var(--accent-lo) 70%, #1a1a1a); }
+[data-accent-title] .win.active > .win-titlebar { background: var(--accent); color: var(--on-accent); }
+[data-accent-title] .win.active > .win-titlebar .win-title, [data-accent-title] .win.active > .win-titlebar .wc, [data-accent-title] .win.active > .win-titlebar .ws-back { color: var(--on-accent); }
+[data-accent-title] .win.active { box-shadow: 0 0 0 1px var(--accent), var(--shadow-win); }
+/* Contrast themes: a few strong colors for Nimbus's own surfaces */
+[data-contrast] { --hover: rgba(255, 255, 255, .14); --press: rgba(255, 255, 255, .22); --line: currentColor; --line-strong: currentColor; --shadow-1: none; }
+[data-contrast="aquatic"] { --surface: #202020; --surface-2: #202020; --card: #202020; --text: #ffffff; --text-2: #ffffff; --text-3: #a6a6a6; --accent: #8ee3f0; --accent-text: #75e9fc; --on-accent: #263b50; --acrylic: #202020; --acrylic-solid: #202020; color-scheme: dark; }
+[data-contrast="desert"] { --surface: #fffaef; --surface-2: #fffaef; --card: #fffaef; --text: #3d3d3d; --text-2: #3d3d3d; --text-3: #676767; --accent: #903909; --accent-text: #1c5e75; --on-accent: #fff5e3; --acrylic: #fffaef; --acrylic-solid: #fffaef; --hover: rgba(0, 0, 0, .08); --press: rgba(0, 0, 0, .14); color-scheme: light; }
+[data-contrast="dusk"] { --surface: #2d3236; --surface-2: #2d3236; --card: #2d3236; --text: #ffffff; --text-2: #ffffff; --text-3: #a6a6a6; --accent: #a1bfde; --accent-text: #70ebde; --on-accent: #212d3b; --acrylic: #2d3236; --acrylic-solid: #2d3236; color-scheme: dark; }
+[data-contrast="nightsky"] { --surface: #000000; --surface-2: #000000; --card: #000000; --text: #ffffff; --text-2: #ffffff; --text-3: #a6a6a6; --accent: #d6b4fd; --accent-text: #8080ff; --on-accent: #2b2b2b; --acrylic: #000000; --acrylic-solid: #000000; color-scheme: dark; }
+[data-contrast] .win, [data-contrast] .flyout, [data-contrast] #taskbar, [data-contrast] .modal, [data-contrast] .menu { border: 2px solid var(--text); background: var(--surface); }
+[data-contrast] .app-settings.ws { --ws-card: var(--surface); --ws-card-hover: var(--hover); --ws-card-line: var(--text-3); --ws-sub: var(--surface); --ws-ctl: var(--surface); --ws-ctl-line: var(--text); --ws-ctl-bottom: var(--text); }
+/* Accessibility: the screen flashes with notification sounds */
+.screen-flash { position: absolute; inset: 0; z-index: 97; pointer-events: none; background: #fff; animation: flash .45s ease-out forwards; }
+@keyframes flash { from { opacity: .55; } to { opacity: 0; } }
+/* Volume and brightness indicator, above the taskbar like Windows' */
+#osd { position: absolute; z-index: 40; left: 50%; bottom: calc(var(--tb-reserve) + 24px); transform: translate(-50%, 12px); display: flex; align-items: center; gap: 14px; height: 48px; padding: 0 18px; border-radius: 8px; border: 1px solid var(--line); box-shadow: var(--shadow-fly); opacity: 0; transition: opacity .15s, transform .2s cubic-bezier(.2, .8, .2, 1); min-width: 200px; }
+#osd.show { opacity: 1; transform: translate(-50%, 0); }
+#os[data-tb-pos="top"] #osd { bottom: 48px; }
+.osd-ic svg { width: 20px; height: 20px; }
+.osd-bar { flex: 1; height: 4px; border-radius: 2px; background: var(--text-3); overflow: hidden; min-width: 120px; }
+.osd-bar i { display: block; height: 100%; background: var(--accent); }
+.osd-v { min-width: 26px; text-align: right; font-variant-numeric: tabular-nums; font-size: var(--fs-md); }
+/* Clipboard history (Windows key + V) */
+#clip { display: flex; flex-direction: column; max-height: 520px; padding: 14px 12px 12px; }
+.clip-head { display: flex; align-items: center; justify-content: space-between; padding: 0 4px 10px; }
+.clip-head h3 { margin: 0; font-size: var(--fs-md); font-weight: 600; }
+.clip-list { display: flex; flex-direction: column; gap: 6px; overflow: auto; }
+.clip-item { position: relative; padding: 10px 70px 10px 12px; border-radius: 6px; background: color-mix(in srgb, var(--card) 80%, transparent); border: 1px solid var(--line); min-height: 48px; }
+.clip-item:hover, .clip-item:focus-visible { background: var(--card); border-color: var(--line-strong); }
+.clip-text { white-space: pre-wrap; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; font-size: var(--fs-md); overflow-wrap: anywhere; }
+.clip-item img { max-width: 100%; max-height: 120px; border-radius: 4px; display: block; }
+.clip-acts { position: absolute; top: 6px; right: 6px; display: flex; gap: 2px; opacity: 0; }
+.clip-item:hover .clip-acts, .clip-item:focus-within .clip-acts { opacity: 1; }
+.clip-acts .ibtn { width: 28px; height: 28px; }
+.clip-acts .ibtn svg { width: 15px; height: 15px; }
+.clip-empty, .clip-off p { color: var(--text-2); padding: 8px 4px; margin: 0; line-height: 1.45; }
+.clip-off { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }

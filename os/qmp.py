@@ -3,6 +3,7 @@
 
 usage: qmp.py SOCKET OUTDIR NAME SLOWNESS SCENARIO
   SCENARIO  full  - boot, open Start, Terminal and Settings, Alt+Tab, then shut down
+            settings - Settings' sound, display, input, power, printing and storage through the real services
             short - boot to the desktop, then shut down
             wifi  - boot with nimbus.test=wifi, check the desktop joined NimbusTestAP, then shut down
             storage - boot with nimbus.test=storage from a USB image: set up saving, restart twice, check
@@ -271,6 +272,55 @@ def main():
             if result == "kept":
                 time.sleep(4 * slow)
                 snap("09-saving")
+
+    if scenario == "settings":
+        serial = os.path.join(outdir, f"{name}-serial.log")
+
+        def slog():
+            return open(serial, errors="replace").read() if os.path.exists(serial) else ""
+
+        def got(pattern, seconds):
+            end = time.time() + seconds * slow
+            while time.time() < end:
+                m = re.search(pattern, slog())
+                if m or "test settings: failed" in slog():
+                    return m
+                time.sleep(2)
+            return None
+
+        m = got(r"test settings: sound (\S+)[^\r\n]*? outputs=(\d+) default=([^\r\n]*)", 120)
+        note("Sound plays through PipeWire", bool(m) and m.group(1) == "available" and int(m.group(2)) > 0,
+             f"{m.group(2)} output(s), default {m.group(3).strip()}" if m else "no result")
+        m = got(r"test settings: volume now (\d+)", 30)
+        note("Settings changes the real volume", bool(m) and m.group(1) == "37", m.group(1) if m else "no result")
+        m = got(r"test settings: display (\S+) (\d+)x(\d+) modes=(\d+)", 60)
+        note("Settings lists the display's resolutions", bool(m) and int(m.group(4)) > 1, f"{m.group(1)} {m.group(2)}x{m.group(3)}, {m.group(4)} modes" if m else "no result")
+        m = got(r"test settings: resolution changed to (\d+x\d+)", 40)
+        note("Settings changes the resolution", bool(m) and m.group(1) != "1440x900", m.group(1) if m else "no result")
+        if m:
+            time.sleep(0.5)
+            snap("03-resolution-changed")
+        m = got(r"test settings: resolution back to (\d+x\d+)", 40)
+        note("...and puts it back", bool(m) and m.group(1) == "1440x900", m.group(1) if m else "no result")
+        m = got(r"test settings: input keyboards=(\d+) pointers=(\d+)", 30)
+        note("Settings sees the keyboard and pointer", bool(m) and int(m.group(1)) > 0 and int(m.group(2)) > 0, f"{m.group(1)} keyboard(s), {m.group(2)} pointer(s)" if m else "no result")
+        m = got(r"test settings: power modes ([^\r\n]*)", 30)
+        note("Power modes answer", bool(m) and "none" not in m.group(1).split(" ")[0], m.group(1).strip() if m else "no result")
+        m = got(r"test settings: printing ([^\r\n]*)", 30)
+        note("The printing service runs", bool(m) and m.group(1).startswith("ready"), m.group(1).strip() if m else "no result")
+        m = got(r"test settings: storage ([^\r\n]*)", 60)
+        note("Storage is measured", bool(m) and "failed" not in m.group(1), m.group(1).strip() if m else "no result")
+        for i, page in enumerate(["system", "sound", "display", "devices", "network", "personalization", "time", "update"]):
+            if got(r"test settings: page " + page, 30):
+                time.sleep(0.4 * slow)
+                snap(f"{i + 4:02d}-settings-{page}")
+        failed = re.search(r"test settings: failed: ([^\r\n]*)", slog())
+        note("The Settings test finished", bool(re.search(r"test settings: done", slog())), failed.group(1) if failed else "")
+        try:
+            vm.cmd("quit")
+        except Exception:
+            pass
+        return finish()
 
     if scenario == "chrome":
         serial = os.path.join(outdir, f"{name}-serial.log")

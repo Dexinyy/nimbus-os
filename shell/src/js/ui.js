@@ -270,14 +270,26 @@ Dialog.file = function ({ mode = 'save', kind = 'text', folder = 'documents', na
 /* ========== Notifications ========== */
 const Notif = {
   items: [], unread: 0,
-  push({ app = 'settings', title, body = '', action = null, actions = null, silent = false }) {
+  push({ app = 'settings', title, body = '', action = null, actions = null, silent = false, urgent = false }) {
+    // Settings > Notifications: all of them off, or one app's
+    if (!urgent && (S.data.notifs === false || (S.data.notifOff || {})[app])) return null;
     const n = { id: uid(), app, title, body, action, time: Date.now() };
     this.items.unshift(n);
     if (this.items.length > 40) this.items.pop();
     this.unread++;
-    if (!S.data.dnd) { this.toast(n, actions); if (!silent) Sound.play('notify'); }
+    if (!this.quiet()) {
+      this.toast(n, actions);
+      if (!silent && S.data.notifSound !== false) { Sound.play('notify'); if (S.data.flashNotify) flashScreen(); }
+    }
     bus.emit('notif');
     return n;
+  },
+  // Do not disturb: switched on, on a schedule, or while a program is full screen
+  quiet() {
+    if (S.data.dnd) return true;
+    if (S.data.dndAuto && inHours(S.data.dndFrom, S.data.dndTo)) return true;
+    const w = typeof WM !== 'undefined' && WM.active();
+    return !!(S.data.dndFull && w && (w.full || w.state === 'full'));
   },
   remove(id) { this.items = this.items.filter((x) => x.id !== id); bus.emit('notif'); },
   clear() { this.items = []; this.unread = 0; bus.emit('notif'); },
@@ -295,7 +307,7 @@ const Notif = {
     }
     let t = 0; let gone = false;
     const dismiss = () => { if (gone) return; gone = true; clearTimeout(t); el.classList.add('out'); setTimeout(() => el.remove(), 220); };
-    const arm = () => { clearTimeout(t); t = setTimeout(dismiss, 6000); };
+    const arm = () => { clearTimeout(t); t = setTimeout(dismiss, clamp(+S.data.notifTime || 7, 3, 300) * 1000); };
     el.addEventListener('pointerenter', () => clearTimeout(t));
     el.addEventListener('pointerleave', arm);
     x.addEventListener('click', (e) => { e.stopPropagation(); dismiss(); });
@@ -305,6 +317,18 @@ const Notif = {
     arm();
   },
 };
+
+// "HH:MM" to "HH:MM", across midnight too
+function inHours(from, to, d = new Date()) {
+  const m = (t) => { const [a, b] = String(t || '0:0').split(':').map(Number); return a * 60 + (b || 0); };
+  const now = d.getHours() * 60 + d.getMinutes(), f = m(from), e = m(to);
+  return f <= e ? now >= f && now < e : now >= f || now < e;
+}
+// Accessibility: the screen flashes with notification sounds
+function flashScreen() {
+  const el = h('div', { class: 'screen-flash' }); document.getElementById('os').append(el);
+  setTimeout(() => el.remove(), 450);
+}
 
 /* ========== Shared helpers for files ========== */
 const Clip = {

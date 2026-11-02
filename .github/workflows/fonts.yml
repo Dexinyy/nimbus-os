@@ -1,4 +1,4 @@
-name: Build the Selawik font
+name: Get the Selawik font
 
 # Selawik is Microsoft's open-source stand-in for Segoe UI (SIL Open Font License). This takes the font files
 # from Microsoft's release, unchanged, and saves them to the selawik-fonts branch, from where they are copied
@@ -43,5 +43,5 @@ jobs:
           git config user.name "nimbus-ci"
           git config user.email "nimbus-ci@users.noreply.github.com"
           git add -A
-          git commit -qm "Selawik built with fontmake"
+          git commit -qm "Selawik, from Microsoft's release"
           git push -qf "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" selawik-fonts

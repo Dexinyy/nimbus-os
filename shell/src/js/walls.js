@@ -169,15 +169,50 @@ function averageTint(dataURL, cb) {
   img.src = dataURL;
 }
 let currentWallURL = '';
+let slideTimer = 0, slideIdx = -1;
+// Settings > Personalization > Background: a picture (with a fit), a solid color, or a slideshow
+function slideList() {
+  if (S.data.slideSource === 'pictures') {
+    const pics = Object.values(FS.nodes).filter((x) => x.kind === 'image' && !FS.inTrash(x.id)).map((n) => 'file:' + n.id);
+    if (pics.length) return pics;
+  }
+  return WALLS.map((w) => w.id);
+}
+function solidURL(color) {
+  const cv = document.createElement('canvas'); cv.width = 16; cv.height = 9;
+  const c = cv.getContext('2d'); c.fillStyle = color; c.fillRect(0, 0, 16, 9);
+  return cv.toDataURL('image/png');
+}
 function applyWallpaper() {
-  const id = S.data.wallpaper || 'ridgeline';
+  const root = document.documentElement.style;
+  const wall = document.getElementById('wall');
+  clearTimeout(slideTimer);
+  const fitted = S.data.wallMode !== 'solid' && String(S.data.wallMode === 'slideshow' ? '' : S.data.wallpaper).startsWith('file:');
+  wall.style.backgroundSize = fitted ? ({ fit: 'contain', stretch: '100% 100%', tile: 'auto', center: 'auto' }[S.data.wallFit] || 'cover') : 'cover';
+  wall.style.backgroundRepeat = fitted && S.data.wallFit === 'tile' ? 'repeat' : 'no-repeat';
+  wall.style.backgroundColor = S.data.wallColor || '#0063b1';
+  if (S.data.wallMode === 'solid') {
+    const c = /^#[0-9a-f]{6}$/i.test(S.data.wallColor || '') ? S.data.wallColor : '#0063b1';
+    setWallURL(solidURL(c)); root.setProperty('--wall-tint', c); afterTint();
+    return;
+  }
+  let id = S.data.wallpaper || 'ridgeline';
+  if (S.data.wallMode === 'slideshow') {
+    const list = slideList();
+    slideIdx = S.data.slideShuffle ? Math.floor(Math.random() * list.length) : (slideIdx + 1) % list.length;
+    id = list[slideIdx] || id;
+    slideTimer = setTimeout(applyWallpaper, clamp(+S.data.slideEvery || 30, 1, 1440) * 60000);
+  }
+  showWall(id);
+}
+function showWall(id) {
   const root = document.documentElement.style;
   if (String(id).startsWith('file:')) {
     const fid = id.slice(5); const n = FS.get(fid);
     const data = n && !FS.inTrash(fid) ? FS.read(fid) : '';
     if (data.startsWith('data:image')) {
       setWallURL(data);
-      averageTint(data, (t) => { if (t && S.data.wallpaper === id) root.setProperty('--wall-tint', t); });
+      averageTint(data, (t) => { if (t && currentWallURL === data) { root.setProperty('--wall-tint', t); afterTint(); } });
       return;
     }
   }
@@ -185,11 +220,13 @@ function applyWallpaper() {
   const { w, h: hh } = wallSize();
   setWallURL(renderWall(def.id, w, hh));
   root.setProperty('--wall-tint', def.tint);
+  afterTint();
 }
+function afterTint() { if (typeof autoAccent === 'function') autoAccent(); }
 function setWallURL(url) {
   currentWallURL = url;
   document.getElementById('wall').style.backgroundImage = `url("${url}")`;
-  $$('.screen.lock').forEach((el) => { el.style.backgroundImage = `url("${url}")`; });
+  if (!S.data.lockWall) $$('.screen.lock').forEach((el) => { el.style.backgroundImage = `url("${url}")`; });
 }
 /* Downscale an image file (from the viewer's computer) into a data URL */
 function fileToImageURL(file, maxSide = 1600) {
