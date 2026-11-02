@@ -224,7 +224,7 @@ function mountSettings(root, api, args) {
       return [
         h('div', { class: 'about-card' }, h('span', { class: 'about-logo', html: appIcon('logo') }), h('div', {}, h('div', { class: 'about-name', text: osTitle() }), h('div', { class: 'muted', text: ni ? `Version ${ni.version} · ${ni.live ? 'Live session' : 'Installed'}` : 'Version 1.0 · Build 26.11 · Personal edition' }))),
         section('Names',
-          row({ id: 'osName', icon: 'pencil', title: 'OS name', desc: 'Shown at startup, on the lock screen and in the title bar of your browser.', ctl: textField('osName', 'OS name', 'Nimbus', 'Nimbus') }),
+          row({ id: 'osName', icon: 'pencil', title: 'OS name', desc: IS_NATIVE ? 'Shown at startup, on the lock screen and in Welcome.' : 'Shown at startup, on the lock screen and in the title bar of your browser.', ctl: textField('osName', 'OS name', 'Nimbus', 'Nimbus') }),
           row({ id: 'deviceName', icon: 'desktop', title: 'PC name', desc: 'Used by Terminal.', ctl: textField('deviceName', 'PC name', 'My PC', 'My PC') })),
         section('Device specifications', h('div', { class: 'srow sub', 'data-sid': 'specs' }, h('dl', { class: 'specs' }, ...specs.flatMap(([k, v]) => [h('dt', { text: k }), h('dd', { text: v })])))),
       ];
