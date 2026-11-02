@@ -5,6 +5,9 @@ on:
     paths: ["wm/**", ".github/workflows/wm.yml"]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 concurrency:
   group: nimbus-wm-${{ github.ref }}
   cancel-in-progress: true
@@ -36,12 +39,18 @@ jobs:
           ls -la /tmp/hdr/src
           tar -C /tmp/hdr -czf /tmp/headers.tar.gz .
 
-      - name: Upload the headers
-        uses: actions/upload-artifact@v4
-        with:
-          name: headers
-          path: /tmp/headers.tar.gz
-          retention-days: 7
+      - name: Save the headers to the wm-headers branch
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p /tmp/pub && cd /tmp/pub
+          cp /tmp/headers.tar.gz .
+          git init -q -b wm-headers
+          git config user.name "nimbus-ci"
+          git config user.email "nimbus-ci@users.noreply.github.com"
+          git add -A
+          git commit -qm "wlroots headers for ${GITHUB_SHA::7}"
+          git push -qf "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" wm-headers
 
       - name: Build
         run: make -C wm
