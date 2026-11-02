@@ -31,6 +31,7 @@ jobs:
         run: |
           python3 os/test-term.py
           python3 os/test-net.py
+          python3 os/test-storage.py
 
       - name: Install build and test tools
         run: |
@@ -68,6 +69,17 @@ jobs:
         with:
           path: cache
           key: ubuntu-packages-${{ github.run_id }}
+
+      - name: Report the ISO layout and the live boot scripts
+        if: success()
+        run: |
+          {
+            echo "== partition table"; sudo sfdisk -d out/nimbus-os-*-amd64.iso || true
+            echo; echo "== xorriso system area"; xorriso -indev out/nimbus-os-*-amd64.iso -report_system_area plain 2>&1 | tail -40 || true
+            echo; echo "== casper persistence"; sudo grep -n -i "persisten\|casper-rw\|writable\|cow" build/chroot/usr/share/initramfs-tools/scripts/casper | head -80 || true
+          } > out/ci/iso-report.txt 2>&1
+          sudo tar -C build/chroot/usr/share/initramfs-tools -czf out/ci/casper-scripts.tar.gz scripts/casper scripts/casper-helpers scripts/casper-functions scripts/casper-bottom 2>/dev/null || true
+          sudo chown -R "$(id -u)" out/ci
 
       - name: Boot-test the ISO
         run: |

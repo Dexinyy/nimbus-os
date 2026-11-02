@@ -157,4 +157,6 @@ async function testWifi() {
   if (!Net.networks.some((n) => n.ssid === 'NimbusTestAP')) { log('failed: NimbusTestAP never showed up'); return; }
   const ok = await Net.connect('NimbusTestAP', 'nimbus-test-123');
   log(ok ? 'connected' : 'failed: ' + (Net.error ? Net.error.message : 'no reason given'));
+  await sleep(2500);
+  log('settings shows ' + (document.querySelector('.app-settings .net-hero-t')?.textContent || 'nothing'));
 }

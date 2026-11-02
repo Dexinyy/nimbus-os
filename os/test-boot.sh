@@ -4,6 +4,7 @@
 #   2. BIOS: start, shut down
 #   3. Logs: the same as 1, with the system log and keyboard/focus events copied to the serial port
 #   4. Wi-Fi: joins a simulated access point through the desktop's Wi-Fi code
+#   5. Saving: from a USB image with free space, sets up saving, restarts, and checks a setting survives
 # usage: os/test-boot.sh ISO [OUTDIR]     results: OUTDIR/*.png, *-serial.log, summary.md
 set -uo pipefail
 
@@ -29,7 +30,6 @@ run_vm() { # name scenario [extra qemu arguments]
   rm -f "$sock"
   echo "== $name ($scenario)"
   qemu-system-x86_64 "${ACCEL[@]}" -machine q35 -m 4096 -smp 2 \
-    -cdrom "$ISO" \
     -vga none -device VGA,edid=on,xres=1440,yres=900 \
     -device qemu-xhci -device usb-tablet \
     -nic user,model=virtio-net-pci \
@@ -45,20 +45,26 @@ run_vm() { # name scenario [extra qemu arguments]
 
 if [ -n "$OVMF_CODE" ]; then
   cp "$OVMF_VARS" /tmp/nimbus-ovmf-vars.fd
-  run_vm uefi full -drive if=pflash,format=raw,readonly=on,file="$OVMF_CODE" -drive if=pflash,format=raw,file=/tmp/nimbus-ovmf-vars.fd
+  run_vm uefi full -cdrom "$ISO" -drive if=pflash,format=raw,readonly=on,file="$OVMF_CODE" -drive if=pflash,format=raw,file=/tmp/nimbus-ovmf-vars.fd
 else
   echo "OVMF is not installed: skipping the UEFI test"
 fi
-run_vm bios short -boot d
+run_vm bios short -cdrom "$ISO" -boot d
 
 xorriso -osirrox on -indev "$ISO" -extract /casper/vmlinuz /tmp/nimbus-vmlinuz -extract /casper/initrd /tmp/nimbus-initrd >/dev/null 2>&1
 # Same steps again with the system log (and the desktop's keyboard and focus events) on the serial port
 SERIAL="console=tty0 console=ttyS0,115200 systemd.journald.forward_to_console=1 systemd.show_status=1"
-run_vm logs full -kernel /tmp/nimbus-vmlinuz -initrd /tmp/nimbus-initrd \
+run_vm logs full -cdrom "$ISO" -kernel /tmp/nimbus-vmlinuz -initrd /tmp/nimbus-initrd \
   -append "boot=casper noprompt nimbus.debug $SERIAL"
 # Wi-Fi: a simulated access point (mac80211_hwsim), joined with its password
-run_vm wifi wifi -kernel /tmp/nimbus-vmlinuz -initrd /tmp/nimbus-initrd \
+run_vm wifi wifi -cdrom "$ISO" -kernel /tmp/nimbus-vmlinuz -initrd /tmp/nimbus-initrd \
   -append "boot=casper noprompt nimbus.debug nimbus.test=wifi nimbus.open=settings:network $SERIAL"
+# Saving: the ISO written to a 3 GB "USB stick" (an image file); set up saving there, restart twice
+cp --sparse=always "$ISO" /tmp/nimbus-usb.img
+truncate -s 3G /tmp/nimbus-usb.img
+run_vm storage storage -drive if=none,id=stick,file=/tmp/nimbus-usb.img,format=raw -device usb-storage,drive=stick \
+  -kernel /tmp/nimbus-vmlinuz -initrd /tmp/nimbus-initrd \
+  -append "boot=casper noprompt persistent nimbus.debug nimbus.test=storage nimbus.open=settings:system $SERIAL"
 
 cat "$OUTDIR/summary.md"
 exit "$FAILED"

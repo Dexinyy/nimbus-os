@@ -104,8 +104,19 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await page.click('#qs .qtile >> nth=1 >> .qb');
   await sleep(500);
 
-  // Settings > Network & internet
+  // Settings opened before the first network status arrives must fill in once it does
   await page.keyboard.press('Escape');
+  const saved = await page.evaluate(() => { const s = __n.Net.status; __n.Net.status = null; __n.WM.open('settings', { page: 'network' }); return s; });
+  await sleep(500);
+  const before = await page.evaluate(() => document.querySelector('.app-settings .st-main p')?.textContent || '');
+  await page.evaluate((s) => __n.bus.emit('native:net', s), saved);
+  await sleep(500);
+  const after = await page.evaluate(() => document.querySelectorAll('.app-settings .net').length);
+  check('a page opened before the network status arrives fills in later', before.includes('isn’t running') && after === 3, `${before} / ${after}`);
+  await page.evaluate(() => { const w = __n.WM.list().find((x) => x.appId === 'settings'); if (w) __n.WM.close(w, true); });
+  await sleep(300);
+
+  // Settings > Network & internet
   await page.evaluate(() => __n.WM.open('settings', { page: 'network' }));
   await sleep(900);
   const hero = await page.evaluate(() => document.querySelector('.net-hero-t')?.textContent);

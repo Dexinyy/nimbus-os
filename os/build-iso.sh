@@ -112,6 +112,7 @@ PACKAGES=(
   casper user-setup initramfs-tools
   systemd-sysv systemd-resolved systemd-timesyncd udev dbus dbus-user-session libpam-systemd polkitd kmod
   network-manager wpasupplicant wireless-regdb iw dnsmasq-base
+  fdisk e2fsprogs
   sudo locales tzdata kbd iproute2 ca-certificates less nano
   procps psmisc htop neofetch curl wget vim-tiny bash-completion
   cage libgl1-mesa-dri libegl1 libegl-mesa0 libgles2 libgbm1
@@ -139,7 +140,9 @@ echo "Etc/UTC" > "$CHROOT/etc/timezone"
 
 # Copy our files in as root, without touching the owner or rights of existing folders like /etc.
 tar -C "$HERE/overlay" --owner=0 --group=0 -cf - . | tar -C "$CHROOT" --no-overwrite-dir -xf -
-chmod 755 "$CHROOT/usr/bin/nimbus-shell" "$CHROOT/usr/bin/nimbus-session" "$CHROOT/usr/lib/nimbus/shell-debug" "$CHROOT/usr/lib/nimbus/test-wifi-ap"
+chmod 755 "$CHROOT/usr/bin/nimbus-shell" "$CHROOT/usr/bin/nimbus-session" "$CHROOT/usr/lib/nimbus/shell-debug" \
+  "$CHROOT/usr/lib/nimbus/test-wifi-ap" "$CHROOT/usr/lib/nimbus/nimbus-storage"
+chmod 440 "$CHROOT/etc/sudoers.d/nimbus-storage"
 mkdir -p "$CHROOT/usr/share/nimbus" "$CHROOT/usr/share/fonts/truetype/nimbus" "$CHROOT/usr/share/doc/nimbus-os"
 cp -a "$WORK/shell" "$CHROOT/usr/share/nimbus/shell"
 cp "$HERE/fonts/"*.ttf "$HERE/fonts/"*-OFL.txt "$CHROOT/usr/share/fonts/truetype/nimbus/"

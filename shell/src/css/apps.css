@@ -466,3 +466,12 @@
 .net-hero-ic svg { width: 26px; height: 26px; }
 .net-hero-t { font-size: var(--fs-lg); font-weight: 600; margin-bottom: 2px; }
 .srow.net-wrap { display: block; padding: 6px; }
+
+/* Saving between restarts */
+.stg p { margin: 0 0 12px; }
+.stg-list { display: flex; flex-direction: column; gap: 8px; }
+.stg-opt { display: flex; gap: 12px; align-items: flex-start; text-align: left; padding: 12px 14px; border-radius: var(--r-md); border: 1px solid var(--line); background: var(--card); }
+.stg-opt[aria-checked="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.stg-ic svg { width: 22px; height: 22px; color: var(--accent-text); }
+.stg-txt { display: flex; flex-direction: column; gap: 2px; }
+.stg-txt .muted { font-size: var(--fs-sm); line-height: 1.4; }

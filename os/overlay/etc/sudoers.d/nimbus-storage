@@ -1,0 +1,2 @@
+# The desktop may run its storage helper (it only uses empty space, see the helper) as root.
+nimbus ALL=(root) NOPASSWD: /usr/lib/nimbus/nimbus-storage

@@ -316,9 +316,12 @@ const Store = (() => {
         case 'readonly': return { icon: 'cloudOff', title: 'Saved in this browser only', desc: 'Your Claude account does not allow this page to save data, so nothing syncs between devices.' };
         case 'unreachable': return { icon: 'cloudOff', title: 'Sync is unreachable', desc: 'Changes are saved in this browser. Reopen the OS later to sync them.' };
         default:
-          if (IS_NATIVE) return Native.live
-            ? { icon: 'hdd', title: 'Live session', desc: 'You started Nimbus OS from a USB stick or disc, so files and settings are lost when you shut down.' }
-            : { icon: 'hdd', title: 'Saved on this PC', desc: 'Your files and settings are stored on this computer.' };
+          if (IS_NATIVE) {
+            if (!Native.live) return { icon: 'hdd', title: 'Saved on this PC', desc: 'Your files and settings are stored on this computer.' };
+            return Storage.saving
+              ? { icon: 'hdd', title: 'Saved between restarts', desc: 'Files, settings and Wi-Fi passwords are kept on your USB stick or disk.' }
+              : { icon: 'hdd', title: 'Live session', desc: 'Files and settings are lost when you shut down. Set up saving in Settings › System to keep them.' };
+          }
           return localOk
             ? { icon: 'hdd', title: 'Saved in this browser only', desc: 'Open this OS in Claude while signed in to sync it across devices.' }
             : { icon: 'cloudOff', title: 'Not saved', desc: 'This browser blocks storage, so changes last until you close the tab.' };
@@ -326,7 +329,7 @@ const Store = (() => {
     },
     shortLabel() {
       if (cloud === 'on') return 'Synced';
-      if (IS_NATIVE) return Native.live ? 'Live session' : 'This PC';
+      if (IS_NATIVE) return !Native.live ? 'This PC' : Storage.saving ? 'Saved' : 'Live session';
       return 'This browser';
     },
     flushLocal() { writeLocal(); },

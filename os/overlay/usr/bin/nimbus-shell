@@ -9,6 +9,7 @@ named "nimbus"; replies come back through window.__nimbusNative.
 import glob
 import json
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -28,6 +29,7 @@ gi.require_version("WebKit2", "4.1")
 from gi.repository import Gdk, GLib, Gtk, WebKit2  # noqa: E402
 
 VERSION = "0.1"
+STORAGE_LABEL = "writable"  # keep in step with /usr/lib/nimbus/nimbus-storage
 # Calls that are quick and touch state shared with the main loop run on the main thread.
 MAIN_THREAD = {"termOpen", "termInput", "termResize", "termClose", "log"}
 SHELL_DIR = os.environ.get("NIMBUS_SHELL_DIR", "/usr/share/nimbus/shell")
@@ -106,6 +108,28 @@ def cmdline_value(key):
     return ""
 
 
+def persistent():
+    """True when the live session keeps its changes (a mounted file system has the storage label)."""
+    try:
+        out = subprocess.run(["findmnt", "-rn", "-o", "LABEL"], capture_output=True, text=True, timeout=5).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return STORAGE_LABEL in out.split()
+
+
+def storage(*args):
+    """Run the storage helper as root (allowed by /etc/sudoers.d/nimbus-storage) and return its answer."""
+    r = subprocess.run(["sudo", "-n", "/usr/lib/nimbus/nimbus-storage", *args], capture_output=True, text=True, timeout=240)
+    lines = r.stdout.strip().splitlines()
+    try:
+        data = json.loads(lines[-1]) if lines else {}
+    except ValueError:
+        data = {}
+    if not data.get("ok"):
+        raise RuntimeError(data.get("error") or (r.stderr.strip().splitlines() or ["The storage helper failed"])[-1])
+    return data
+
+
 def is_live():
     cmd = read("/proc/cmdline")
     return "boot=casper" in cmd or os.path.isdir("/run/casper") or os.path.isdir("/cdrom/casper")
@@ -144,6 +168,7 @@ def info():
         "hostname": socket.gethostname(),
         "uptime": float(read("/proc/uptime", "0 0").split()[0]),
         "live": is_live(),
+        "persistent": persistent(),
         "timezone": timezone(),
         "battery": battery(),
         "software": SOFTWARE,
@@ -352,6 +377,16 @@ class Shell:
             GLib.idle_add(lambda: self.emit("net", data) and False)
         threading.Thread(target=run, daemon=True).start()
         return False
+
+    # ---- saving between restarts (see /usr/lib/nimbus/nimbus-storage) ----
+    def m_storageStatus(self, _args):
+        return storage("status")
+
+    def m_storageSetup(self, args):
+        place = str(args.get("id", ""))
+        if not re.match(r"^(free|empty):[a-z0-9]+$", place):
+            raise ValueError("Unknown place to save")
+        return storage("setup", place)
 
     def m_info(self, _args):
         return info()

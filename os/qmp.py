@@ -5,6 +5,7 @@ usage: qmp.py SOCKET OUTDIR NAME SLOWNESS SCENARIO
   SCENARIO  full  - boot, open Start, Terminal and Settings, Alt+Tab, then shut down
             short - boot to the desktop, then shut down
             wifi  - boot with nimbus.test=wifi, check the desktop joined NimbusTestAP, then shut down
+            storage - boot with nimbus.test=storage from a USB image: set up saving, restart twice, check
             logs  - boot, take one screenshot, leave the serial log for reading
 
 Screenshots go to OUTDIR/NAME-*.png and results are appended to OUTDIR/summary.md.
@@ -223,6 +224,48 @@ def main():
         time.sleep(3 * slow)
         snap("08-wifi")
         note("Joins a Wi-Fi network with its password", ok, detail)
+        text = open(serial, errors="replace").read() if os.path.exists(serial) else ""
+        m = re.search(r"test wifi: settings shows ([^\r\n]*)", text)
+        note("Settings shows the network it joined", bool(m) and m.group(1).strip() == "NimbusTestAP", m.group(1) if m else "not reported")
+
+    if scenario == "storage":
+        serial = os.path.join(outdir, f"{name}-serial.log")
+
+        def wait_log(pattern, seconds):
+            end = time.time() + seconds * slow
+            while time.time() < end:
+                text = open(serial, errors="replace").read() if os.path.exists(serial) else ""
+                found = re.findall(pattern, text)
+                if found:
+                    return found, text
+                if "test storage: failed" in text:
+                    return [], text
+                time.sleep(2)
+            return [], open(serial, errors="replace").read() if os.path.exists(serial) else ""
+
+        found, text = wait_log(r"test storage: set up on (\S+), restarting", 150)
+        failed = re.search(r"test storage: failed: ([^\r\n]*)", text)
+        note("Sets up saving on the USB stick", bool(found), failed.group(1) if failed else "no result in the system log")
+        if found:
+            found, text = wait_log(r"test storage: marker written, restarting", 240)
+            note("Starts with saving on after a restart", bool(found), "the second start didn't use the storage area")
+        if found:
+            # The third start reports "kept"; a second "marker written" means the second start's changes were lost
+            result, end = "", time.time() + 240 * slow
+            while time.time() < end and not result:
+                text = open(serial, errors="replace").read() if os.path.exists(serial) else ""
+                if "test storage: kept" in text:
+                    result = "kept"
+                elif text.count("test storage: marker written") >= 2:
+                    result = "lost"
+                elif "test storage: failed" in text:
+                    result = "failed"
+                else:
+                    time.sleep(2)
+            note("A setting survives a restart", result == "kept", result or "no result in the system log")
+            if result == "kept":
+                time.sleep(4 * slow)
+                snap("09-saving")
 
     # Alt+F4 closes each window, then on the empty desktop it asks what to do; Enter picks "Shut down".
     for _ in range(4):

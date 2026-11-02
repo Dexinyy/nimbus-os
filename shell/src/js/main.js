@@ -80,6 +80,7 @@ function boot() {
       if (info.open) { const [app, pg] = info.open.split(':'); if (APPS[app]) WM.open(app, pg ? { page: pg } : {}); }
       // Boot tests: "nimbus.test=wifi" joins the simulated access point the way the Wi-Fi menu does
       if (info.test === 'wifi') testWifi();
+      if (info.test === 'storage') testStorage();
     });
     Net.refresh();
   } else if (S.data.lockOnStart) Power.lock();

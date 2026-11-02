@@ -41,7 +41,8 @@ function mountWelcome(root, api) {
     const sync = Store.cloudLabel();
     const go = h('button', { class: 'btn primary', text: 'Start using ' + osName() });
     go.addEventListener('click', () => { S.set('setupDone', true); api.close(); Sound.play('startup'); });
-    const foot = h('div', { class: 'wl-foot' }, h('span', { class: 'wl-sync muted', html: ui(sync.icon) + `<span>${esc(sync.title)}</span>` }), h('span', { class: 'grow' }), go);
+    const saveLink = IS_NATIVE && Native.live && !Storage.saving ? h('button', { class: 'linkbtn', text: 'Set up saving', onclick: () => Storage.open() }) : null;
+    const foot = h('div', { class: 'wl-foot' }, h('span', { class: 'wl-sync muted', html: ui(sync.icon) + `<span>${esc(sync.title)}</span>` }), saveLink, h('span', { class: 'grow' }), go);
     wrap.append(hero, h('div', { class: 'wl-grid' }, left, right), foot);
     root.append(wrap);
   }

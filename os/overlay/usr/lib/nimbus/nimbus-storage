@@ -1,0 +1,222 @@
+#!/usr/bin/env python3
+"""Set up saving for the Nimbus OS live session. The desktop runs this as root through sudo.
+
+  nimbus-storage status       where things are saved now, and where saving could be set up (JSON)
+  nimbus-storage setup ID     create the storage area named ID (from "status"), then print the status
+
+Nimbus starts with the "persistent" boot option, so the live system keeps its changes on a file
+system labeled LABEL whenever one exists. This tool creates one, following strict rules:
+  * on the USB stick Nimbus started from: only in free space after the end of the Nimbus image,
+  * or on a disk that is completely empty: no partition table, no file system, first MiB all zeros.
+Existing partitions are never changed, and everything is checked again right before writing.
+"""
+import fcntl
+import json
+import os
+import re
+import struct
+import subprocess
+import sys
+import time
+
+LABEL = os.environ.get("NIMBUS_STORAGE_LABEL", "writable")  # the label casper looks for
+MIN_SIZE = 1 << 30   # a storage area smaller than 1 GiB isn't worth it
+MIB = 1 << 20
+
+
+class StorageError(Exception):
+    pass
+
+
+def run(*args, check=True, input=None):
+    r = subprocess.run(args, capture_output=True, text=True, input=input, env=dict(os.environ, LC_ALL="C"))
+    if check and r.returncode != 0:
+        raise StorageError((r.stderr or r.stdout).strip() or "%s failed" % args[0])
+    return r.stdout
+
+
+def block_devices():
+    out = run("lsblk", "-J", "-b", "-o", "NAME,PATH,TYPE,SIZE,RO,RM,TRAN,MODEL,VENDOR,FSTYPE,LABEL,PTTYPE,MOUNTPOINTS,LOG-SEC")
+    return json.loads(out).get("blockdevices", [])
+
+
+def walk(devs):
+    for d in devs:
+        yield d
+        yield from walk(d.get("children") or [])
+
+
+def describe(disk):
+    name = " ".join(x for x in ((disk.get("vendor") or "").strip(), (disk.get("model") or "").strip()) if x) or disk["name"]
+    kind = "USB stick" if disk.get("tran") == "usb" or disk.get("rm") else "disk"
+    return {"name": name, "kind": kind, "size": int(disk.get("size") or 0)}
+
+
+def mounted(dev):
+    return any(m for m in (dev.get("mountpoints") or []) if m)
+
+
+def boot_disk_name(devs):
+    """The disk Nimbus started from (casper mounts it at /cdrom)."""
+    src = run("findmnt", "-n", "-o", "SOURCE", "/cdrom", check=False).strip()
+    if not src.startswith("/dev/"):
+        return None
+    for disk in devs:
+        if disk["path"] == src or any(c["path"] == src for c in walk(disk.get("children") or [])):
+            return disk["name"]
+    return None
+
+
+def iso_size(path):
+    """Bytes used by the ISO 9660 image at the start of path (0 if there is none)."""
+    with open(path, "rb") as f:
+        f.seek(16 * 2048)
+        pvd = f.read(2048)
+    if len(pvd) < 132 or pvd[1:6] != b"CD001" or pvd[0] != 1:
+        return 0
+    blocks = struct.unpack_from("<I", pvd, 80)[0]
+    block_size = struct.unpack_from("<H", pvd, 128)[0] or 2048
+    return blocks * block_size
+
+
+def free_after_image(disk):
+    """The free space at the end of the boot disk, after the Nimbus image and every partition."""
+    path, size = disk["path"], int(disk["size"])
+    try:
+        table = json.loads(run("sfdisk", "--json", path, check=False) or "{}").get("partitiontable", {})
+    except ValueError:
+        table = {}
+    sector = int(table.get("sectorsize") or disk.get("log-sec") or 512)
+    used_end = iso_size(path)
+    for p in table.get("partitions", []):
+        used_end = max(used_end, (int(p["start"]) + int(p["size"])) * sector)
+    start = -(-used_end // MIB) * MIB  # round up to the next MiB
+    end = size - (MIB if table.get("label") == "gpt" else 0)  # leave room for the backup GPT
+    return {"label": table.get("label"), "sector": sector, "start": start, "size": max(0, end - start),
+            "count": len(table.get("partitions", []))}
+
+
+def first_mib_is_zero(path):
+    with open(path, "rb") as f:
+        return f.read(MIB).count(0) == MIB
+
+
+def is_empty(disk):
+    if disk.get("children") or disk.get("fstype") or disk.get("pttype") or mounted(disk):
+        return False
+    if run("wipefs", "--no-act", "--noheadings", disk["path"], check=False).strip():
+        return False
+    return first_mib_is_zero(disk["path"])
+
+
+def current(devs):
+    """The storage area in use (or present but not in use)."""
+    for d in walk(devs):
+        if d.get("label") == LABEL:
+            info = {"device": d["path"], "active": mounted(d)}
+            disk = next((x for x in devs if d is x or d in walk(x.get("children") or [])), d)
+            info["disk"] = describe(disk)
+            info.update(size=int(d.get("size") or 0), free=None)
+            for mount in (m for m in (d.get("mountpoints") or []) if m):
+                try:
+                    st = os.statvfs(mount)
+                except OSError:
+                    continue
+                info.update(size=st.f_blocks * st.f_frsize, free=st.f_bavail * st.f_frsize)
+                break
+            return info
+    return None
+
+
+def candidates(devs):
+    if current(devs):
+        return []  # one storage area is enough
+    boot = boot_disk_name(devs)
+    out = []
+    for disk in devs:
+        if disk.get("type") != "disk" or disk.get("ro") or disk["name"].startswith(("loop", "sr", "ram", "zram", "fd")):
+            continue
+        if disk["name"] == boot:
+            free = free_after_image(disk)
+            if free["size"] >= MIN_SIZE:
+                out.append({"id": "free:" + disk["name"], "kind": "free", "device": disk["path"], "disk": describe(disk),
+                            "size": free["size"]})
+        elif is_empty(disk) and int(disk.get("size") or 0) >= MIN_SIZE:
+            out.append({"id": "empty:" + disk["name"], "kind": "empty", "device": disk["path"], "disk": describe(disk),
+                        "size": int(disk["size"])})
+    return out
+
+
+def status():
+    devs = block_devices()
+    cur = current(devs)
+    persistent = "persistent" in open("/proc/cmdline").read().split()
+    return {"label": LABEL, "persistentBoot": persistent, "storage": cur, "candidates": candidates(devs)}
+
+
+def wait_for_partition(disk_path, start_bytes):
+    """The path of the partition starting at start_bytes on disk_path, once the kernel shows it."""
+    for _ in range(50):
+        run("udevadm", "settle", check=False)
+        for dev in walk(block_devices()):
+            if dev.get("type") != "part":
+                continue
+            sysfs = "/sys/class/block/%s" % dev["name"]
+            try:
+                parent = os.path.basename(os.path.dirname(os.path.realpath(sysfs)))
+                start = int(open(sysfs + "/start").read()) * 512
+            except OSError:
+                continue
+            if "/dev/" + parent == disk_path and start == start_bytes:
+                return dev["path"]
+        time.sleep(0.2)
+    raise StorageError("The new storage area didn't show up.")
+
+
+def setup(cid):
+    lock = open("/run/nimbus-storage.lock", "w")
+    fcntl.flock(lock, fcntl.LOCK_EX)
+    devs = block_devices()
+    c = next((c for c in candidates(devs) if c["id"] == cid), None)
+    if c is None:
+        raise StorageError("That place isn't available for saving any more.")
+    disk = next(d for d in devs if d["path"] == c["device"])
+    if c["kind"] == "free":
+        free = free_after_image(disk)
+        if free["size"] < MIN_SIZE:
+            raise StorageError("There isn't enough free space left.")
+        sector = free["sector"]
+        if free["label"] == "gpt":
+            # The backup partition table of a disk image sits at the end of the image, not of the stick
+            run("sfdisk", "--no-reread", "--no-tell-kernel", "--relocate", "gpt-bak-std", disk["path"])
+        run("sfdisk", "--append", "--no-reread", "--no-tell-kernel", disk["path"],
+            input="start=%d, size=%d, type=L\n" % (free["start"] // sector, free["size"] // sector))
+        # The stick is in use, so the kernel can't reread the whole table: add just what's new
+        run("partx", "--add", disk["path"], check=False)
+        part = wait_for_partition(disk["path"], free["start"])
+    else:
+        if not is_empty(disk):
+            raise StorageError("That disk isn't empty any more.")
+        run("sfdisk", disk["path"], input="label: dos\nstart=2048, type=L\n")
+        part = wait_for_partition(disk["path"], 2048 * 512)
+    run("mkfs.ext4", "-F", "-q", "-L", LABEL, "-E", "lazy_itable_init=1,lazy_journal_init=1", part)
+    run("sync")
+    run("udevadm", "settle", check=False)
+    return status()
+
+
+def main():
+    if len(sys.argv) < 2 or sys.argv[1] not in ("status", "setup") or (sys.argv[1] == "setup" and len(sys.argv) != 3):
+        print(__doc__, file=sys.stderr)
+        return 2
+    try:
+        result = status() if sys.argv[1] == "status" else setup(sys.argv[2])
+        print(json.dumps({"ok": True, **result}))
+        return 0
+    except (StorageError, OSError, ValueError, KeyError) as exc:
+        print(json.dumps({"ok": False, "error": str(exc)}))
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

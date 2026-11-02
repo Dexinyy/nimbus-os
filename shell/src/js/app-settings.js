@@ -24,6 +24,7 @@ const SETTINGS_INDEX = [
   ['specs', 'Device specifications', 'about', 'cpu memory ram processor version', 'cpu'],
   ['wifi', 'Wi-Fi', 'network', 'wifi wlan wireless internet network ssid password connect', 'wifi'],
   ['airplane', 'Airplane mode', 'network', 'flight offline radio', 'airplane'], ['ethernet', 'Ethernet', 'network', 'wired cable lan internet', 'ethernet'],
+  ...(IS_NATIVE ? [['saving', 'Save your work between restarts', 'system', 'persistent persistence storage keep files usb disk live session', 'hdd']] : []),
 ].map(([id, name, page, keywords, icon]) => ({ id, name, page, keywords, icon, pageName: (SETTINGS_PAGES.find((p) => p[0] === page) || [])[1] }))
   .filter((s) => s.pageName);
 const ACCENTS = ['#4a74f5', '#2b88d8', '#0f9fa8', '#1f9d61', '#6f8f1f', '#d18f0b', '#e2671d', '#d83b45', '#d6337f', '#9b5de5', '#6a4ff0', '#5f6b7a'];
@@ -38,7 +39,9 @@ function browserName() {
   return 'Your browser';
 }
 function mountSettings(root, api, args) {
-  let page = args.page || 'system', syncs = [], nets = null;
+  let page = args.page || 'system', syncs = [], nets = null, netShape = '';
+  // What the network page was drawn for: when this changes the page is rebuilt, otherwise only its live parts update
+  const shapeOfNet = () => `${Net.ready}|${Net.hasWifi}`;
   root.classList.add('app-settings');
   root.innerHTML = `<aside class="st-side"><div class="st-user"></div><label class="st-search searchbox">${ui('search')}<input type="search" id="${api.id}-find" placeholder="Find a setting" aria-label="Find a setting"></label><nav class="st-nav" aria-label="Settings pages"></nav></aside><main class="st-main" tabindex="-1"></main>`;
   const nav = root.querySelector('.st-nav'), main = root.querySelector('.st-main'), find = root.querySelector('.st-search input');
@@ -92,6 +95,7 @@ function mountSettings(root, api, args) {
     return lab;
   }
   function networkPage() {
+    netShape = shapeOfNet();
     if (!Net.ready) return [section('', h('p', { class: 'muted', text: 'The network service isn’t running, so networks can’t be shown.' }))];
     const st = () => Net.status;
     const hero = h('div', { class: 'net-hero' });
@@ -121,9 +125,18 @@ function mountSettings(root, api, args) {
     return out;
   }
   // ---- pages ----
+  function savingSection() {
+    if (!IS_NATIVE || !Native.live) return null;
+    const on = Storage.saving;
+    return section('Saving your work',
+      row({ id: 'saving', icon: 'hdd', title: on ? 'Saving is on' : 'Your work isn’t saved yet',
+        desc: on ? 'Files, settings and Wi-Fi passwords are kept between restarts.' : 'This is a live session: files and settings are lost when you shut down.',
+        ctl: h('button', { class: on ? 'btn' : 'btn primary', text: on ? 'Details' : 'Set up saving', disabled: Storage.busy, onclick: () => Storage.open() }) }));
+  }
   const PAGES = {
     network: networkPage,
     system: () => [
+      savingSection(),
       section('Display',
         row({ id: 'brightness', icon: 'sun', title: 'Brightness', desc: 'Dims the whole screen of this OS.', ctl: slider('brightness', 30, 100, 1, pct, 'Brightness') }),
         row({ id: 'nightLight', icon: 'sunset', title: 'Night light', desc: 'Warmer colors that are easier on your eyes at night.', ctl: toggle('nightLight', 'Night light') }),
@@ -339,7 +352,11 @@ function mountSettings(root, api, args) {
   api.on('caps', () => render());
   api.on('native-info', () => { if (['about', 'system', 'privacy', 'accounts'].includes(page)) render(); });
   api.on('fs', () => { if (page === 'about') render(); });
-  api.on('net', () => { if (page === 'network') syncs.forEach((f) => { try { f(); } catch {} }); });
+  api.on('net', () => {
+    if (page !== 'network' || find.value.trim()) return;
+    if (shapeOfNet() !== netShape) render();
+    else syncs.forEach((f) => { try { f(); } catch {} });
+  });
   api.onClose(() => { if (nets) nets.destroy(); });
   api.onArgs = (a) => { if (a.page) { find.value = ''; go(a.page, a.focus); } };
   go(page, args.focus);
