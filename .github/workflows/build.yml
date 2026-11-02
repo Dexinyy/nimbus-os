@@ -93,6 +93,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           {
+            echo "Your own desktop OS. Download **nimbus-os-0.1-amd64.iso** below and start it in VirtualBox,"
+            echo "or write it to a USB stick with balenaEtcher or Rufus (DD mode) and boot your PC from it with Secure Boot off."
+            echo "Nothing is installed: it runs from the stick and your drive isn't touched."
+            echo "Step-by-step instructions are in the [README](https://github.com/${GITHUB_REPOSITORY}#try-it)."
+            echo
+            echo "Built from commit ${GITHUB_SHA::7}."
+            echo
             cat out/ci/summary.md
             echo
             echo "Screenshots from the test run are in the [ci-results branch](https://github.com/${GITHUB_REPOSITORY}/tree/ci-results)."
