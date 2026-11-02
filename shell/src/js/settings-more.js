@@ -283,6 +283,7 @@ defPage('update', { title: 'Nimbus Update', icon: 'update', keywords: 'updates c
       h('div', { class: 'ws-hero-meta' }, h('div', { class: 'ws-hero-name', text: title }), h('div', { class: 'ws-d', text: sub })),
       IS_NATIVE ? WS.button(Upd.busy ? 'Checking…' : 'Check for updates', () => checkUpdates(ctx), { accent: true, disabled: Upd.busy }) : null),
     items.length ? WS.group(null, items) : null,
+    caps.programs ? WS.group('Apps and protection', storeUpdatesCard(ctx), securityDefsCard(ctx)) : null,
     WS.group('More options',
       IS_NATIVE ? WS.card(ctx, { sid: 'updPause', icon: 'pause', title: 'Pause updates', desc: paused ? 'Programs won’t update by themselves until then' : '', ctl: WS.combo(ctx, pauseOpts, () => (paused ? 'p' : 0), (v) => { if (v === 'p') return; S.set('updPause', +v ? Date.now() + (+v) * 7 * 86400e3 : 0); ctx.rerender(); }, 'Pause updates', { width: 200 }) }) : null,
       WS.card(ctx, { icon: 'history', title: 'Update history', go: 'updatehistory' }),
@@ -290,6 +291,22 @@ defPage('update', { title: 'Nimbus Update', icon: 'update', keywords: 'updates c
   ];
 } });
 defSettings('update', [['updPause', 'Pause updates', 'stop delay']]);
+// Apps from the Store update there (Library); virus definitions in Nimbus Security
+function storeUpdatesCard(ctx) {
+  const desc = h('span', { text: 'Checking for app updates…' });
+  Native.call('storeUpdates', {}, 120000).then((u) => { const n = u.filter((x) => x.kind === 'app').length; desc.textContent = n ? (n === 1 ? '1 app has an update' : n + ' apps have updates') : 'Your apps from the Store are up to date'; }).catch(() => { desc.textContent = 'Apps you get from the Store update in its Library'; });
+  return WS.card(ctx, { iconHtml: `<span class="ws-appic">${appIcon('store')}</span>`, title: 'Apps from the Store', desc, ctl: WS.button('Open Library', () => WM.open('store', { page: 'library' })) });
+}
+function securityDefsCard(ctx) {
+  const desc = h('span', { text: 'Checking…' });
+  secStatus().then((st) => { desc.textContent = st.defs.present ? `Version ${st.defs.version}, updated ${fmtDT(st.defs.updated * 1000, { dateStyle: 'medium', timeStyle: 'short' })}` : 'Not downloaded yet (about 230 MB)'; }).catch(() => { desc.textContent = 'Nimbus Security’s virus definitions'; });
+  return WS.card(ctx, { iconHtml: `<span class="ws-appic">${appIcon('security')}</span>`, title: 'Security intelligence', desc, ctl: WS.button('Check for updates', async (e, b) => {
+    b.disabled = true; b.textContent = 'Updating…';
+    try { const d = await Native.call('securityUpdate', {}, 60 * 60 * 1000); desc.textContent = `Version ${d.version}, updated just now`; Notif.push({ app: 'security', title: 'Security intelligence is up to date', silent: true }); }
+    catch (err) { Notif.push({ app: 'security', title: 'Couldn’t update security intelligence', body: err.message }); }
+    b.disabled = false; b.textContent = 'Check for updates'; secStatus(true).catch(() => {});
+  }) });
+}
 defPage('updatehistory', { title: 'Update history', parent: 'update', icon: 'history', keywords: 'installed updates', render: (ctx) => {
   const box = h('div', { class: 'ws-cards' });
   const info = IS_NATIVE && Native.info;

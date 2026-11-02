@@ -72,7 +72,15 @@ const Programs = {
     return (mine.find((p) => p.id === 'fp:' + fp) || mine[0]).id;
   },
 };
-if (IS_NATIVE) bus.on('native:programs-changed', () => Programs.refresh());
+if (IS_NATIVE) {
+  bus.on('native:programs-changed', () => Programs.refresh());
+  // Lutris installs Battle.net and the others in its own time, Steam its games: look again when one of their
+  // windows closes, and when Start opens (now and then)
+  const again = debounce(() => Programs.refresh(), 1500);
+  bus.on('native:wm', (ev) => { if (ev && ev.ev === 'gone') { const w = WM.byNid(ev.id); if (!w || w.flatpak) again(); } });
+  let lastLook = 0;
+  bus.on('flyout', (name) => { if (name === 'start' && Date.now() - lastLook > 20000) { lastLook = Date.now(); Programs.refresh(); } });
+}
 
 /* Installs, updates and removals going on, for every Store window (and the Library's badge) */
 const StoreJobs = {
