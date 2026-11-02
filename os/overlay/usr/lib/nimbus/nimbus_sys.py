@@ -131,7 +131,8 @@ def device_kind(d, source=False):
 def device_entry(d, default_name, source=False):
     p = d.get("properties", {})
     port = next((x for x in d.get("ports") or [] if x.get("name") == d.get("active_port")), None)
-    card = p.get("device.product.name") or p.get("alsa.card_name") or p.get("device.description") or d.get("description", "")
+    # "Built-in Audio" reads better than the chip's full name (shown in Windows as "Realtek(R) Audio")
+    card = re.sub(r"\s*\([^)]*\)", "", p.get("device.description") or p.get("alsa.card_name") or p.get("device.product.name") or d.get("description", "")).strip()
     name = (port or {}).get("description") or d.get("description") or d.get("name")
     if p.get("device.bus") == "bluetooth":
         name, card = d.get("description") or name, "Bluetooth"
