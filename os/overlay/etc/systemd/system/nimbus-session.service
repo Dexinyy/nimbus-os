@@ -4,6 +4,8 @@ Documentation=file:///usr/share/doc/nimbus-os/README.md
 After=systemd-user-sessions.service plymouth-quit-wait.service systemd-logind.service dbus.service getty@tty1.service
 Wants=dbus.service systemd-logind.service
 Conflicts=getty@tty1.service
+# Always bring the desktop back, however often it stops
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple
@@ -21,7 +23,7 @@ UtmpMode=user
 Environment=XDG_SESSION_TYPE=wayland XDG_SESSION_CLASS=user
 ExecStart=/usr/bin/nimbus-session
 Restart=always
-RestartSec=1
+RestartSec=2
 
 [Install]
 WantedBy=graphical.target
