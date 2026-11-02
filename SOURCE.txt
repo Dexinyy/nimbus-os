@@ -1,0 +1,2 @@
+Selawik repository at 89362e84731d1f5777fa078fd4d5ebbd339e4378
+Release 1.01 (First release of Selawik Binary files)
