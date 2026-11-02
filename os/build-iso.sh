@@ -236,11 +236,11 @@ cp /usr/share/grub/unicode.pf2 "$ISODIR/boot/grub/fonts/"
 : > "$ISODIR/.disk/nimbus-os"  # GRUB on UEFI finds the Nimbus disc or stick by this file
 # BIOS: GRUB as an El Torito image; on a USB stick the hybrid MBR code starts it
 grub-mkimage -O i386-pc-eltorito -p /boot/grub -o "$ISODIR/boot/grub/i386-pc/eltorito.img" biosdisk iso9660
-# UEFI: GRUB in a small FAT image, which finds the Nimbus file system and reads its grub.cfg
+# UEFI: GRUB in a small FAT image. Its built-in config only finds the Nimbus file system; GRUB then
+# reads $prefix/grub.cfg itself, keeping $root (a "configfile" here would start a context without it).
 cat > "$WORK/grub-efi.cfg" <<'EOF'
 search --no-floppy --set=root --file /.disk/nimbus-os
 set prefix=($root)/boot/grub
-configfile $prefix/grub.cfg
 EOF
 grub-mkimage -O x86_64-efi -p /boot/grub -c "$WORK/grub-efi.cfg" -o "$WORK/bootx64.efi" \
   part_gpt part_msdos fat iso9660 search search_fs_file configfile normal

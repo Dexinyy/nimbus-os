@@ -249,9 +249,9 @@ def main():
         if found and found[0].startswith("set up"):
             note("Sets up saving on the empty disk", True)
             found, text = wait_log(r"test storage: marker written, restarting", 240)
-            note("Starts with saving on after a restart", bool(found), "the second start didn't use the storage area")
+            note("Starts with saving on after a restart", bool(found), "" if found else "the second start didn't use the storage area")
         else:
-            note("Saves by itself from the first start", bool(found), failed.group(1) if failed else "no result in the system log")
+            note("Saves by itself from the first start", bool(found), "" if found else failed.group(1) if failed else "no result in the system log")
         if found:
             # The third start reports "kept"; a second "marker written" means the second start's changes were lost
             result, end = "", time.time() + 240 * slow
@@ -265,7 +265,7 @@ def main():
                     result = "failed"
                 else:
                     time.sleep(2)
-            note("A setting survives a restart", result == "kept", result or "no result in the system log")
+            note("A setting survives a restart", result == "kept", "" if result == "kept" else result or "no result in the system log")
             if result == "kept":
                 time.sleep(4 * slow)
                 snap("09-saving")
