@@ -1,0 +1,37 @@
+name: Build the Selawik font
+
+# Selawik is Microsoft's open-source stand-in for Segoe UI (SIL Open Font License). Its repository has only the
+# sources, so this builds the font files and saves them to the selawik-fonts branch, from where they are copied
+# into os/fonts.
+on:
+  workflow_dispatch:
+  push:
+    paths: [".github/workflows/fonts.yml"]
+
+permissions:
+  contents: write
+
+jobs:
+  fonts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Build
+        run: |
+          git clone -q --depth 1 https://github.com/microsoft/Selawik /tmp/selawik
+          python3 -m venv /tmp/venv && /tmp/venv/bin/pip install -q fontmake
+          cd /tmp/selawik/"Source files"/Glyphs
+          /tmp/venv/bin/fontmake -g selawik.glyphs -o ttf -i --output-dir /tmp/out 2>&1 | tail -5
+          ls -la /tmp/out
+      - name: Save to the selawik-fonts branch
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p /tmp/pub && cd /tmp/pub
+          cp /tmp/out/*.ttf . && cp /tmp/selawik/LICENSE.txt Selawik-OFL.txt
+          git init -q -b selawik-fonts
+          git config user.name "nimbus-ci"
+          git config user.email "nimbus-ci@users.noreply.github.com"
+          git add -A
+          git commit -qm "Selawik built with fontmake"
+          git push -qf "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" selawik-fonts
