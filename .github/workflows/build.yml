@@ -3,7 +3,7 @@ name: Build Nimbus OS
 on:
   push:
     branches: [main]
-    paths-ignore: ["**.md"]
+    paths-ignore: ["**.md", "wm/test-headless.sh", ".github/workflows/wm.yml", "shell/test/**"]
   workflow_dispatch:
 
 permissions:
